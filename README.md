@@ -302,8 +302,8 @@ Learn how to engage with the Kubernetes community on the [community page](http:/
 
 You can reach the maintainers of this project at:
 
-- [Slack](http://slack.k8s.io/)
-- [Mailing List](https://groups.google.com/forum/#!forum/kubernetes-dev)
+- [Slack](http://slack.k8s.io/) in the [#sig-testing](https://kubernetes.slack.com/messages/sig-testing) channel
+- [sig-testing mailing list](https://groups.google.com/forum/#!forum/kubernetes-sig-testing)
 
 ### Code of conduct
 
