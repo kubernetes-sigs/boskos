@@ -1,7 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//def:image.bzl", "tags")
-load("//prow:def.bzl", "prow_push")
+load("@io_k8s_test_infra//def:image.bzl", "tags")
+load("@io_k8s_test_infra//prow:def.bzl", "prow_push")
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix sigs.k8s.io/boskos
+# gazelle:proto disable
+gazelle(name = "gazelle")
 
 prow_push(
     name = "push",

@@ -1,6 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
-load("//prow:def.bzl", "prow_image")
+load("@io_k8s_test_infra//prow:def.bzl", "prow_image")
 
 NAME = "aws-janitor-boskos"
 

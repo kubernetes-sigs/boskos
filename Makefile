@@ -21,4 +21,16 @@ build:
 test:
 	go test ./...
 
-.PHONY: all build test
+# TODO(ixdy): remove Bazel support
+update-bazel:
+	bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories \
+	  -prune=true -build_file_generation=on -build_file_proto_mode=disable
+	bazel run //:gazelle -- fix
+
+bazel-build:
+	bazel build //...
+
+bazel-test:
+	bazel test //...
+
+.PHONY: all build test update-bazel bazel-build bazel-test
