@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
-	"k8s.io/test-infra/boskos/mason"
-	"k8s.io/test-infra/boskos/ranch"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
+	"sigs.k8s.io/boskos/mason"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 const (

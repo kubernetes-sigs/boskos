@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/common"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/common"
 )
 
 type options struct {

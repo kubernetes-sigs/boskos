@@ -21,8 +21,8 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/metrics"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/metrics"
 )
 
 func TestNormalizeResourceMetrics(t *testing.T) {

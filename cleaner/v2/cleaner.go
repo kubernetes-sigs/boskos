@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"k8s.io/test-infra/boskos/cleaner"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
+	"sigs.k8s.io/boskos/cleaner"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
 )
 
 const controllerName = "boskos-cleaner"

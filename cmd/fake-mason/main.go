@@ -27,11 +27,11 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
-	"k8s.io/test-infra/boskos/mason"
-	"k8s.io/test-infra/boskos/ranch"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
+	"sigs.k8s.io/boskos/mason"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 const (

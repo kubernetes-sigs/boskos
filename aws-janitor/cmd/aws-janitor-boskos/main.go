@@ -26,10 +26,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog"
-	"k8s.io/test-infra/boskos/aws-janitor/resources"
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/common"
-	awsboskos "k8s.io/test-infra/boskos/common/aws"
+	"sigs.k8s.io/boskos/aws-janitor/resources"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/common"
+	awsboskos "sigs.k8s.io/boskos/common/aws"
 )
 
 var (

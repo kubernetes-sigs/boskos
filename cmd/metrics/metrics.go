@@ -26,12 +26,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/metrics"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/metrics"
 )
 
 var (

@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
 )
 
 // Storage is used to decouple ranch functionality with the resource persistence layer

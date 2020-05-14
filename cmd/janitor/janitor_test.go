@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/test-infra/boskos/common"
+	"sigs.k8s.io/boskos/common"
 )
 
 type fakeBoskos struct {

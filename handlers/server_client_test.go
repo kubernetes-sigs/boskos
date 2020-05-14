@@ -31,10 +31,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
-	"k8s.io/test-infra/boskos/ranch"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 func makeTestBoskos(t *testing.T, r *ranch.Ranch) *httptest.Server {

@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/ranch"
 	"k8s.io/test-infra/prow/simplifypath"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 // l keeps the tree legible

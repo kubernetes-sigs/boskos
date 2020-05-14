@@ -29,16 +29,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"k8s.io/test-infra/boskos/cleaner"
-	cleanerv2 "k8s.io/test-infra/boskos/cleaner/v2"
-	"k8s.io/test-infra/boskos/client"
-	"k8s.io/test-infra/boskos/crds"
-	"k8s.io/test-infra/boskos/ranch"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
+	"sigs.k8s.io/boskos/cleaner"
+	cleanerv2 "sigs.k8s.io/boskos/cleaner/v2"
+	"sigs.k8s.io/boskos/client"
+	"sigs.k8s.io/boskos/crds"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 const (

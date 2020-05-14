@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
 )
 
 const (

@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 
-	"k8s.io/test-infra/boskos/client"
+	"sigs.k8s.io/boskos/client"
 )
 
 func init() {
