@@ -36,6 +36,11 @@ update-modules:
 	go mod tidy
 	cd $(TOOLS_DIR) && go mod tidy
 
+verify-boilerplate:
+	./hack/verify/verify_boilerplate.py --rootdir=$(CURDIR) --boilerplate-dir=$(CURDIR)/hack/verify/boilerplate
+
+verify: verify-boilerplate
+
 # Tools
 $(GOTESTSUM): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/gotestsum gotest.tools/gotestsum
@@ -52,4 +57,4 @@ bazel-build:
 bazel-test:
 	bazel test //...
 
-.PHONY: all build test update-modules clean update-bazel bazel-build bazel-test
+.PHONY: all build test update-modules clean verify-boilerplate verify update-bazel bazel-build bazel-test
