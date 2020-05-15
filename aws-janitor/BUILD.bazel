@@ -32,25 +32,3 @@ prow_image(
     component = NAME,
     visibility = ["//visibility:public"],
 )
-
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//boskos/aws-janitor/account:all-srcs",
-        "//boskos/aws-janitor/cmd/aws-janitor-boskos:all-srcs",
-        "//boskos/aws-janitor/cmd/aws-resources-list:all-srcs",
-        "//boskos/aws-janitor/regions:all-srcs",
-        "//boskos/aws-janitor/resources:all-srcs",
-        "//boskos/aws-janitor/s3:all-srcs",
-    ],
-    tags = ["automanaged"],
-    visibility = ["//visibility:public"],
-)

@@ -63,19 +63,6 @@ prow_image(
     visibility = ["//visibility:public"],
 )
 
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
-)
-
 go_test(
     name = "go_default_test",
     srcs = ["janitor_test.go"],
