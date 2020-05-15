@@ -3,3 +3,5 @@
 /bazel-*
 .DS_Store
 /.vscode/*
+
+/hack/tools/bin/

@@ -12,14 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+TOOLS_DIR := hack/tools
+BIN_DIR := bin
+TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
+
+GOTESTSUM := $(TOOLS_BIN_DIR)/gotestsum
+
+export GO111MODULE=on
+
 all: build
 
 # TODO(ixdy): containerize
 build:
 	go build ./...
 
-test:
-	go test ./...
+test: $(GOTESTSUM)
+	$(GOTESTSUM) $${ARTIFACTS:+--junitfile="${ARTIFACTS}/junit.xml"} ./...
+
+clean:
+	rm -rf $(TOOLS_BIN_DIR)
+
+update-modules:
+	go mod tidy
+	cd $(TOOLS_DIR) && go mod tidy
+
+# Tools
+$(GOTESTSUM): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/gotestsum gotest.tools/gotestsum
 
 # TODO(ixdy): remove Bazel support
 update-bazel:
@@ -33,4 +52,4 @@ bazel-build:
 bazel-test:
 	bazel test //...
 
-.PHONY: all build test update-bazel bazel-build bazel-test
+.PHONY: all build test update-modules clean update-bazel bazel-build bazel-test
