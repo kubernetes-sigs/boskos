@@ -11,14 +11,14 @@ gazelle(name = "gazelle")
 prow_push(
     name = "push",
     images = tags(targets = {
-        "{STABLE_PROW_REPO}/boskos/aws-janitor": "//boskos/aws-janitor:image",
-        "{STABLE_PROW_REPO}/boskos/aws-janitor-boskos": "//boskos/aws-janitor/cmd/aws-janitor-boskos:image",
-        "{STABLE_PROW_REPO}/boskos/boskos": "//boskos/cmd/boskos:image",
-        "{STABLE_PROW_REPO}/boskos/fake-mason": "//boskos/cmd/fake-mason:image",
-        "{STABLE_PROW_REPO}/boskos/cleaner": "//boskos/cmd/cleaner:image",
-        "{STABLE_PROW_REPO}/boskos/janitor": "//boskos/cmd/janitor:image",
-        "{STABLE_PROW_REPO}/boskos/metrics": "//boskos/cmd/metrics:image",
-        "{STABLE_PROW_REPO}/boskos/reaper": "//boskos/cmd/reaper:image",
-        "{STABLE_PROW_REPO}/boskos/cli": "//boskos/cmd/cli:image",
+        "{STABLE_PROW_REPO}/boskos/aws-janitor": "//aws-janitor:image",
+        "{STABLE_PROW_REPO}/boskos/aws-janitor-boskos": "//aws-janitor/cmd/aws-janitor-boskos:image",
+        "{STABLE_PROW_REPO}/boskos/boskos": "//cmd/boskos:image",
+        "{STABLE_PROW_REPO}/boskos/fake-mason": "//cmd/fake-mason:image",
+        "{STABLE_PROW_REPO}/boskos/cleaner": "//cmd/cleaner:image",
+        "{STABLE_PROW_REPO}/boskos/janitor": "//cmd/janitor:image",
+        "{STABLE_PROW_REPO}/boskos/metrics": "//cmd/metrics:image",
+        "{STABLE_PROW_REPO}/boskos/reaper": "//cmd/reaper:image",
+        "{STABLE_PROW_REPO}/boskos/cli": "//cmd/cli:image",
     }),
 )

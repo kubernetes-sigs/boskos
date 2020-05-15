@@ -16,7 +16,7 @@
 # bump.sh will
 # * ensure there are no pending changes
 # * optionally activate GOOGLE_APPLICATION_CREDENTIALS and configure-docker if set
-# * run //boskos:release-push to build and push boskos images
+# * run //:release-push to build and push boskos images
 # * update all the cluster/*.yaml files to use the new image tags
 
 set -o errexit
@@ -65,10 +65,10 @@ if [[ "${new_version}" == *-dirty ]]; then
   echo "  Fix with git commit" >&2
   exit 1
 fi
-echo -e "Pushing $(color-version ${new_version}) via $(color-target //boskos:release-push --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64) ..." >&2
+echo -e "Pushing $(color-version ${new_version}) via $(color-target //:release-push --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64) ..." >&2
 # Remove retries after https://github.com/bazelbuild/rules_docker/issues/673
 for i in {1..3}; do
-  if bazel run //boskos:push --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64; then
+  if bazel run //:push --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64; then
     exit 0
   elif [[ "$i" == 3 ]]; then
     echo "Failed"
