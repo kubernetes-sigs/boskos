@@ -106,3 +106,8 @@ http_archive(
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
+
+load("//:repositories.bzl", "go_repositories")
+
+# gazelle:repository_macro repositories.bzl%go_repositories
+go_repositories()

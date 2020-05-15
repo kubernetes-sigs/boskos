@@ -21,16 +21,16 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
-    importpath = "k8s.io/test-infra/boskos/cmd/metrics",
+    importpath = "sigs.k8s.io/boskos/cmd/metrics",
     deps = [
-        "//boskos/client:go_default_library",
-        "//boskos/common:go_default_library",
-        "//boskos/metrics:go_default_library",
-        "//prow/config:go_default_library",
-        "//prow/logrusutil:go_default_library",
-        "//prow/metrics:go_default_library",
+        "//client:go_default_library",
+        "//common:go_default_library",
+        "//metrics:go_default_library",
         "@com_github_prometheus_client_golang//prometheus:go_default_library",
         "@com_github_sirupsen_logrus//:go_default_library",
+        "@io_k8s_test_infra//prow/config:go_default_library",
+        "@io_k8s_test_infra//prow/logrusutil:go_default_library",
+        "@io_k8s_test_infra//prow/metrics:go_default_library",
     ],
 )
 

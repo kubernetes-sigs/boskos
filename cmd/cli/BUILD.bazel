@@ -4,11 +4,11 @@ load("@io_k8s_test_infra//prow:def.bzl", "prow_image")
 go_library(
     name = "go_default_library",
     srcs = ["cli.go"],
-    importpath = "k8s.io/test-infra/boskos/cmd/cli",
+    importpath = "sigs.k8s.io/boskos/cmd/cli",
     visibility = ["//visibility:private"],
     deps = [
-        "//boskos/client:go_default_library",
-        "//boskos/common:go_default_library",
+        "//client:go_default_library",
+        "//common:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
     ],
 )
@@ -33,7 +33,7 @@ go_test(
     srcs = ["cli_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//boskos/client:go_default_library",
+        "//client:go_default_library",
         "@io_k8s_apimachinery//pkg/util/diff:go_default_library",
     ],
 )
