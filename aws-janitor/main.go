@@ -24,10 +24,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
 	"k8s.io/klog"
-	"k8s.io/test-infra/boskos/aws-janitor/account"
-	"k8s.io/test-infra/boskos/aws-janitor/regions"
-	"k8s.io/test-infra/boskos/aws-janitor/resources"
-	s3path "k8s.io/test-infra/boskos/aws-janitor/s3"
+	"sigs.k8s.io/boskos/aws-janitor/account"
+	"sigs.k8s.io/boskos/aws-janitor/regions"
+	"sigs.k8s.io/boskos/aws-janitor/resources"
+	s3path "sigs.k8s.io/boskos/aws-janitor/s3"
 )
 
 var (

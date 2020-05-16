@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE ?= gcr.io/k8s-prow/boskos/aws-janitor-boskos
-VERSION ?= $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)
+all: build
 
-image:
-	GO111MODULE=on CGO_ENABLED=0 go build sigs.k8s.io/boskos/aws-janitor
-	docker build -t "$(IMAGE):$(VERSION)" .
+# TODO(ixdy): containerize
+build:
+	go build ./...
 
-push: image
-	docker tag "$(IMAGE):$(VERSION)" "$(IMAGE):latest"
-	docker push "$(IMAGE):$(VERSION)"
-	docker push "$(IMAGE):latest"
+test:
+	go test ./...
 
-.PHONY: image push
+# TODO(ixdy): remove Bazel support
+update-bazel:
+	bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories \
+	  -prune=true -build_file_generation=on -build_file_proto_mode=disable
+	bazel run //:gazelle -- fix
+
+bazel-build:
+	bazel build //...
+
+bazel-test:
+	bazel test //...
+
+.PHONY: all build test update-bazel bazel-build bazel-test

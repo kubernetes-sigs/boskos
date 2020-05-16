@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/test-infra/boskos/common"
+	"sigs.k8s.io/boskos/common"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"

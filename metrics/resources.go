@@ -21,8 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/ranch"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 const (

@@ -29,8 +29,8 @@ import (
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
 )
 
 const (

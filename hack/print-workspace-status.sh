@@ -1,4 +1,5 @@
-# Copyright 2016 The Kubernetes Authors.
+#!/bin/bash
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE ?= gcr.io/k8s-prow/boskos/aws-janitor-boskos
-VERSION ?= $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)
+# This takes in environment variables and outputs data used by Bazel
+# to set key-value pairs
 
-image:
-	GO111MODULE=on CGO_ENABLED=0 go build sigs.k8s.io/boskos/aws-janitor
-	docker build -t "$(IMAGE):$(VERSION)" .
+set -o errexit
+set -o nounset
+set -o pipefail
 
-push: image
-	docker tag "$(IMAGE):$(VERSION)" "$(IMAGE):latest"
-	docker push "$(IMAGE):$(VERSION)"
-	docker push "$(IMAGE):latest"
+git_commit="$(git describe --tags --always --dirty)"
+build_date="$(date -u '+%Y%m%d')"
+docker_tag="v${build_date}-${git_commit}"
 
-.PHONY: image push
+cat <<EOF
+STABLE_PROW_REPO ${PROW_REPO_OVERRIDE:-gcr.io/k8s-prow}
+STABLE_BUILD_GIT_COMMIT ${git_commit}
+DOCKER_TAG ${docker_tag}
+EOF

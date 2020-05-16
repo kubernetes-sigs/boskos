@@ -37,8 +37,8 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"k8s.io/test-infra/boskos/common"
-	"k8s.io/test-infra/boskos/crds"
+	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/crds"
 )
 
 // Make debugging a bit easier

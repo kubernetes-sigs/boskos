@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"k8s.io/test-infra/boskos/aws-janitor/regions"
+	"sigs.k8s.io/boskos/aws-janitor/regions"
 )
 
 type Path struct {

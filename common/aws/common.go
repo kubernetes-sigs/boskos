@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"k8s.io/test-infra/boskos/common"
+	"sigs.k8s.io/boskos/common"
 )
 
 const (

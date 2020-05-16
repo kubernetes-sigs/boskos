@@ -29,15 +29,15 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"k8s.io/test-infra/boskos/crds"
-	"k8s.io/test-infra/boskos/handlers"
-	"k8s.io/test-infra/boskos/metrics"
-	"k8s.io/test-infra/boskos/ranch"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
+	"sigs.k8s.io/boskos/crds"
+	"sigs.k8s.io/boskos/handlers"
+	"sigs.k8s.io/boskos/metrics"
+	"sigs.k8s.io/boskos/ranch"
 )
 
 const (
