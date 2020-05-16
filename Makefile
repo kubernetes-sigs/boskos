@@ -17,6 +17,7 @@ BIN_DIR := bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
 
 GOTESTSUM := $(TOOLS_BIN_DIR)/gotestsum
+GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 
 export GO111MODULE=on
 
@@ -39,11 +40,18 @@ update-modules:
 verify-boilerplate:
 	./hack/verify/verify_boilerplate.py --rootdir=$(CURDIR) --boilerplate-dir=$(CURDIR)/hack/verify/boilerplate
 
-verify: verify-boilerplate
+# TODO(ixdy): fix legacy errors and remove --new-from-rev
+verify-lint: $(GOLANGCI_LINT)
+	./hack/tools/bin/golangci-lint run -v --new-from-rev HEAD~
+
+verify: verify-boilerplate verify-lint
 
 # Tools
 $(GOTESTSUM): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/gotestsum gotest.tools/gotestsum
+
+$(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
 
 # TODO(ixdy): remove Bazel support
 update-bazel:
@@ -57,4 +65,4 @@ bazel-build:
 bazel-test:
 	bazel test //...
 
-.PHONY: all build test update-modules clean verify-boilerplate verify update-bazel bazel-build bazel-test
+.PHONY: all build test update-modules clean verify-boilerplate verify-lint verify update-bazel bazel-build bazel-test
