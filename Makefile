@@ -21,30 +21,42 @@ GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 
 export GO111MODULE=on
 
+.PHONY: all
 all: build
 
 # TODO(ixdy): containerize
+.PHONY: build
 build:
 	go build ./...
 
+.PHONY: test
 test: $(GOTESTSUM)
 	$(GOTESTSUM) $${ARTIFACTS:+--junitfile="${ARTIFACTS}/junit.xml"} ./...
 
+.PHONY: clean
 clean:
 	rm -rf $(TOOLS_BIN_DIR)
 
+.PHONY: update-modules
 update-modules:
 	go mod tidy
 	cd $(TOOLS_DIR) && go mod tidy
 
+.PHONY: verify-boilerplate
 verify-boilerplate:
 	./hack/verify/verify_boilerplate.py --rootdir=$(CURDIR) --boilerplate-dir=$(CURDIR)/hack/verify/boilerplate
 
+.PHONY: verify-lint
 # TODO(ixdy): fix legacy errors and remove --new-from-rev
 verify-lint: $(GOLANGCI_LINT)
 	./hack/tools/bin/golangci-lint run -v --new-from-rev HEAD~
 
-verify: verify-boilerplate verify-lint
+.PHONY: verify-modules
+verify-modules:
+	./hack/verify/verify_modules.sh
+
+.PHONY: verify
+verify: verify-boilerplate verify-lint verify-modules
 
 # Tools
 $(GOTESTSUM): $(TOOLS_DIR)/go.mod
@@ -54,15 +66,16 @@ $(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
 
 # TODO(ixdy): remove Bazel support
+.PHONY: update-bazel
 update-bazel:
 	bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories \
 	  -prune=true -build_file_generation=on -build_file_proto_mode=disable
 	bazel run //:gazelle -- fix
 
+.PHONY: bazel-build
 bazel-build:
 	bazel build //...
 
+.PHONY: bazel-test
 bazel-test:
 	bazel test //...
-
-.PHONY: all build test update-modules clean verify-boilerplate verify-lint verify update-bazel bazel-build bazel-test
