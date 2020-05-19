@@ -20,6 +20,7 @@
 import argparse
 import datetime
 import glob
+import io
 import os
 import re
 import sys
@@ -65,7 +66,7 @@ def get_refs():
 
         # Pass the encoding parameter to avoid ascii decode error for some
         # platform.
-        ref_file = open(path, 'r', encoding='utf-8')
+        ref_file = io.open(path, 'r', encoding='utf-8')
         ref = ref_file.read().splitlines()
         ref_file.close()
         refs[extension] = ref
@@ -96,7 +97,7 @@ def file_passes(filename, refs, regexs):  # pylint: disable=too-many-locals
     try:
         # Pass the encoding parameter to avoid ascii decode error for some
         # platform.
-        with open(filename, 'r', encoding='utf-8') as fp:
+        with io.open(filename, 'r', encoding='utf-8') as fp:
             data = fp.read()
     except IOError:
         return False
@@ -167,7 +168,7 @@ IGNORE_HEADERS = [
 def has_ignored_header(pathname):
     # Pass the encoding parameter to avoid ascii decode error for some
     # platform.
-    with open(pathname, 'r', encoding='utf-8') as myfile:
+    with io.open(pathname, 'r', encoding='utf-8') as myfile:
         data = myfile.read()
         for header in IGNORE_HEADERS:
             if data.startswith(header):
