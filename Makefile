@@ -12,14 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+WHAT ?= ./...
+DOCKER_REPO ?= gcr.io/k8s-prow/boskos
+DOCKER_TAG ?= v$(shell date -u '+%Y%m%d')-$(shell git describe --tags --always --dirty)
+OUTPUT_DIR ?= _output
+
 TOOLS_DIR := hack/tools
 BIN_DIR := bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
+OUTPUT_BIN_DIR := $(OUTPUT_DIR)/$(BIN_DIR)
 
 GOTESTSUM := $(TOOLS_BIN_DIR)/gotestsum
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 
+export GO_VERSION=1.14.3
 export GO111MODULE=on
+export DOCKER_REPO
+export DOCKER_TAG
 
 .PHONY: all
 all: build
@@ -27,15 +36,34 @@ all: build
 # TODO(ixdy): containerize
 .PHONY: build
 build:
-	go build ./...
+	MINIMUM_GO_VERSION=go$(GO_VERSION) ./hack/ensure-go.sh
+	mkdir -p "$(OUTPUT_BIN_DIR)"
+	go build -o "$(OUTPUT_BIN_DIR)" $(WHAT)
 
 .PHONY: test
 test: $(GOTESTSUM)
-	$(GOTESTSUM) $${ARTIFACTS:+--junitfile="${ARTIFACTS}/junit.xml"} ./...
+	MINIMUM_GO_VERSION=go$(GO_VERSION) ./hack/ensure-go.sh
+	$(GOTESTSUM) $${ARTIFACTS:+--junitfile="${ARTIFACTS}/junit.xml"} $(WHAT)
+
+.PHONY: images
+images: aws-janitor-image
+images: aws-janitor-boskos-image
+images: boskos-image
+images: boskosctl-image
+images: cleaner-image
+images: fake-mason-image
+images: janitor-image
+images: metrics-image
+images: reaper-image
+
+.PHONY: %-image
+%-image:
+	./images/build.sh $*
 
 .PHONY: clean
 clean:
-	rm -rf $(TOOLS_BIN_DIR)
+	rm -rf "$(OUTPUT_DIR)"
+	rm -rf "$(TOOLS_BIN_DIR)"
 
 .PHONY: update-modules
 update-modules:

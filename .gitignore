@@ -4,4 +4,5 @@
 .DS_Store
 /.vscode/*
 
+_output/
 /hack/tools/bin/
