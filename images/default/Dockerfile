@@ -1,4 +1,4 @@
-# Copyright 2019 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:stretch-20190204-slim
+# Most of the images can be based on distroless, which is fairly lightweight.
 
-RUN apt-get -y update && \
-    apt-get -y install ca-certificates && \
-    update-ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+ARG go_version
 
-COPY aws-janitor-boskos /usr/local/bin/
+FROM golang:${go_version} as build
+WORKDIR /go/src/app
 
-ENTRYPOINT ["/bin/sh", "-c", "/bin/echo started && /usr/local/bin/aws-janitor-boskos \"$@\"", "--"]
+# Cache module downloads
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY . .
+# Cache build output too
+RUN make build
+
+ARG package
+RUN make build WHAT="${package}"
+
+FROM gcr.io/distroless/base-debian10
+ARG binary
+COPY --from=build "/go/src/app/_output/bin/${binary}" /app
+ENTRYPOINT ["/app"]

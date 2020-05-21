@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE ?= gcr.io/k8s-prow/boskos/aws-janitor-boskos
-VERSION ?= $(shell date +v%Y%m%d)-$(shell git describe --tags --always --dirty)
+# Installs a few extra tools folks might want to use when running boskosctl.
 
-image:
-	GO111MODULE=on CGO_ENABLED=0 go build sigs.k8s.io/boskos/aws-janitor
-	docker build -t "$(IMAGE):$(VERSION)" .
+ARG go_version
+ARG alpine_version=3.11
 
-push: image
-	docker tag "$(IMAGE):$(VERSION)" "$(IMAGE):latest"
-	docker push "$(IMAGE):$(VERSION)"
-	docker push "$(IMAGE):latest"
+FROM golang:${go_version}-alpine${alpine_version} as build
+WORKDIR /go/src/app
 
-.PHONY: image push
+RUN apk add bash make
+
+# Cache module downloads
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY . .
+RUN make build WHAT=./cmd/boskosctl
+
+FROM alpine:${alpine_version}
+
+RUN apk add bash jq
+
+COPY --from=build "/go/src/app/_output/bin/boskosctl" /bin/boskosctl
+ENTRYPOINT ["/bin/boskosctl"]
