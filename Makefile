@@ -13,7 +13,7 @@
 # limitations under the License.
 
 WHAT ?= ./...
-DOCKER_REPO ?= gcr.io/k8s-prow/boskos
+DOCKER_REPO ?= gcr.io/k8s-staging-boskos
 DOCKER_TAG ?= v$(shell date -u '+%Y%m%d')-$(shell git describe --tags --always --dirty)
 OUTPUT_DIR ?= _output
 
