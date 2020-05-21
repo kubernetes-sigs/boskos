@@ -228,7 +228,7 @@ brand new resources in order to convert them in the final resource states. Mason
 comes with its own client to ease usage. The mason client takes care of
 acquiring and release all the right resources from the User Data information.
 
-[`cleaner`] Mark resource with status `ToBeDeleted` as `Tombstone` such they can be
+[`Cleaner`] Mark resource with status `ToBeDeleted` as `Tombstone` such they can be
 safely deleted by Boskos. This is important for dynamic resources such that all
 associated resources can be released before deletion to prevent leak.
 
@@ -244,7 +244,7 @@ For the boskos server that handles k8s e2e jobs, the status is available from th
 
 ## Adding UserData to a resource
 
-1. Check it out: 
+1. Check it out:
     ```shell
     curl -X POST "http://localhost:8080/acquire?type=my-resource&state=free&dest=busy&owner=$(whoami)"
     {"type":"my-resource","name":"resource1","state":"busy","owner":"user","lastupdate":"2019-02-07T22:33:38.01350902Z","userdata":null}
@@ -288,9 +288,10 @@ If you don't see a command prompt, try pressing enter.
 [ root@curl-XXXXX:/ ]$ curl -X POST 'http://boskos.test-pods.svc.cluster.local/acquire?type=project&state=free&dest=busy&owner=user'
 ````
 
-[`Reaper`]: ./reaper
-[`Janitor`]: ./janitor
-[`Metrics`]: ./metrics
+[`Reaper`]: ./cmd/reaper
+[`Janitor`]: ./cmd/janitor
+[`Metrics`]: ./cmd/metrics
+[`Cleaner`]: ./cmd/cleaner
 [`Mason`]: ./mason
 [`Storage`]: ./storage
 [`crds`]: ./crds
