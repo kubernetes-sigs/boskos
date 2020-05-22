@@ -92,18 +92,3 @@ $(GOTESTSUM): $(TOOLS_DIR)/go.mod
 
 $(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-
-# TODO(ixdy): remove Bazel support
-.PHONY: update-bazel
-update-bazel:
-	bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories \
-	  -prune=true -build_file_generation=on -build_file_proto_mode=disable
-	bazel run //:gazelle -- fix
-
-.PHONY: bazel-build
-bazel-build:
-	bazel build //...
-
-.PHONY: bazel-test
-bazel-test:
-	bazel test //...
