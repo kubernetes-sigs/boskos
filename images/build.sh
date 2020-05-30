@@ -32,18 +32,7 @@ fi
 
 docker_build() {
     local binary=$1
-    local package
-    # TODO(ixdy): fix project layout for aws-janitor binaries
-    case "${binary}" in
-        aws-janitor)
-            package="./aws-janitor"
-            ;;
-        aws-janitor-boskos)
-            package="./aws-janitor/cmd/aws-janitor-boskos"
-            ;;
-        *)
-            package="./cmd/${binary}"
-    esac
+    local package="./cmd/${binary}"
     local image_dir
     if [[ -d ./images/"${binary}" ]]; then
         image_dir="${binary}"
