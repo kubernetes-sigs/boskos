@@ -28,11 +28,18 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
-RUN make build WHAT=./cmd/boskosctl
+
+ARG DOCKER_TAG
+ENV DOCKER_TAG=${DOCKER_TAG}
+
+ARG cmd
+RUN make "${cmd}"
 
 FROM alpine:${alpine_version}
 
 RUN apk add bash jq
 
-COPY --from=build "/go/src/app/_output/bin/boskosctl" /bin/boskosctl
+ARG cmd
+COPY --from=build "/go/src/app/_output/bin/${cmd}" /bin/boskosctl
+
 ENTRYPOINT ["/bin/boskosctl"]

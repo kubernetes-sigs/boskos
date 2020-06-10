@@ -31,20 +31,20 @@ if [[ -z "${DOCKER_TAG:-}" ]]; then
 fi
 
 docker_build() {
-    local binary=$1
-    local package="./cmd/${binary}"
+    local cmd=$1
     local image_dir
-    if [[ -d ./images/"${binary}" ]]; then
-        image_dir="${binary}"
+    if [[ -d ./images/"${cmd}" ]]; then
+        image_dir="${cmd}"
     else
         image_dir="default"
     fi
+    # We need to set DOCKER_TAG in the container because git metadata isn't available
     docker build --pull \
+        --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
         --build-arg "go_version=${GO_VERSION}" \
-        --build-arg "package=${package}" \
-        --build-arg "binary=${binary}" \
-        -t "${DOCKER_REPO}/${binary}:${DOCKER_TAG}" \
-        -t "${DOCKER_REPO}/${binary}:latest" \
+        --build-arg "cmd=${cmd}" \
+        -t "${DOCKER_REPO}/${cmd}:${DOCKER_TAG}" \
+        -t "${DOCKER_REPO}/${cmd}:latest" \
         -f "./images/${image_dir}/Dockerfile" .
 }
 

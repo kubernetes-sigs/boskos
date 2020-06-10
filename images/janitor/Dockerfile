@@ -25,16 +25,21 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
+
+ARG DOCKER_TAG
+ENV DOCKER_TAG=${DOCKER_TAG}
+
 # Cache build output too
 RUN make build
 
-ARG package
-RUN make build WHAT="${package}"
+ARG cmd
+RUN make "${cmd}"
 
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:277.0.0-slim
-ARG binary
 COPY ./cmd/janitor/gcp_janitor.py /bin
-COPY --from=build "/go/src/app/_output/bin/${binary}" /bin/janitor
+
+ARG cmd
+COPY --from=build "/go/src/app/_output/bin/${cmd}" /bin/janitor
 
 # the entrypoint must be sh
 # https://github.com/kubernetes/test-infra/issues/5877
