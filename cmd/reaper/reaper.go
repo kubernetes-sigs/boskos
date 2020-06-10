@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"k8s.io/test-infra/prow/logrusutil"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
 )
@@ -39,13 +40,14 @@ func init() {
 }
 
 func main() {
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrusutil.ComponentInit()
+
+	flag.Parse()
 	boskos, err := client.NewClient("Reaper", *boskosURL, *username, *passwordFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}
 	logrus.Infof("Initialized boskos client!")
-	flag.Parse()
 
 	if len(rTypes) == 0 {
 		logrus.Fatal("--resource-type must not be empty!")

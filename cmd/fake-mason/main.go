@@ -26,6 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/test-infra/prow/logrusutil"
 
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -63,11 +64,11 @@ func (m *fakeMasonAgent) Construct(context.Context, common.Resource, common.Type
 }
 
 func main() {
+	logrusutil.ComponentInit()
+
 	kubeClientOptions.AddFlags(flag.CommandLine)
 	flag.Parse()
 	kubeClientOptions.Validate()
-
-	logrus.SetFormatter(&logrus.JSONFormatter{})
 
 	kubeClient, err := kubeClientOptions.Client()
 	if err != nil {
