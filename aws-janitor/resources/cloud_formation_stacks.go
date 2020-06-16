@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Cloud Formation Stacks
@@ -48,7 +48,7 @@ func (CloudFormationStacks) MarkAndSweep(sess *session.Session, acct string, reg
 				name: aws.StringValue(stack.StackName),
 			}
 			if set.Mark(o) {
-				klog.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
+				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
 				toDelete = append(toDelete, o)
 			}
 		}
@@ -61,7 +61,7 @@ func (CloudFormationStacks) MarkAndSweep(sess *session.Session, acct string, reg
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			klog.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil

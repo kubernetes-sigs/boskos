@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // SecurityGroups: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeSecurityGroups
@@ -67,7 +67,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 		addRefs(ingress, *sg.GroupId, acct, sg.IpPermissions)
 		addRefs(egress, *sg.GroupId, acct, sg.IpPermissionsEgress)
 		if set.Mark(s) {
-			klog.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
+			logrus.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
 			toDelete = append(toDelete, s)
 		}
 	}
@@ -76,7 +76,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 
 		// Revoke all ingress rules.
 		for _, ref := range ingress[sg.ID] {
-			klog.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
+			logrus.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
 
 			revokeReq := &ec2.RevokeSecurityGroupIngressInput{
 				GroupId:       aws.String(ref.id),
@@ -84,13 +84,13 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 			}
 
 			if _, err := svc.RevokeSecurityGroupIngress(revokeReq); err != nil {
-				klog.Warningf("%v: failed to revoke ingress reference from %s: %v", sg.ARN(), ref.id, err)
+				logrus.Warningf("%v: failed to revoke ingress reference from %s: %v", sg.ARN(), ref.id, err)
 			}
 		}
 
 		// Revoke all egress rules.
 		for _, ref := range egress[sg.ID] {
-			klog.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
+			logrus.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
 
 			revokeReq := &ec2.RevokeSecurityGroupEgressInput{
 				GroupId:       aws.String(ref.id),
@@ -98,7 +98,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 			}
 
 			if _, err := svc.RevokeSecurityGroupEgress(revokeReq); err != nil {
-				klog.Warningf("%s: failed to revoke egress reference from %s: %v", sg.ARN(), ref.id, err)
+				logrus.Warningf("%s: failed to revoke egress reference from %s: %v", sg.ARN(), ref.id, err)
 			}
 		}
 
@@ -108,7 +108,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 		}
 
 		if _, err := svc.DeleteSecurityGroup(deleteReq); err != nil {
-			klog.Warningf("%s: delete failed: %v", sg.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", sg.ARN(), err)
 		}
 	}
 

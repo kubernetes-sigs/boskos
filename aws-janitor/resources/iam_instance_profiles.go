@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // IAM Instance Profiles
@@ -50,13 +50,13 @@ func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, regi
 			}
 
 			if !managed {
-				klog.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
+				logrus.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
 				continue
 			}
 
 			o := &iamInstanceProfile{profile: p}
 			if set.Mark(o) {
-				klog.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
+				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
 				toDelete = append(toDelete, o)
 			}
 		}
@@ -69,7 +69,7 @@ func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, regi
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			klog.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil

@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // LaunchConfigurations: http://docs.aws.amazon.com/sdk-for-go/api/service/autoscaling/#AutoScaling.DescribeLaunchConfigurations
@@ -38,7 +38,7 @@ func (LaunchConfigurations) MarkAndSweep(sess *session.Session, acct string, reg
 		for _, lc := range page.LaunchConfigurations {
 			l := &launchConfiguration{ID: *lc.LaunchConfigurationARN, Name: *lc.LaunchConfigurationName}
 			if set.Mark(l) {
-				klog.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
+				logrus.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -55,7 +55,7 @@ func (LaunchConfigurations) MarkAndSweep(sess *session.Session, acct string, reg
 		}
 
 		if _, err := svc.DeleteLaunchConfiguration(deleteReq); err != nil {
-			klog.Warningf("%s: delete failed: %v", lc.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", lc.ARN(), err)
 		}
 	}
 

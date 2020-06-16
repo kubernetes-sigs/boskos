@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Instances: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeInstances
@@ -56,7 +56,7 @@ func (Instances) MarkAndSweep(sess *session.Session, acct string, region string,
 				}
 
 				if set.Mark(i) {
-					klog.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
+					logrus.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
 					toDelete = append(toDelete, inst.InstanceId)
 				}
 			}
@@ -72,7 +72,7 @@ func (Instances) MarkAndSweep(sess *session.Session, acct string, region string,
 		// TODO(zmerlynn): In theory this should be split up into
 		// blocks of 1000, but burn that bridge if it ever happens...
 		if _, err := svc.TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: toDelete}); err != nil {
-			klog.Warningf("Termination failed for instances: %s : %v", strings.Join(aws.StringValueSlice(toDelete), ", "), err)
+			logrus.Warningf("Termination failed for instances: %s : %v", strings.Join(aws.StringValueSlice(toDelete), ", "), err)
 		}
 	}
 

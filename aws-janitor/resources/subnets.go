@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Subnets: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeSubnets
@@ -50,9 +50,9 @@ func (Subnets) MarkAndSweep(sess *session.Session, acct string, region string, s
 	for _, sub := range resp.Subnets {
 		s := &subnet{Account: acct, Region: region, ID: *sub.SubnetId}
 		if set.Mark(s) {
-			klog.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+			logrus.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
 			if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
-				klog.Warningf("%s: delete failed: %v", s.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", s.ARN(), err)
 			}
 		}
 	}

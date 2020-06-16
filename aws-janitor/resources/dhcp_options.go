@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // DHCPOptions: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeDhcpOptions
@@ -74,16 +74,16 @@ func (DHCPOptions) MarkAndSweep(sess *session.Session, acct string, region strin
 
 		dh := &dhcpOption{Account: acct, Region: region, ID: *dhcp.DhcpOptionsId}
 		if set.Mark(dh) {
-			klog.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+			logrus.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
 
 			if _, err := svc.DeleteDhcpOptions(&ec2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
-				klog.Warningf("%s: delete failed: %v", dh.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", dh.ARN(), err)
 			}
 		}
 	}
 
 	if len(defaults) > 1 {
-		klog.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
+		logrus.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
 	}
 
 	return nil

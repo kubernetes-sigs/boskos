@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Elastic IPs: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeAddresses
@@ -42,19 +42,19 @@ func (Addresses) MarkAndSweep(sess *session.Session, acct string, region string,
 	for _, addr := range resp.Addresses {
 		a := &address{Account: acct, Region: region, ID: *addr.AllocationId}
 		if set.Mark(a) {
-			klog.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
+			logrus.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
 
 			if addr.AssociationId != nil {
-				klog.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)
+				logrus.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)
 				_, err := svc.DisassociateAddress(&ec2.DisassociateAddressInput{AssociationId: addr.AssociationId})
 				if err != nil {
-					klog.Warningf("%s: disassociating %T failed: %v", a.ARN(), addr, err)
+					logrus.Warningf("%s: disassociating %T failed: %v", a.ARN(), addr, err)
 				}
 			}
 
 			_, err := svc.ReleaseAddress(&ec2.ReleaseAddressInput{AllocationId: addr.AllocationId})
 			if err != nil {
-				klog.Warningf("%s: delete failed: %v", a.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", a.ARN(), err)
 			}
 		}
 	}

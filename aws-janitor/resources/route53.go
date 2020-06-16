@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Route53
@@ -39,7 +39,7 @@ func zoneIsManaged(z *route53.HostedZone) bool {
 		return true
 	}
 
-	klog.Infof("unknown zone %q; ignoring", name)
+	logrus.Infof("unknown zone %q; ignoring", name)
 	return false
 }
 
@@ -71,7 +71,7 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 		}
 	}
 
-	klog.Infof("Ignoring unmanaged name %q", name)
+	logrus.Infof("Ignoring unmanaged name %q", name)
 	return false
 }
 
@@ -98,7 +98,7 @@ func (Route53ResourceRecordSets) MarkAndSweep(sess *session.Session, acct string
 
 					o := &route53ResourceRecordSet{zone: z, obj: rrs}
 					if set.Mark(o) {
-						klog.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+						logrus.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
 						toDelete = append(toDelete, o)
 					}
 				}
@@ -131,14 +131,14 @@ func (Route53ResourceRecordSets) MarkAndSweep(sess *session.Session, acct string
 					changes = nil
 				}
 
-				klog.Infof("Deleting %d route53 resource records", len(chunk))
+				logrus.Infof("Deleting %d route53 resource records", len(chunk))
 				deleteReq := &route53.ChangeResourceRecordSetsInput{
 					HostedZoneId: z.Id,
 					ChangeBatch:  &route53.ChangeBatch{Changes: chunk},
 				}
 
 				if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
-					klog.Warningf("unable to delete DNS records: %v", err)
+					logrus.Warningf("unable to delete DNS records: %v", err)
 				}
 			}
 		}

@@ -25,7 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 
 	s3path "sigs.k8s.io/boskos/aws-janitor/s3"
 )
@@ -111,12 +111,12 @@ func (s *Set) Mark(r Interface) bool {
 			s.swept = append(s.swept, key)
 			return true
 		}
-		klog.V(1).Infof("%s: seen for %v", key, since)
+		logrus.Debugf("%s: seen for %v", key, since)
 		return false
 	}
 
 	s.firstSeen[key] = now
-	klog.V(1).Infof("%s: first seen", key)
+	logrus.Debugf("%s: first seen", key)
 	if s.ttl == 0 {
 		// If the TTL is 0, it should be deleted now.
 		s.swept = append(s.swept, key)
@@ -138,12 +138,12 @@ func (s *Set) MarkComplete() int {
 	}
 
 	for _, key := range gone {
-		klog.V(1).Infof("%s: deleted since last run", key)
+		logrus.Debugf("%s: deleted since last run", key)
 		delete(s.firstSeen, key)
 	}
 
 	if len(s.swept) > 0 {
-		klog.Errorf("%d resources swept: %v", len(s.swept), s.swept)
+		logrus.Errorf("%d resources swept: %v", len(s.swept), s.swept)
 	}
 
 	return len(s.swept)

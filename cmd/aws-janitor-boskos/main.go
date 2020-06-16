@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -25,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
+	"k8s.io/test-infra/prow/logrusutil"
 	"sigs.k8s.io/boskos/aws-janitor/resources"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -40,6 +41,7 @@ var (
 	sweepCount         = flag.Int("sweep-count", 5, "Number of times to sweep the resources")
 	sweepSleep         = flag.String("sweep-sleep", "30s", "The duration to pause between sweeps")
 	sweepSleepDuration time.Duration
+	logLevel           = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 )
 
 const (
@@ -47,15 +49,21 @@ const (
 )
 
 func main() {
-	klog.InitFlags(nil)
+	logrusutil.ComponentInit()
 	flag.Parse()
+
+	level, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		logrus.WithError(err).Fatal("invalid log level specified")
+	}
+	logrus.SetLevel(level)
+
 	if d, err := time.ParseDuration(*sweepSleep); err != nil {
 		sweepSleepDuration = time.Second * 30
 	} else {
 		sweepSleepDuration = d
 	}
 
-	logrus.SetFormatter(&logrus.JSONFormatter{})
 	boskos, err := client.NewClient("AWSJanitor", *boskosURL, *username, *passwordFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")

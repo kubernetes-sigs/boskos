@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // IAM Roles
@@ -47,7 +47,7 @@ func roleIsManaged(role *iam.Role) bool {
 		return true
 	}
 
-	klog.Infof("Unknown role name=%q, path=%q; assuming not managed", name, path)
+	logrus.Infof("Unknown role name=%q, path=%q; assuming not managed", name, path)
 	return false
 }
 
@@ -64,7 +64,7 @@ func (IAMRoles) MarkAndSweep(sess *session.Session, acct string, region string, 
 
 			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(r.RoleId), roleName: aws.StringValue(r.RoleName)}
 			if set.Mark(l) {
-				klog.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
+				logrus.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -77,7 +77,7 @@ func (IAMRoles) MarkAndSweep(sess *session.Session, acct string, region string, 
 
 	for _, r := range toDelete {
 		if err := r.delete(svc); err != nil {
-			klog.Warningf("%s: delete failed: %v", r.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", r.ARN(), err)
 		}
 	}
 
@@ -139,7 +139,7 @@ func (r iamRole) delete(svc *iam.IAM) error {
 	}
 
 	for _, policyName := range policyNames {
-		klog.V(2).Infof("Deleting IAM role policy %q %q", roleName, policyName)
+		logrus.Debugf("Deleting IAM role policy %q %q", roleName, policyName)
 
 		deletePolicyReq := &iam.DeleteRolePolicyInput{
 			RoleName:   aws.String(roleName),
@@ -151,7 +151,7 @@ func (r iamRole) delete(svc *iam.IAM) error {
 		}
 	}
 
-	klog.V(2).Infof("Deleting IAM role %q", roleName)
+	logrus.Debugf("Deleting IAM role %q", roleName)
 
 	deleteReq := &iam.DeleteRoleInput{
 		RoleName: aws.String(roleName),
