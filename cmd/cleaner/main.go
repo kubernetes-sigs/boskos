@@ -29,7 +29,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config"
+	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
@@ -48,7 +50,8 @@ const (
 )
 
 var (
-	kubeClientOptions crds.KubernetesClientOptions
+	kubeClientOptions      crds.KubernetesClientOptions
+	instrumentationOptions prowflagutil.InstrumentationOptions
 
 	boskosURL           string
 	username            string
@@ -67,19 +70,25 @@ func init() {
 	flag.StringVar(&namespace, "namespace", corev1.NamespaceDefault, "namespace to install on")
 	flag.StringVar(&logLevel, "log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	flag.BoolVar(&useV2Implementation, "use-v2-implementation", false, "Use the new controller-based v2 implementation. It is much faster and works directly based on the crds, but was used less")
-	kubeClientOptions.AddFlags(flag.CommandLine)
 }
 
 func main() {
 	logrusutil.ComponentInit()
+	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+		o.AddFlags(flag.CommandLine)
+	}
 	flag.Parse()
-	kubeClientOptions.Validate()
 
 	level, err := logrus.ParseLevel(logLevel)
 	if err != nil {
 		logrus.WithError(err).Fatal("invalid log level specified")
 	}
 	logrus.SetLevel(level)
+	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+		if err := o.Validate(false); err != nil {
+			logrus.Fatalf("Invalid options: %v", err)
+		}
+	}
 
 	client, err := client.NewClient(defaultOwner, boskosURL, username, passwordFile)
 	if err != nil {
@@ -87,8 +96,8 @@ func main() {
 	}
 
 	defer interrupts.WaitForGracefulShutdown()
-	prowmetrics.ExposeMetrics("boskos", config.PushGateway{})
-	pjutil.ServePProf()
+	prowmetrics.ExposeMetrics("boskos", config.PushGateway{}, instrumentationOptions.MetricsPort)
+	pjutil.ServePProf(instrumentationOptions.PProfPort)
 
 	if useV2Implementation {
 		v2Main(client)

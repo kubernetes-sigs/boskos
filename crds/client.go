@@ -18,12 +18,12 @@ package crds
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -36,6 +36,7 @@ import (
 )
 
 // KubernetesClientOptions are flag options used to create a kube client.
+// It implements the k8s.io/test-infra/pkg/flagutil.OptionGroup interface.
 type KubernetesClientOptions struct {
 	inMemory   bool
 	kubeConfig string
@@ -48,10 +49,10 @@ func (o *KubernetesClientOptions) AddFlags(fs *flag.FlagSet) {
 }
 
 // Validate validates Kubernetes client options.
-func (o *KubernetesClientOptions) Validate() error {
+func (o *KubernetesClientOptions) Validate(dryRun bool) error {
 	if o.kubeConfig != "" {
 		if _, err := os.Stat(o.kubeConfig); err != nil {
-			return err
+			return errors.Wrapf(err, "Invalid kubeconfig '%s'", o.kubeConfig)
 		}
 	}
 	return nil

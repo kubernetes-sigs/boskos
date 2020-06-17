@@ -68,7 +68,9 @@ func main() {
 
 	kubeClientOptions.AddFlags(flag.CommandLine)
 	flag.Parse()
-	kubeClientOptions.Validate()
+	if err := kubeClientOptions.Validate(false); err != nil {
+		logrus.Fatalf("Invalid options: %v", err)
+	}
 
 	kubeClient, err := kubeClientOptions.Client()
 	if err != nil {
