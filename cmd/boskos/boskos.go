@@ -29,7 +29,9 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
+	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config"
+	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
@@ -50,16 +52,16 @@ var (
 	configPath                  = flag.String("config", "config.yaml", "Path to init resource file")
 	dynamicResourceUpdatePeriod = flag.Duration("dynamic-resource-update-period", defaultDynamicResourceUpdatePeriod,
 		"Period at which to update dynamic resources. Set to 0 to disable.")
-	requestTTL        = flag.Duration("request-ttl", defaultRequestTTL, "request TTL before losing priority in the queue")
-	kubeClientOptions crds.KubernetesClientOptions
-	logLevel          = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
-	namespace         = flag.String("namespace", corev1.NamespaceDefault, "namespace to install on")
-)
+	requestTTL = flag.Duration("request-ttl", defaultRequestTTL, "request TTL before losing priority in the queue")
+	logLevel   = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	namespace  = flag.String("namespace", corev1.NamespaceDefault, "namespace to install on")
 
-var (
 	httpRequestDuration = prowmetrics.HttpRequestDuration("boskos", 0.005, 1200)
 	httpResponseSize    = prowmetrics.HttpResponseSize("boskos", 128, 65536)
 	traceHandler        = prowmetrics.TraceHandler(handlers.NewBoskosSimplifier(), httpRequestDuration, httpResponseSize)
+
+	kubeClientOptions      crds.KubernetesClientOptions
+	instrumentationOptions prowflagutil.InstrumentationOptions
 )
 
 func init() {
@@ -69,22 +71,29 @@ func init() {
 
 func main() {
 	logrusutil.ComponentInit()
-	kubeClientOptions.AddFlags(flag.CommandLine)
+	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+		o.AddFlags(flag.CommandLine)
+	}
 	flag.Parse()
+
 	level, err := logrus.ParseLevel(*logLevel)
 	if err != nil {
 		logrus.WithError(err).Fatal("invalid log level specified")
 	}
 	logrus.SetLevel(level)
-	kubeClientOptions.Validate()
+	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+		if err := o.Validate(false); err != nil {
+			logrus.Fatalf("Invalid options: %v", err)
+		}
+	}
 
 	// collect data on mutex holders and blocking profiles
 	runtime.SetBlockProfileRate(1)
 	runtime.SetMutexProfileFraction(1)
 
 	defer interrupts.WaitForGracefulShutdown()
-	pjutil.ServePProf()
-	prowmetrics.ExposeMetrics("boskos", config.PushGateway{})
+	pjutil.ServePProf(instrumentationOptions.PProfPort)
+	prowmetrics.ExposeMetrics("boskos", config.PushGateway{}, instrumentationOptions.MetricsPort)
 	// signal to the world that we are healthy
 	// this needs to be in a separate port as we don't start the
 	// main server with the main mux until we're ready

@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/config"
+	"k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"sigs.k8s.io/boskos/client"
@@ -43,6 +44,8 @@ var (
 	username       string
 	passwordFile   string
 	rtypes, states common.CommaSeparatedStrings
+
+	instrumentationOptions flagutil.InstrumentationOptions
 )
 
 func init() {
@@ -56,8 +59,13 @@ func init() {
 
 func main() {
 	logrusutil.ComponentInit()
+	instrumentationOptions.AddFlags(flag.CommandLine)
 
 	flag.Parse()
+	if err := instrumentationOptions.Validate(false); err != nil {
+		logrus.Fatalf("Invalid options: %v", err)
+	}
+
 	boskos, err := client.NewClient("Metrics", boskosURL, username, passwordFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
@@ -67,7 +75,7 @@ func main() {
 		states = common.KnownStates
 	}
 
-	prowmetrics.ExposeMetrics("boskos", config.PushGateway{})
+	prowmetrics.ExposeMetrics("boskos", config.PushGateway{}, instrumentationOptions.MetricsPort)
 
 	go func() {
 		tick := time.NewTicker(30 * time.Second).C
