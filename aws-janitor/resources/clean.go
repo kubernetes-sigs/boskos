@@ -23,8 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
 	"sigs.k8s.io/boskos/aws-janitor/account"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 )
@@ -36,7 +36,7 @@ func CleanAll(sess *session.Session, region string) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to retrieve account")
 	}
-	klog.V(1).Infof("Account: %s", acct)
+	logrus.Debugf("Account: %s", acct)
 
 	var regionList []string
 	if region == "" {
@@ -47,7 +47,7 @@ func CleanAll(sess *session.Session, region string) error {
 	} else {
 		regionList = []string{region}
 	}
-	klog.Infof("Regions: %s", strings.Join(regionList, ", "))
+	logrus.Infof("Regions: %s", strings.Join(regionList, ", "))
 
 	var errs []error
 
@@ -58,7 +58,7 @@ func CleanAll(sess *session.Session, region string) error {
 				// ignore errors for resources we do not have permissions to list
 				if reqerr, ok := errors.Cause(err).(awserr.RequestFailure); ok {
 					if reqerr.StatusCode() == http.StatusForbidden {
-						klog.V(1).Infof("Skipping resources of type %T, account does not have permission to list", typ)
+						logrus.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
 						continue
 					}
 				}

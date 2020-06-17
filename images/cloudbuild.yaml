@@ -42,6 +42,8 @@ images:
   - "gcr.io/$PROJECT_ID/aws-janitor:latest"
   - "gcr.io/$PROJECT_ID/aws-janitor-boskos:$_GIT_TAG"
   - "gcr.io/$PROJECT_ID/aws-janitor-boskos:latest"
+  - "gcr.io/$PROJECT_ID/aws-resources-list:$_GIT_TAG"
+  - "gcr.io/$PROJECT_ID/aws-resources-list:latest"
   - "gcr.io/$PROJECT_ID/boskos:$_GIT_TAG"
   - "gcr.io/$PROJECT_ID/boskos:latest"
   - "gcr.io/$PROJECT_ID/boskosctl:$_GIT_TAG"

@@ -25,6 +25,8 @@ OUTPUT_BIN_DIR := $(OUTPUT_DIR)/$(BIN_DIR)
 GOTESTSUM := $(TOOLS_BIN_DIR)/gotestsum
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 
+CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
+
 export GO_VERSION=1.14.3
 export GO111MODULE=on
 export DOCKER_REPO
@@ -33,12 +35,22 @@ export DOCKER_TAG
 .PHONY: all
 all: build
 
+.PHONY: $(CMDS)
+$(CMDS):
+	MINIMUM_GO_VERSION=go$(GO_VERSION) ./hack/ensure-go.sh
+	mkdir -p "$(OUTPUT_BIN_DIR)"
+	go build -o "$(OUTPUT_BIN_DIR)" \
+		-ldflags " \
+			-X 'k8s.io/test-infra/prow/version.Name=$@' \
+			-X 'k8s.io/test-infra/prow/version.Version=$(DOCKER_TAG)' \
+		" \
+		./cmd/$@
+
 # TODO(ixdy): containerize
 .PHONY: build
 build:
 	MINIMUM_GO_VERSION=go$(GO_VERSION) ./hack/ensure-go.sh
-	mkdir -p "$(OUTPUT_BIN_DIR)"
-	go build -o "$(OUTPUT_BIN_DIR)" $(WHAT)
+	go build $(WHAT)
 
 .PHONY: test
 test: $(GOTESTSUM)
@@ -46,15 +58,7 @@ test: $(GOTESTSUM)
 	$(GOTESTSUM) $${ARTIFACTS:+--junitfile="${ARTIFACTS}/junit.xml"} $(WHAT)
 
 .PHONY: images
-images: aws-janitor-image
-images: aws-janitor-boskos-image
-images: boskos-image
-images: boskosctl-image
-images: cleaner-image
-images: fake-mason-image
-images: janitor-image
-images: metrics-image
-images: reaper-image
+images: $(patsubst %,%-image,$(CMDS))
 
 .PHONY: %-image
 %-image:

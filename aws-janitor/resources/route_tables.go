@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // RouteTables: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeRouteTables
@@ -56,25 +56,25 @@ func (RouteTables) MarkAndSweep(sess *session.Session, acct string, region strin
 		r := &routeTable{Account: acct, Region: region, ID: *rt.RouteTableId}
 		if set.Mark(r) {
 			for _, assoc := range rt.Associations {
-				klog.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
+				logrus.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
 
 				disReq := &ec2.DisassociateRouteTableInput{
 					AssociationId: assoc.RouteTableAssociationId,
 				}
 
 				if _, err := svc.DisassociateRouteTable(disReq); err != nil {
-					klog.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
+					logrus.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
 				}
 			}
 
-			klog.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
+			logrus.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
 
 			deleteReq := &ec2.DeleteRouteTableInput{
 				RouteTableId: rt.RouteTableId,
 			}
 
 			if _, err := svc.DeleteRouteTable(deleteReq); err != nil {
-				klog.Warningf("%s: delete failed: %v", r.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", r.ARN(), err)
 			}
 		}
 	}

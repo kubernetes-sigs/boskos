@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // LaunchTemplates https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeLaunchTemplates
@@ -44,7 +44,7 @@ func (LaunchTemplates) MarkAndSweep(sess *session.Session, acct string, region s
 				Name:    *lt.LaunchTemplateName,
 			}
 			if set.Mark(l) {
-				klog.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
+				logrus.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -61,7 +61,7 @@ func (LaunchTemplates) MarkAndSweep(sess *session.Session, acct string, region s
 		}
 
 		if _, err := svc.DeleteLaunchTemplate(deleteReq); err != nil {
-			klog.Warningf("%s: delete failed: %v", lt.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", lt.ARN(), err)
 		}
 	}
 

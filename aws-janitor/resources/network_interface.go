@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Clean-up ENIs
@@ -43,7 +43,7 @@ func (NetworkInterfaces) MarkAndSweep(sess *session.Session, account string, reg
 				a.AttachmentID = *eni.Attachment.AttachmentId
 			}
 			if set.Mark(a) {
-				klog.Warningf("%s: deleting %T", a.ARN(), a)
+				logrus.Warningf("%s: deleting %T", a.ARN(), a)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -60,7 +60,7 @@ func (NetworkInterfaces) MarkAndSweep(sess *session.Session, account string, reg
 				AttachmentId: aws.String(eni.AttachmentID),
 			}
 			if _, err := svc.DetachNetworkInterface(detachInput); err != nil {
-				klog.Warningf("%s: detach failed: %v", eni.ARN(), err)
+				logrus.Warningf("%s: detach failed: %v", eni.ARN(), err)
 			}
 		}
 
@@ -69,7 +69,7 @@ func (NetworkInterfaces) MarkAndSweep(sess *session.Session, account string, reg
 		}
 
 		if _, err := svc.DeleteNetworkInterface(deleteInput); err != nil {
-			klog.Warningf("%s: delete failed: %v", eni.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", eni.ARN(), err)
 		}
 	}
 

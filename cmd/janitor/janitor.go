@@ -24,6 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
+	"k8s.io/test-infra/prow/logrusutil"
 
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -48,7 +49,8 @@ func init() {
 }
 
 func main() {
-	// Activate service account
+	logrusutil.ComponentInit()
+
 	flag.Parse()
 	extraJanitorFlags := flag.CommandLine.Args()
 
@@ -58,7 +60,6 @@ func main() {
 	}
 	logrus.SetLevel(level)
 
-	logrus.SetFormatter(&logrus.JSONFormatter{})
 	boskos, err := client.NewClient("Janitor", *boskosURL, *username, *passwordFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")

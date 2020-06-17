@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // VPCs: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeVpcs
@@ -49,7 +49,7 @@ func (VPCs) MarkAndSweep(sess *session.Session, acct string, region string, set 
 	for _, vp := range resp.Vpcs {
 		v := &vpc{Account: acct, Region: region, ID: *vp.VpcId}
 		if set.Mark(v) {
-			klog.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
+			logrus.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
 
 			if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
 				disReq := &ec2.AssociateDhcpOptionsInput{
@@ -58,12 +58,12 @@ func (VPCs) MarkAndSweep(sess *session.Session, acct string, region string, set 
 				}
 
 				if _, err := svc.AssociateDhcpOptions(disReq); err != nil {
-					klog.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
+					logrus.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
 				}
 			}
 
 			if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
-				klog.Warningf("%s: delete failed: %v", v.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", v.ARN(), err)
 			}
 		}
 	}

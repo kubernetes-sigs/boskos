@@ -18,12 +18,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
+	"k8s.io/test-infra/prow/logrusutil"
 	"sigs.k8s.io/boskos/aws-janitor/account"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 	"sigs.k8s.io/boskos/aws-janitor/resources"
@@ -35,13 +37,18 @@ var (
 	region   = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
 	path     = flag.String("path", "", "S3 path for mark data (required when -all=false)")
 	cleanAll = flag.Bool("all", false, "Clean all resources (ignores -path)")
+	logLevel = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 )
 
 func main() {
-	klog.InitFlags(nil)
-	flag.Lookup("logtostderr").Value.Set("true")
+	logrusutil.ComponentInit()
 	flag.Parse()
-	defer klog.Flush()
+
+	level, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		logrus.WithError(err).Fatal("invalid log level specified")
+	}
+	logrus.SetLevel(level)
 
 	// Retry aggressively (with default back-off). If the account is
 	// in a really bad state, we may be contending with API rate
@@ -51,10 +58,10 @@ func main() {
 
 	if *cleanAll {
 		if err := resources.CleanAll(sess, *region); err != nil {
-			klog.Fatalf("Error cleaning all resources: %v", err)
+			logrus.Fatalf("Error cleaning all resources: %v", err)
 		}
 	} else if err := markAndSweep(sess, *region); err != nil {
-		klog.Fatalf("Error marking and sweeping resources: %v", err)
+		logrus.Fatalf("Error marking and sweeping resources: %v", err)
 	}
 }
 
@@ -68,7 +75,7 @@ func markAndSweep(sess *session.Session, region string) error {
 	if err != nil {
 		return errors.Wrap(err, "Error getting current user")
 	}
-	klog.V(1).Infof("account: %s", acct)
+	logrus.Debugf("account: %s", acct)
 
 	var regionList []string
 	if region == "" {
@@ -79,7 +86,7 @@ func markAndSweep(sess *session.Session, region string) error {
 	} else {
 		regionList = []string{region}
 	}
-	klog.Infof("Regions: %+v", regionList)
+	logrus.Infof("Regions: %+v", regionList)
 
 	res, err := resources.LoadSet(sess, s3p, *maxTTL)
 	if err != nil {
@@ -105,7 +112,7 @@ func markAndSweep(sess *session.Session, region string) error {
 		return errors.Wrapf(err, "Error saving %q", *path)
 	}
 
-	klog.Infof("swept %d resources", swept)
+	logrus.Infof("swept %d resources", swept)
 
 	return nil
 }

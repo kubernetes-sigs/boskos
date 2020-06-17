@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Clean-up ELBs
@@ -39,7 +39,7 @@ func (LoadBalancers) MarkAndSweep(sess *session.Session, account string, region 
 		for _, lb := range page.LoadBalancers {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn}
 			if set.Mark(a) {
-				klog.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
+				logrus.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -56,7 +56,7 @@ func (LoadBalancers) MarkAndSweep(sess *session.Session, account string, region 
 		}
 
 		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
-			klog.Warningf("%s: delete failed: %v", lb.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", lb.ARN(), err)
 		}
 	}
 

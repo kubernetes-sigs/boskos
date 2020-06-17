@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // AutoScalingGroups: https://docs.aws.amazon.com/sdk-for-go/api/service/autoscaling/#AutoScaling.DescribeAutoScalingGroups
@@ -39,7 +39,7 @@ func (AutoScalingGroups) MarkAndSweep(sess *session.Session, acct string, region
 		for _, asg := range page.AutoScalingGroups {
 			a := &autoScalingGroup{ID: *asg.AutoScalingGroupARN, Name: *asg.AutoScalingGroupName}
 			if set.Mark(a) {
-				klog.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
+				logrus.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -57,7 +57,7 @@ func (AutoScalingGroups) MarkAndSweep(sess *session.Session, acct string, region
 		}
 
 		if _, err := svc.DeleteAutoScalingGroup(deleteInput); err != nil {
-			klog.Warningf("%s: delete failed: %v", asg.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", asg.ARN(), err)
 		}
 	}
 
@@ -65,14 +65,14 @@ func (AutoScalingGroups) MarkAndSweep(sess *session.Session, acct string, region
 	// resources, so this just makes the rest go more smoothly (and
 	// prevents a second pass).
 	for _, asg := range toDelete {
-		klog.Warningf("%s: waiting for delete", asg.ARN())
+		logrus.Warningf("%s: waiting for delete", asg.ARN())
 
 		describeInput := &autoscaling.DescribeAutoScalingGroupsInput{
 			AutoScalingGroupNames: []*string{aws.String(asg.Name)},
 		}
 
 		if err := svc.WaitUntilGroupNotExists(describeInput); err != nil {
-			klog.Warningf("%s: wait failed: %v", asg.ARN(), err)
+			logrus.Warningf("%s: wait failed: %v", asg.ARN(), err)
 		}
 	}
 

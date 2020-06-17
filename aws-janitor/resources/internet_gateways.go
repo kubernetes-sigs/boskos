@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // InternetGateways: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeInternetGateways
@@ -64,7 +64,7 @@ func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region 
 
 		if set.Mark(i) {
 			isDefault := false
-			klog.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
+			logrus.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
 
 			for _, att := range ig.Attachments {
 				if defaultVPC[aws.StringValue(att.VpcId)] {
@@ -78,12 +78,12 @@ func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region 
 				}
 
 				if _, err := svc.DetachInternetGateway(detachReq); err != nil {
-					klog.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
+					logrus.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
 				}
 			}
 
 			if isDefault {
-				klog.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
+				logrus.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
 				continue
 			}
 
@@ -92,7 +92,7 @@ func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region 
 			}
 
 			if _, err := svc.DeleteInternetGateway(deleteReq); err != nil {
-				klog.Warningf("%s: delete failed: %v", i.ARN(), err)
+				logrus.Warningf("%s: delete failed: %v", i.ARN(), err)
 			}
 		}
 	}

@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"github.com/sirupsen/logrus"
 )
 
 // Volumes: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeVolumes
@@ -39,7 +39,7 @@ func (Volumes) MarkAndSweep(sess *session.Session, acct string, region string, s
 		for _, vol := range page.Volumes {
 			v := &volume{Account: acct, Region: region, ID: *vol.VolumeId}
 			if set.Mark(v) {
-				klog.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
+				logrus.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
 				toDelete = append(toDelete, v)
 			}
 		}
@@ -56,7 +56,7 @@ func (Volumes) MarkAndSweep(sess *session.Session, acct string, region string, s
 		}
 
 		if _, err := svc.DeleteVolume(deleteReq); err != nil {
-			klog.Warningf("%s: delete failed: %v", vol.ARN(), err)
+			logrus.Warningf("%s: delete failed: %v", vol.ARN(), err)
 		}
 	}
 

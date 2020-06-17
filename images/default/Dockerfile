@@ -25,13 +25,19 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
+
+ARG DOCKER_TAG
+ENV DOCKER_TAG=${DOCKER_TAG}
+
 # Cache build output too
 RUN make build
 
-ARG package
-RUN make build WHAT="${package}"
+ARG cmd
+RUN make "${cmd}"
 
 FROM gcr.io/distroless/base-debian10
-ARG binary
-COPY --from=build "/go/src/app/_output/bin/${binary}" /app
+
+ARG cmd
+COPY --from=build "/go/src/app/_output/bin/${cmd}" /app
+
 ENTRYPOINT ["/app"]
