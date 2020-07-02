@@ -1,0 +1,46 @@
+# Copyright 2020 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+resources:
+  - names:
+      - project-alfa
+      - project-bravo
+      - project-charlie
+      - project-delta
+    state: dirty
+    type: phonetic-project
+
+  - names:
+      - project-one
+      - project-two
+      - project-three
+    state: dirty
+    type: numeric-project
+
+  - names:
+      - token-1
+      - token-2
+      - token-3
+      - token-4
+      - token-5
+      - token-6
+      - token-7
+    state: free
+    type: manual-token
+
+  - type: automatic-token
+    state: free
+    min-count: 5
+    max-count: 5
+    lifespan: 5m
