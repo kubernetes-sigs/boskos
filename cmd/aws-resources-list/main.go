@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"sigs.k8s.io/boskos/aws-janitor/account"
@@ -28,12 +29,26 @@ import (
 )
 
 var (
-	region = flag.String("region", regions.Default, "")
+	region = flag.String("region", "", "Region to list (defaults to all)")
 )
+
+func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
+	fmt.Printf("==%T==\n", res)
+	for _, region := range regions {
+		set, err := res.ListAll(sess, acct, region)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
+			continue
+		}
+
+		for _, s := range set.GetARNs() {
+			fmt.Println(s)
+		}
+	}
+}
 
 func main() {
 	flag.Parse()
-	resourceKinds := append(resources.RegionalTypeList, resources.GlobalTypeList...)
 
 	session := session.Must(session.NewSession())
 	acct, err := account.GetAccount(session, *region)
@@ -42,17 +57,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, r := range resourceKinds {
-		set, err := r.ListAll(session, acct, *region)
+	var regionList []string
+	if *region == "" {
+		regionList, err = regions.GetAll(session)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", r, err)
-			continue
+			fmt.Fprintf(os.Stderr, "couldn't retrieve list of regions: %v", err)
 		}
+		sort.Strings(regionList)
+	} else {
+		regionList = []string{*region}
+	}
 
-		fmt.Printf("==%T==\n", r)
-
-		for _, s := range set.GetARNs() {
-			fmt.Println(s)
-		}
+	for _, r := range resources.RegionalTypeList {
+		listResources(r, session, acct, regionList)
+	}
+	for _, r := range resources.GlobalTypeList {
+		listResources(r, session, acct, []string{""})
 	}
 }
