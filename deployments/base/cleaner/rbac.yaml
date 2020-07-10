@@ -18,10 +18,11 @@ metadata:
   name: boskos-cleaner
   namespace: boskos
 ---
-kind: RoleBinding
+# Give the cleaner access to update Boskos resources directly
 apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
-  name: boskos-cleaner
+  name: boskos-cleaner-crd-updater
   namespace: boskos
 subjects:
   - kind: ServiceAccount
@@ -29,5 +30,43 @@ subjects:
     namespace: boskos
 roleRef:
   kind: Role
-  name: boskos-crd-reader
+  name: boskos-crd-updater
+  apiGroup: rbac.authorization.k8s.io
+---
+# Give the cleaner access to its leaderlock
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: boskos-cleaner-leaderlock
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - boskos-cleaner-leaderlock
+    verbs:
+      - get
+      - update
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - events
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: boskos-cleaner-leaderlock
+  namespace: boskos
+subjects:
+  - kind: ServiceAccount
+    name: boskos-cleaner
+    namespace: boskos
+roleRef:
+  kind: Role
+  name: boskos-cleaner-leaderlock
   apiGroup: rbac.authorization.k8s.io

@@ -50,4 +50,14 @@ metadata:
 rules:
   - apiGroups: ["boskos.k8s.io"]
     resources: ["*"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: boskos-crd-updater
+  namespace: boskos
+rules:
+  - apiGroups: ["boskos.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "update"]
