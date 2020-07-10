@@ -19,6 +19,7 @@ package resources
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -55,6 +56,7 @@ func (s *Set) GetARNs() []string {
 		i++
 	}
 
+	sort.Strings(slice)
 	return slice
 }
 
