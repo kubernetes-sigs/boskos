@@ -70,6 +70,9 @@ DEMOLISH_ORDER = [
 
     # logging resources
     Resource('', 'logging', 'sinks', None, None, None, False, False),
+
+    # GKE hub memberships
+    Resource('', 'container', 'hub', 'memberships', None, None, False, False)
 ]
 
 # gcloud compute zones list --format="value(name)" | sort | awk '{print "    \x27"$1"\x27," }'
@@ -198,13 +201,14 @@ def validate_item(item, age, resource, clear_all):
     if clear_all:
         return True
 
-    if 'creationTimestamp' not in item:
-        raise ValueError('missing key: creationTimestamp - %r' % item)
+    creationTimestamp = item.get('creationTimestamp', item.get('createTime'))
+    if creationTimestamp is None:
+        raise ValueError('missing key: creationTimestamp or createTime - %r' % item)
 
     # Unify datetime to use utc timezone.
-    created = datetime.datetime.strptime(item['creationTimestamp'], '%Y-%m-%dT%H:%M:%S')
+    created = datetime.datetime.strptime(creationTimestamp, '%Y-%m-%dT%H:%M:%S')
     log('Found %r(%r), %r, created time = %r' %
-        (resource.name, resource.subgroup, item['name'], item['creationTimestamp']))
+        (resource.name, resource.subgroup, item['name'], creationTimestamp))
     if created < age:
         log('Added to janitor list: %r(%r), %r' %
             (resource.name, resource.subgroup, item['name']))
@@ -238,7 +242,7 @@ def collect(project, age, resource, filt, clear_all):
     cmd = base_command(resource)
     cmd.extend([
         'list',
-        '--format=json(name,creationTimestamp.date(tz=UTC),zone,region,isManaged)',
+        '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
         '--filter=%s' % filt,
         '--project=%s' % project])
     if resource.condition == 'zone' and resource.name != 'sole-tenancy' and resource.name != 'network-endpoint-groups':
@@ -483,10 +487,10 @@ def main(project, days, hours, filt, rate_limit, service_account):
             col = collect(project, age, res, filt, clear_all)
             if col:
                 err |= clear_resources(project, col, res, rate_limit)
-        except (subprocess.CalledProcessError, ValueError):
+        except (subprocess.CalledProcessError, ValueError) as exc:
             err |= 1  # keep clean the other resource
-            print >> sys.stderr, 'Fail to list resource %r from project %r' % (
-                res.name, project)
+            print >> sys.stderr, 'Fail to list resource %r from project %r: %r' % (
+                res.name, project, exc)
 
     print '[=== Finish Janitor on project %r with status %r ===]' % (project, err)
     sys.exit(err)
