@@ -520,7 +520,7 @@ def main(project, days, hours, filt, rate_limit, service_account):
             except (subprocess.CalledProcessError, ValueError) as exc:
                 err |= 1  # keep clean the other resource
                 print('Fail to list resource %r from project %r: %r' % (res.name, project, exc),
-                    file=sys.stderr)
+                      file=sys.stderr)
 
     print('[=== Finish Janitor on project %r with status %r ===]' % (project, err))
     sys.exit(err)
