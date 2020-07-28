@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -155,8 +155,7 @@ ZONES = [
 def log(message):
     """ print a message if --verbose is set. """
     if ARGS.verbose:
-        tss = "[" + str(datetime.datetime.now()) + "] "
-        print tss + message + '\n'
+        print('[%s] %s' % (str(datetime.datetime.now()), message))
 
 
 def base_command(resource):
@@ -300,7 +299,8 @@ def asyncCall(cmd, tolerate, name, errs, lock, hide_output):
         if not tolerate:
             with lock:
                 errs.append(exc)
-        print >> sys.stderr, 'Error try to delete resources %s: %r' % (name, exc)
+        print('Error try to delete resources %s: %r' % (name, exc),
+              file=sys.stderr)
 
 def clear_resources(project, cols, resource, rate_limit):
     """Clear a collection of resource, from collect func above.
@@ -341,7 +341,7 @@ def clear_resources(project, cols, resource, rate_limit):
 
         log('going to delete %d %s' % (len(items), resource.name))
         # try to delete at most $rate_limit items at a time
-        for idx in xrange(0, len(items), rate_limit):
+        for idx in range(0, len(items), rate_limit):
             clean = items[idx:idx + rate_limit]
             cmd = base + list(clean)
             if condition:
@@ -433,7 +433,7 @@ def clean_gke_cluster(project, age, filt):
 
 
 def activate_service_account(service_account):
-    print '[=== Activating service_account %s ===]' % service_account
+    print('[=== Activating service_account %s ===]' % service_account)
     cmd = [
         'gcloud', 'auth', 'activate-service-account',
         '--key-file=%s' % service_account,
@@ -443,7 +443,8 @@ def activate_service_account(service_account):
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError:
-        print >> sys.stderr, 'Error try to activate service_account: %s' % service_account
+        print('Error try to activate service_account: %s' % service_account,
+              file=sys.stderr)
         return 1
     return 0
 
@@ -460,16 +461,15 @@ def main(project, days, hours, filt, rate_limit, service_account):
         1 if list or delete command fails
     """
 
-    print '[=== Start Janitor on project %r ===]' % project
+    print('[=== Start Janitor on project %r ===]' % project)
     err = 0
     age = datetime.datetime.utcnow() - datetime.timedelta(days=days, hours=hours)
-    clear_all = (days is 0 and hours is 0)
+    clear_all = (days == 0 and hours == 0)
 
     if service_account:
         err |= activate_service_account(service_account)
         if err:
-            print >> sys.stderr, 'Failed to activate service account %r' % (
-                service_account)
+            print('Failed to activate service account %r' % service_account, file=sys.stderr)
             sys.exit(err)
 
     # try to clean a leaked GKE cluster first, rather than attempting to delete
@@ -478,7 +478,7 @@ def main(project, days, hours, filt, rate_limit, service_account):
         err |= clean_gke_cluster(project, age, filt)
     except ValueError:
         err |= 1  # keep clean the other resource
-        print >> sys.stderr, 'Fail to clean up cluster from project %r' % project
+        print('Fail to clean up cluster from project %r' % project, file=sys.stderr)
 
     for res in DEMOLISH_ORDER:
         log('Try to search for %r with condition %r, managed %r' % (
@@ -489,10 +489,10 @@ def main(project, days, hours, filt, rate_limit, service_account):
                 err |= clear_resources(project, col, res, rate_limit)
         except (subprocess.CalledProcessError, ValueError) as exc:
             err |= 1  # keep clean the other resource
-            print >> sys.stderr, 'Fail to list resource %r from project %r: %r' % (
-                res.name, project, exc)
+            print('Fail to list resource %r from project %r: %r' % (res.name, project, exc),
+                  file=sys.stderr)
 
-    print '[=== Finish Janitor on project %r with status %r ===]' % (project, err)
+    print('[=== Finish Janitor on project %r with status %r ===]' % (project, err))
     sys.exit(err)
 
 
@@ -529,7 +529,7 @@ if __name__ == '__main__':
 
     # We want to allow --days=0 and --hours=0, so check against None instead.
     if ARGS.days is None and ARGS.hours is None:
-        print >> sys.stderr, 'must specify --days and/or --hours'
+        print('must specify --days and/or --hours', file=sys.stderr)
         sys.exit(1)
 
     main(ARGS.project, ARGS.days or 0, ARGS.hours or 0, ARGS.filter,
