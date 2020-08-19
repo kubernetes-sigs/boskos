@@ -26,58 +26,59 @@ import sys
 import threading
 
 # A resource that need to be cleared.
+# Any names in preserved_names will never be deleted.
 Resource = collections.namedtuple(
-    'Resource', 'api_version group name subgroup condition managed tolerate bulk_delete')
+    'Resource', 'api_version group name subgroup condition managed tolerate bulk_delete preserved_names')
 RESOURCES_BY_API = {
     # [WARNING FROM KRZYZACY] : TOUCH THIS WITH CARE!
     # ORDER (INSIDE EACH API BLOCK) REALLY MATTERS HERE!
 
     # compute resources
     'compute.googleapis.com': [
-        Resource('', 'compute', 'instances', None, 'zone', None, False, True),
-        Resource('', 'compute', 'addresses', None, 'global', None, False, True),
-        Resource('', 'compute', 'addresses', None, 'region', None, False, True),
-        Resource('', 'compute', 'disks', None, 'zone', None, False, True),
-        Resource('', 'compute', 'disks', None, 'region', None, False, True),
-        Resource('', 'compute', 'firewall-rules', None, None, None, False, True),
-        Resource('', 'compute', 'forwarding-rules', None, 'global', None, False, True),
-        Resource('', 'compute', 'forwarding-rules', None, 'region', None, False, True),
-        Resource('', 'compute', 'target-http-proxies', None, 'global', None, False, True),
-        Resource('', 'compute', 'target-http-proxies', None, 'region', None, False, True),
-        Resource('', 'compute', 'target-https-proxies', None, 'global', None, False, True),
-        Resource('', 'compute', 'target-https-proxies', None, 'region', None, False, True),
-        Resource('', 'compute', 'target-tcp-proxies', None, None, None, False, True),
-        Resource('', 'compute', 'ssl-certificates', None, 'global', None, False, True),
-        Resource('', 'compute', 'ssl-certificates', None, 'region', None, False, True),
-        Resource('', 'compute', 'url-maps', None, 'global', None, False, True),
-        Resource('', 'compute', 'url-maps', None, 'region', None, False, True),
-        Resource('', 'compute', 'backend-services', None, 'global', None, False, True),
-        Resource('', 'compute', 'backend-services', None, 'region', None, False, True),
-        Resource('', 'compute', 'target-pools', None, 'region', None, False, True),
-        Resource('', 'compute', 'health-checks', None, 'global', None, False, True),
-        Resource('', 'compute', 'health-checks', None, 'region', None, False, True),
-        Resource('', 'compute', 'http-health-checks', None, None, None, False, True),
-        Resource('', 'compute', 'instance-groups', None, 'region', 'Yes', False, True),
-        Resource('', 'compute', 'instance-groups', None, 'zone', 'Yes', False, True),
-        Resource('', 'compute', 'instance-groups', None, 'zone', 'No', False, True),
-        Resource('', 'compute', 'instance-templates', None, None, None, False, True),
-        Resource('', 'compute', 'sole-tenancy', 'node-groups', 'zone', None, False, True),
-        Resource('', 'compute', 'sole-tenancy', 'node-templates', 'region', None, False, True),
-        Resource('', 'compute', 'network-endpoint-groups', None, 'zone', None, False, False),
-        Resource('', 'compute', 'routes', None, None, None, False, True),
-        Resource('', 'compute', 'routers', None, 'region', None, False, True),
-        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True),
-        Resource('', 'compute', 'networks', None, None, None, False, True),
+        Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
+        Resource('', 'compute', 'addresses', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'addresses', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'disks', None, 'zone', None, False, True, None),
+        Resource('', 'compute', 'disks', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'firewall-rules', None, None, None, False, True, None),
+        Resource('', 'compute', 'forwarding-rules', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'forwarding-rules', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'target-http-proxies', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'target-http-proxies', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'target-https-proxies', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'target-https-proxies', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'target-tcp-proxies', None, None, None, False, True, None),
+        Resource('', 'compute', 'ssl-certificates', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'ssl-certificates', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'url-maps', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'url-maps', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'backend-services', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'backend-services', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'target-pools', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'health-checks', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'health-checks', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'http-health-checks', None, None, None, False, True, None),
+        Resource('', 'compute', 'instance-groups', None, 'region', 'Yes', False, True, None),
+        Resource('', 'compute', 'instance-groups', None, 'zone', 'Yes', False, True, None),
+        Resource('', 'compute', 'instance-groups', None, 'zone', 'No', False, True, None),
+        Resource('', 'compute', 'instance-templates', None, None, None, False, True, None),
+        Resource('', 'compute', 'sole-tenancy', 'node-groups', 'zone', None, False, True, None),
+        Resource('', 'compute', 'sole-tenancy', 'node-templates', 'region', None, False, True, None),
+        Resource('', 'compute', 'network-endpoint-groups', None, 'zone', None, False, False, None),
+        Resource('', 'compute', 'routes', None, None, None, False, True, None),
+        Resource('', 'compute', 'routers', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, None),
+        Resource('', 'compute', 'networks', None, None, None, False, True, None),
     ],
 
     # logging resources
     'logging.googleapis.com': [
-        Resource('', 'logging', 'sinks', None, None, None, False, False),
+        Resource('', 'logging', 'sinks', None, None, None, False, False, ['_Default', '_Required']),
     ],
 
     # GKE hub memberships
     'gkehub.googleapis.com': [
-        Resource('', 'container', 'hub', 'memberships', None, None, False, False),
+        Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
     ],
 }
 
@@ -195,6 +196,9 @@ def validate_item(item, age, resource, clear_all):
     Raises:
         ValueError if json result from gcloud is invalid.
     """
+
+    if resource.preserved_names and item['name'] in resource.preserved_names:
+        return False
 
     if resource.managed:
         if 'isManaged' not in item:
