@@ -18,6 +18,7 @@ package ranch
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 type request struct {
 	id         string
 	expiration time.Time
+	// Used to calculate since when this resource has been acquired
+	createdAt time.Time
 }
 
 type requestNode struct {
@@ -91,13 +94,12 @@ func newRequestQueue() *requestQueue {
 
 // update updates expiration time is updated if already present,
 // add a new requestID at the end otherwise (FIFO)
-func (rq *requestQueue) update(requestID string, newExpiration time.Time) bool {
-
+func (rq *requestQueue) update(requestID string, newExpiration, now time.Time) bool {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
 	req, exists := rq.requestMap[requestID]
 	if !exists {
-		req = request{id: requestID}
+		req = request{id: requestID, createdAt: now}
 		rq.requestList.Append(requestID)
 		logrus.Infof("request id %s added", requestID)
 	}
@@ -144,7 +146,7 @@ func (rq *requestQueue) getRank(requestID string, ttl time.Duration, now time.Ti
 	// not considering empty requestID as new
 	var new bool
 	if requestID != "" {
-		new = rq.update(requestID, now.Add(ttl))
+		new = rq.update(requestID, now.Add(ttl), now)
 	}
 	rank := 1
 	rq.lock.RLock()
@@ -242,6 +244,25 @@ func (rp *RequestManager) GetRank(key interface{}, id string) (int, bool) {
 		rp.requests[key] = rq
 	}
 	return rq.getRank(id, rp.ttl, rp.now())
+}
+
+// GetCreatedAt returns when the request was created
+func (rp *RequestManager) GetCreatedAt(key interface{}, id string) (time.Time, error) {
+	rp.lock.Lock()
+	defer rp.lock.Unlock()
+	var createdTime time.Time
+	rq := rp.requests[key]
+	if rq == nil {
+		//This should never happen
+		return createdTime, fmt.Errorf("failed to get the created time because the request queue is nil for the key %v", key)
+	}
+
+	req, exists := rq.requestMap[id]
+	if !exists {
+		//This should never happen
+		return createdTime, fmt.Errorf("failed to get the created time because the request does not exist for the id %s", id)
+	}
+	return req.createdAt, nil
 }
 
 // Delete deletes a specific request such that it is not accounted in the next GetRank call.

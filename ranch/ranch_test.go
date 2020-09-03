@@ -199,7 +199,11 @@ func TestAcquire(t *testing.T) {
 
 	for _, tc := range testcases {
 		c := makeTestRanch(tc.resources)
-		res, err := c.Acquire(tc.rtype, tc.state, tc.dest, tc.owner, "")
+		now := time.Now()
+		c.now = func() time.Time {
+			return now
+		}
+		res, createdTime, err := c.Acquire(tc.rtype, tc.state, tc.dest, tc.owner, "")
 		if !AreErrorsEqual(err, tc.expectErr) {
 			t.Errorf("%s - Got error %v, expected error %v", tc.name, err, tc.expectErr)
 			continue
@@ -210,7 +214,9 @@ func TestAcquire(t *testing.T) {
 			t.Errorf("failed to get resources")
 			continue
 		}
-
+		if !now.Equal(createdTime) {
+			t.Errorf("expected createdAt %s, got %s", now, createdTime)
+		}
 		if err == nil {
 			if res.Status.State != tc.dest {
 				t.Errorf("%s - Wrong final state. Got %v, expected %v", tc.name, res.Status.State, tc.dest)
@@ -239,37 +245,47 @@ func TestAcquirePriority(t *testing.T) {
 	r.requestMgr.now = func() time.Time { return now }
 
 	// Setting Priority, this request will fail
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err == nil {
+	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err == nil {
 		t.Errorf("should fail as there are not resource available")
 	}
 	if err := r.Storage.AddResource(res); err != nil {
 		t.Fatalf("failed to add resource: %v", err)
 	}
 	// Attempting to acquire this resource without priority
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, ""); err == nil {
+	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, ""); err == nil {
 		t.Errorf("should fail as there is only resource, and it is prioritizes to request_id_1")
 	}
 	// Attempting to acquire this resource with priority, which will set a place in the queue
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_2"); err == nil {
+	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_2"); err == nil {
 		t.Errorf("should fail as there is only resource, and it is prioritizes to request_id_1")
 	}
 	// Attempting with the first request
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err != nil {
+	_, createdTime, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1")
+	if err != nil {
 		t.Fatalf("should succeed since the request priority should match its rank in the queue. got %v", err)
+	}
+	if !now.Equal(createdTime) {
+		t.Errorf("expected createdAt %s, got %s", now, createdTime)
 	}
 	r.Release(res.Name, common.Free, "tester")
 	// Attempting with the first request
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err == nil {
+	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err == nil {
 		t.Errorf("should not succeed since this request has already been fulfilled")
 	}
 	// Attempting to acquire this resource without priority
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, ""); err == nil {
+	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, ""); err == nil {
 		t.Errorf("should fail as request_id_2 has rank 1 now")
 	}
 	r.requestMgr.cleanup(expiredFuture)
+	now2 := time.Now()
+	r.now = func() time.Time { return now2 }
 	// Attempting to acquire this resource without priority
-	if _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, ""); err != nil {
+	_, createdTime, err = r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "")
+	if err != nil {
 		t.Errorf("request_id_2 expired, this should work now, got %v", err)
+	}
+	if !now2.Equal(createdTime) {
+		t.Errorf("expected createdAt %s, got %s", now, createdTime)
 	}
 }
 
@@ -283,7 +299,7 @@ func TestAcquireRoundRobin(t *testing.T) {
 
 	c := makeTestRanch(resources)
 	for i := 0; i < 4; i++ {
-		res, err := c.Acquire("t", "s", "d", "foo", "")
+		res, _, err := c.Acquire("t", "s", "d", "foo", "")
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -318,7 +334,7 @@ func TestAcquireOnDemand(t *testing.T) {
 	c := makeTestRanch(dRLCs)
 	c.now = func() time.Time { return now }
 	// First acquire should trigger a creation
-	if _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID1); err == nil {
+	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID1); err == nil {
 		t.Errorf("should fail since there is not resource yet")
 	}
 	if resources, err := c.Storage.GetResources(); err != nil {
@@ -327,7 +343,7 @@ func TestAcquireOnDemand(t *testing.T) {
 		t.Fatal("A resource should have been created")
 	}
 	// Attempting to create another resource
-	if _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID1); err == nil {
+	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID1); err == nil {
 		t.Errorf("should succeed since the created is dirty")
 	}
 	if resources, err := c.Storage.GetResources(); err != nil {
@@ -336,7 +352,7 @@ func TestAcquireOnDemand(t *testing.T) {
 		t.Errorf("No new resource should have been created")
 	}
 	// Creating another
-	if _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID2); err == nil {
+	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID2); err == nil {
 		t.Errorf("should succeed since the created is dirty")
 	}
 	if resources, err := c.Storage.GetResources(); err != nil {
@@ -345,7 +361,7 @@ func TestAcquireOnDemand(t *testing.T) {
 		t.Errorf("Another resource should have been created")
 	}
 	// Attempting to create another
-	if _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID3); err == nil {
+	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID3); err == nil {
 		t.Errorf("should fail since there is not resource yet")
 	}
 	resources, err := c.Storage.GetResources()
@@ -357,7 +373,7 @@ func TestAcquireOnDemand(t *testing.T) {
 	for _, res := range resources.Items {
 		c.Storage.DeleteResource(res.Name)
 	}
-	if _, err := c.Acquire(rType, common.Free, common.Busy, owner, ""); err == nil {
+	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, ""); err == nil {
 		t.Errorf("should fail since there is not resource yet")
 	}
 	if resources, err := c.Storage.GetResources(); err != nil {

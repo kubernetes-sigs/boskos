@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"k8s.io/test-infra/prow/simplifypath"
 	"sigs.k8s.io/boskos/common"
@@ -90,6 +92,23 @@ func handleDefault(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
+var (
+	acquireDurationSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "boskos_acquire_duration_seconds",
+		Help:    "Histogram of waiting in seconds for a Boskos' client to acquire a resource.",
+		Buckets: []float64{1, 10, 100, 500, 1000, 1500, 2000},
+	}, []string{
+		"type",
+		"state",
+		"dest",
+		"has_request_id",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(acquireDurationSeconds)
+}
+
 //  handleAcquire: Handler for /acquire
 //  Method: POST
 // 	URLParams:
@@ -122,7 +141,7 @@ func handleAcquire(r *ranch.Ranch) http.HandlerFunc {
 
 		logrus.Infof("Request for a %v %v from %v, dest %v", state, rtype, owner, dest)
 
-		resource, err := r.Acquire(rtype, state, dest, owner, requestID)
+		resource, createdTime, err := r.Acquire(rtype, state, dest, owner, requestID)
 		if err != nil {
 			returnAndLogError(res, err, "Acquire failed")
 			return
@@ -141,6 +160,10 @@ func handleAcquire(r *ranch.Ranch) http.HandlerFunc {
 		}
 		logrus.Infof("Resource leased: %v", string(resJSON))
 		fmt.Fprint(res, string(resJSON))
+
+		latency := time.Since(createdTime)
+		labels := prometheus.Labels{"type": rtype, "state": state, "dest": dest, "has_request_id": strconv.FormatBool(requestID != "")}
+		acquireDurationSeconds.With(labels).Observe(latency.Seconds())
 	}
 }
 

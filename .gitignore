@@ -3,6 +3,7 @@
 /bazel-*
 .DS_Store
 /.vscode/*
+/.idea/*
 
 _output/
 /hack/tools/bin/
