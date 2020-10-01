@@ -112,9 +112,9 @@ type acquireRequestPriorityKey struct {
 //     dest - destination state of the requested resource
 //     owner - requester of the resource
 //     requestID - request ID to get a priority in the queue
-// Out: A valid Resource object on success, or
+// Out: A valid Resource object and the time when the resource was originally requested on success, or
 //      ResourceNotFound error if target type resource does not exist in target state.
-func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.ResourceObject, error) {
+func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.ResourceObject, time.Time, error) {
 	logger := logrus.WithFields(logrus.Fields{
 		"type":       rType,
 		"state":      state,
@@ -124,6 +124,7 @@ func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.Reso
 	})
 
 	var returnRes *crds.ResourceObject
+	createdTime := r.now()
 	if err := retryOnConflict(retry.DefaultBackoff, func() error {
 		logger.Debug("Determining request priority...")
 		ts := acquireRequestPriorityKey{rType: rType, state: state}
@@ -165,6 +166,10 @@ func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.Reso
 			}
 			// Deleting this request since it has been fulfilled
 			if requestID != "" {
+				if createdTime, err = r.requestMgr.GetCreatedAt(ts, requestID); err != nil {
+					// It is chosen NOT to fail the function since the resource has been already updated to give ownership.
+					logger.WithError(err).Errorf("Error occurred when getting the created time")
+				}
 				logger.Debug("Cleaning up requests.")
 				r.requestMgr.Delete(ts, requestID)
 			}
@@ -173,23 +178,7 @@ func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.Reso
 			return nil
 		}
 
-		if new {
-			logger.Debug("Checking for associated dynamic resource type...")
-			lifeCycle, err := r.Storage.GetDynamicResourceLifeCycle(rType)
-			// Assuming error means no associated dynamic resource.
-			if err == nil {
-				if typeCount < lifeCycle.Spec.MaxCount {
-					logger.Debug("Adding new dynamic resources...")
-					res := newResourceFromNewDynamicResourceLifeCycle(r.Storage.generateName(), lifeCycle, r.now())
-					if err := r.Storage.AddResource(res); err != nil {
-						logger.WithError(err).Warningf("unable to add a new resource of type %s", rType)
-					}
-					logger.Infof("Added dynamic resource %s of type %s", res.Name, res.Spec.Type)
-				}
-			} else {
-				logrus.WithError(err).Debug("Failed listing DRLC")
-			}
-		}
+		addResource(new, logger, r, rType, typeCount)
 
 		if typeCount > 0 {
 			return &ResourceNotFound{rType}
@@ -204,10 +193,31 @@ func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.Reso
 		default:
 			logrus.WithError(err).Error("Acquire failed")
 		}
-		return nil, err
+		return nil, createdTime, err
 	}
 
-	return returnRes, nil
+	return returnRes, createdTime, nil
+}
+
+func addResource(new bool, logger *logrus.Entry, r *Ranch, rType string, typeCount int) {
+	if !new {
+		return
+	}
+	logger.Debug("Checking for associated dynamic resource type...")
+	lifeCycle, err := r.Storage.GetDynamicResourceLifeCycle(rType)
+	// Assuming error means no associated dynamic resource.
+	if err == nil {
+		if typeCount < lifeCycle.Spec.MaxCount {
+			logger.Debug("Adding new dynamic resources...")
+			res := newResourceFromNewDynamicResourceLifeCycle(r.Storage.generateName(), lifeCycle, r.now())
+			if err := r.Storage.AddResource(res); err != nil {
+				logger.WithError(err).Warningf("unable to add a new resource of type %s", rType)
+			}
+			logger.Infof("Added dynamic resource %s of type %s", res.Name, res.Spec.Type)
+		}
+	} else {
+		logrus.WithError(err).Debug("Failed listing DRLC")
+	}
 }
 
 // AcquireByState checks out resources of a given type without an owner,

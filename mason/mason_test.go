@@ -131,7 +131,7 @@ func createFakeBoskos(tc testConfig) (*ranch.Storage, *Client, chan releasedReso
 }
 
 func (fb *fakeBoskos) Acquire(rtype, state, dest string) (*common.Resource, error) {
-	crd, err := fb.ranch.Acquire(rtype, state, dest, owner, "")
+	crd, _, err := fb.ranch.Acquire(rtype, state, dest, owner, "")
 	if crd != nil {
 		return resourcePtr(crd.ToResource()), err
 	}

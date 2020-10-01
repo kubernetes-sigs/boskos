@@ -62,7 +62,7 @@ func createFakeBoskos(objects ...runtime.Object) (*ranch.Storage, boskosClient, 
 }
 
 func (fb *fakeBoskos) Acquire(rtype, state, dest string) (*common.Resource, error) {
-	crdRes, err := fb.ranch.Acquire(rtype, state, dest, testOwner, "")
+	crdRes, _, err := fb.ranch.Acquire(rtype, state, dest, testOwner, "")
 	if err != nil {
 		return nil, err
 	}
