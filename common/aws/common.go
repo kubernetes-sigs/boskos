@@ -19,15 +19,13 @@ package aws
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"sigs.k8s.io/boskos/common"
 )
 
 const (
-	// ResourceType is the Boskos Type for AWS accounts
-	ResourceType = "aws-account"
-
 	// UserDataAccessIDKey is the key in UserData containing the AWS Access key ID
 	UserDataAccessIDKey = "access-key-id"
 
@@ -39,8 +37,8 @@ const (
 func GetAWSCreds(r *common.Resource) (credentials.Value, error) {
 	val := credentials.Value{}
 
-	if r.Type != ResourceType {
-		return val, fmt.Errorf("Wanted resource of type %q, got %q", ResourceType, r.Type)
+	if !strings.HasSuffix(r.Type, "aws-account") {
+		return val, fmt.Errorf("invalid aws resource type %q", r.Type)
 	}
 
 	accessKey, ok := r.UserData.Map.Load(UserDataAccessIDKey)
@@ -56,5 +54,4 @@ func GetAWSCreds(r *common.Resource) (credentials.Value, error) {
 	val.SecretAccessKey = secretKey.(string)
 
 	return val, nil
-
 }

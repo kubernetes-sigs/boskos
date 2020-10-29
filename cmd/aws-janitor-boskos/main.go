@@ -35,6 +35,7 @@ import (
 
 var (
 	boskosURL          = flag.String("boskos-url", "http://boskos", "Boskos URL")
+	rTypes             common.CommaSeparatedStrings
 	username           = flag.String("username", "", "Username used to access the Boskos server")
 	passwordFile       = flag.String("password-file", "", "The path to password file used to access the Boskos server")
 	region             = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
@@ -47,6 +48,10 @@ var (
 const (
 	sleepTime = time.Minute
 )
+
+func init() {
+	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be cleaned up")
+}
 
 func main() {
 	logrusutil.ComponentInit()
@@ -64,6 +69,11 @@ func main() {
 		sweepSleepDuration = d
 	}
 
+	if len(rTypes) == 0 {
+		logrus.Info("--resource-type is empty! Setting it to default: aws-account")
+		rTypes = []string{"aws-account"}
+	}
+
 	boskos, err := client.NewClient("AWSJanitor", *boskosURL, *username, *passwordFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
@@ -75,21 +85,23 @@ func main() {
 
 func run(boskos *client.Client) error {
 	for {
-		if res, err := boskos.Acquire(awsboskos.ResourceType, common.Dirty, common.Cleaning); errors.Cause(err) == client.ErrNotFound {
-			logrus.Info("no resource acquired. Sleeping.")
-			time.Sleep(sleepTime)
-			continue
-		} else if err != nil {
-			return errors.Wrap(err, "Couldn't retrieve resources from Boskos")
-		} else {
-			logrus.WithField("name", res.Name).Info("Acquired resource")
-			if err := cleanResource(res); err != nil {
-				return errors.Wrapf(err, "Couldn't clean resource %q", res.Name)
+		for _, resourceType := range rTypes {
+			if res, err := boskos.Acquire(resourceType, common.Dirty, common.Cleaning); errors.Cause(err) == client.ErrNotFound {
+				logrus.Info("no resource acquired. Sleeping.")
+				time.Sleep(sleepTime)
+				continue
+			} else if err != nil {
+				return errors.Wrap(err, "Couldn't retrieve resources from Boskos")
+			} else {
+				logrus.WithField("name", res.Name).Info("Acquired resource")
+				if err := cleanResource(res); err != nil {
+					return errors.Wrapf(err, "Couldn't clean resource %q", res.Name)
+				}
+				if err := boskos.ReleaseOne(res.Name, common.Free); err != nil {
+					return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
+				}
+				logrus.WithField("name", res.Name).Info("Released resource")
 			}
-			if err := boskos.ReleaseOne(res.Name, common.Free); err != nil {
-				return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
-			}
-			logrus.WithField("name", res.Name).Info("Released resource")
 		}
 	}
 }
