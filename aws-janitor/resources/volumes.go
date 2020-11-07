@@ -40,7 +40,9 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
 			if set.Mark(v) {
 				logger.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
-				toDelete = append(toDelete, v)
+				if !opts.DryRun {
+					toDelete = append(toDelete, v)
+				}
 			}
 		}
 		return true

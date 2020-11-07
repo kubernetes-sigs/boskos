@@ -51,6 +51,9 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 		s := &subnet{Account: opts.Account, Region: opts.Region, ID: *sub.SubnetId}
 		if set.Mark(s) {
 			logger.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+			if opts.DryRun {
+				continue
+			}
 			if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
 				logger.Warningf("%s: delete failed: %v", s.ARN(), err)
 			}

@@ -31,7 +31,7 @@ import (
 
 // CleanAll cleans all of the resources for all of the regions visible to
 // the provided AWS session.
-func CleanAll(sess *session.Session, region string) error {
+func CleanAll(sess *session.Session, region string, dryRun bool) error {
 	acct, err := account.GetAccount(sess, regions.Default)
 	if err != nil {
 		return errors.Wrap(err, "Failed to retrieve account")
@@ -54,6 +54,7 @@ func CleanAll(sess *session.Session, region string) error {
 	opts := Options{
 		Session: sess,
 		Account: acct,
+		DryRun:  dryRun,
 	}
 	for _, r := range regionList {
 		opts.Region = r

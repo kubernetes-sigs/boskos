@@ -40,7 +40,9 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn}
 			if set.Mark(a) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
-				toDelete = append(toDelete, a)
+				if !opts.DryRun {
+					toDelete = append(toDelete, a)
+				}
 			}
 		}
 		return true

@@ -75,6 +75,9 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 		dh := &dhcpOption{Account: opts.Account, Region: opts.Region, ID: *dhcp.DhcpOptionsId}
 		if set.Mark(dh) {
 			logger.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+			if opts.DryRun {
+				continue
+			}
 
 			if _, err := svc.DeleteDhcpOptions(&ec2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
 				logger.Warningf("%s: delete failed: %v", dh.ARN(), err)

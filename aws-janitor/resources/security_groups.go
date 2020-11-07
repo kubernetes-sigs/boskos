@@ -68,7 +68,9 @@ func (SecurityGroups) MarkAndSweep(opts Options, set *Set) error {
 		addRefs(egress, *sg.GroupId, opts.Account, sg.IpPermissionsEgress)
 		if set.Mark(s) {
 			logger.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
-			toDelete = append(toDelete, s)
+			if !opts.DryRun {
+				toDelete = append(toDelete, s)
+			}
 		}
 	}
 

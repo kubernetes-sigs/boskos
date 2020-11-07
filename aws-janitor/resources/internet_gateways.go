@@ -65,6 +65,9 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 		if set.Mark(i) {
 			isDefault := false
 			logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
+			if opts.DryRun {
+				continue
+			}
 
 			for _, att := range ig.Attachments {
 				if defaultVPC[aws.StringValue(att.VpcId)] {

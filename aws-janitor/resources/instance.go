@@ -57,7 +57,9 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 
 				if set.Mark(i) {
 					logger.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
-					toDelete = append(toDelete, inst.InstanceId)
+					if !opts.DryRun {
+						toDelete = append(toDelete, inst.InstanceId)
+					}
 				}
 			}
 		}

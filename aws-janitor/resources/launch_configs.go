@@ -39,7 +39,9 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 			l := &launchConfiguration{ID: *lc.LaunchConfigurationARN, Name: *lc.LaunchConfigurationName}
 			if set.Mark(l) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
-				toDelete = append(toDelete, l)
+				if !opts.DryRun {
+					toDelete = append(toDelete, l)
+				}
 			}
 		}
 		return true

@@ -55,6 +55,11 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 
 		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
 		if set.Mark(r) {
+			logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
+			if opts.DryRun {
+				continue
+			}
+
 			for _, assoc := range rt.Associations {
 				logger.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
 
@@ -66,8 +71,6 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 					logger.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
 				}
 			}
-
-			logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
 
 			deleteReq := &ec2.DeleteRouteTableInput{
 				RouteTableId: rt.RouteTableId,

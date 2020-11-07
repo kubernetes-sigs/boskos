@@ -40,7 +40,9 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 			a := &classicLoadBalancer{region: opts.Region, account: opts.Account, name: *lb.LoadBalancerName, dnsName: *lb.DNSName}
 			if set.Mark(a) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, a.name)
-				toDelete = append(toDelete, a)
+				if !opts.DryRun {
+					toDelete = append(toDelete, a)
+				}
 			}
 		}
 		return true

@@ -49,7 +49,9 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 			}
 			if set.Mark(o) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
-				toDelete = append(toDelete, o)
+				if !opts.DryRun {
+					toDelete = append(toDelete, o)
+				}
 			}
 		}
 		return true

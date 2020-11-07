@@ -65,7 +65,9 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(r.RoleId), roleName: aws.StringValue(r.RoleName)}
 			if set.Mark(l) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
-				toDelete = append(toDelete, l)
+				if !opts.DryRun {
+					toDelete = append(toDelete, l)
+				}
 			}
 		}
 		return true

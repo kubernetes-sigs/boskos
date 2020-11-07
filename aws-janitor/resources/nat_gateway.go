@@ -46,6 +46,10 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 			}
 
 			if set.Mark(g) {
+				logger.Warningf("%s: deleting %T: %s", g.ARN(), gw, g.ID)
+				if opts.DryRun {
+					continue
+				}
 				inp := &ec2.DeleteNatGatewayInput{NatGatewayId: gw.NatGatewayId}
 				if _, err := svc.DeleteNatGateway(inp); err != nil {
 					logger.Warningf("%s: delete failed: %v", g.ARN(), err)

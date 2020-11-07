@@ -25,6 +25,9 @@ type Options struct {
 	Session *session.Session `json:"-"`
 	Account string
 	Region  string
+
+	// Whether to actually delete resources, or just report what would be deleted.
+	DryRun bool
 }
 
 type Type interface {

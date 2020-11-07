@@ -44,7 +44,9 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 			}
 			if set.Mark(a) {
 				logger.Warningf("%s: deleting %T", a.ARN(), a)
-				toDelete = append(toDelete, a)
+				if !opts.DryRun {
+					toDelete = append(toDelete, a)
+				}
 			}
 		}
 		return true

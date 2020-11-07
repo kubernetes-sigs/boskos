@@ -99,7 +99,9 @@ func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 					o := &route53ResourceRecordSet{zone: z, obj: rrs}
 					if set.Mark(o) {
 						logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
-						toDelete = append(toDelete, o)
+						if !opts.DryRun {
+							toDelete = append(toDelete, o)
+						}
 					}
 				}
 				return true

@@ -40,7 +40,9 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 			a := &autoScalingGroup{ID: *asg.AutoScalingGroupARN, Name: *asg.AutoScalingGroupName}
 			if set.Mark(a) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
-				toDelete = append(toDelete, a)
+				if !opts.DryRun {
+					toDelete = append(toDelete, a)
+				}
 			}
 		}
 		return true

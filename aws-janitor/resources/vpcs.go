@@ -50,7 +50,9 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 		v := &vpc{Account: opts.Account, Region: opts.Region, ID: *vp.VpcId}
 		if set.Mark(v) {
 			logger.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
-
+			if opts.DryRun {
+				continue
+			}
 			if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
 				disReq := &ec2.AssociateDhcpOptionsInput{
 					VpcId:         vp.VpcId,

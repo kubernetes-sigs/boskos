@@ -43,6 +43,9 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 		a := &address{Account: opts.Account, Region: opts.Region, ID: *addr.AllocationId}
 		if set.Mark(a) {
 			logger.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
+			if opts.DryRun {
+				continue
+			}
 
 			if addr.AssociationId != nil {
 				logger.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)

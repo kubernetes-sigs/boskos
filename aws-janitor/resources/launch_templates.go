@@ -45,7 +45,9 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 			}
 			if set.Mark(l) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
-				toDelete = append(toDelete, l)
+				if !opts.DryRun {
+					toDelete = append(toDelete, l)
+				}
 			}
 		}
 		return true
