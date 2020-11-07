@@ -30,6 +30,7 @@ import (
 type Volumes struct{}
 
 func (Volumes) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*volume // Paged call, defer deletion until we have the whole list.
@@ -38,7 +39,7 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 		for _, vol := range page.Volumes {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
 			if set.Mark(v) {
-				logrus.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
+				logger.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
 				toDelete = append(toDelete, v)
 			}
 		}
@@ -55,7 +56,7 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteVolume(deleteReq); err != nil {
-			logrus.Warningf("%s: delete failed: %v", vol.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", vol.ARN(), err)
 		}
 	}
 

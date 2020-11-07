@@ -29,6 +29,7 @@ import (
 type LaunchConfigurations struct{}
 
 func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*launchConfiguration // Paged call, defer deletion until we have the whole list.
@@ -37,7 +38,7 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 		for _, lc := range page.LaunchConfigurations {
 			l := &launchConfiguration{ID: *lc.LaunchConfigurationARN, Name: *lc.LaunchConfigurationName}
 			if set.Mark(l) {
-				logrus.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -54,7 +55,7 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteLaunchConfiguration(deleteReq); err != nil {
-			logrus.Warningf("%s: delete failed: %v", lc.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", lc.ARN(), err)
 		}
 	}
 

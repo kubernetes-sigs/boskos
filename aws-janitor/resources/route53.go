@@ -75,6 +75,7 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 }
 
 func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var listError error
@@ -97,7 +98,7 @@ func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 
 					o := &route53ResourceRecordSet{zone: z, obj: rrs}
 					if set.Mark(o) {
-						logrus.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+						logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
 						toDelete = append(toDelete, o)
 					}
 				}
@@ -130,14 +131,14 @@ func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 					changes = nil
 				}
 
-				logrus.Infof("Deleting %d route53 resource records", len(chunk))
+				logger.Infof("Deleting %d route53 resource records", len(chunk))
 				deleteReq := &route53.ChangeResourceRecordSetsInput{
 					HostedZoneId: z.Id,
 					ChangeBatch:  &route53.ChangeBatch{Changes: chunk},
 				}
 
 				if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
-					logrus.Warningf("unable to delete DNS records: %v", err)
+					logger.Warningf("unable to delete DNS records: %v", err)
 				}
 			}
 		}

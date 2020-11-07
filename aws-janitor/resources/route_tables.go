@@ -31,6 +31,7 @@ import (
 type RouteTables struct{}
 
 func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeRouteTables(nil)
@@ -55,25 +56,25 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
 		if set.Mark(r) {
 			for _, assoc := range rt.Associations {
-				logrus.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
+				logger.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
 
 				disReq := &ec2.DisassociateRouteTableInput{
 					AssociationId: assoc.RouteTableAssociationId,
 				}
 
 				if _, err := svc.DisassociateRouteTable(disReq); err != nil {
-					logrus.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
+					logger.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
 				}
 			}
 
-			logrus.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
+			logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
 
 			deleteReq := &ec2.DeleteRouteTableInput{
 				RouteTableId: rt.RouteTableId,
 			}
 
 			if _, err := svc.DeleteRouteTable(deleteReq); err != nil {
-				logrus.Warningf("%s: delete failed: %v", r.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", r.ARN(), err)
 			}
 		}
 	}

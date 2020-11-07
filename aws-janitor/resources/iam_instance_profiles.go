@@ -29,6 +29,7 @@ import (
 type IAMInstanceProfiles struct{}
 
 func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*iamInstanceProfile // Paged call, defer deletion until we have the whole list.
@@ -49,13 +50,13 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 			}
 
 			if !managed {
-				logrus.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
+				logger.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
 				continue
 			}
 
 			o := &iamInstanceProfile{profile: p}
 			if set.Mark(o) {
-				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
 				toDelete = append(toDelete, o)
 			}
 		}
@@ -68,7 +69,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil

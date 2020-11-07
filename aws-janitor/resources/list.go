@@ -22,7 +22,7 @@ import (
 
 // Options holds parameters for resource functions.
 type Options struct {
-	Session *session.Session
+	Session *session.Session `json:"-"`
 	Account string
 	Region  string
 }

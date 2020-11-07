@@ -29,6 +29,7 @@ import (
 type CloudFormationStacks struct{}
 
 func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := cf.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*cloudFormationStack // Paged call, defer deletion until we have the whole list.
@@ -47,7 +48,7 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 				name: aws.StringValue(stack.StackName),
 			}
 			if set.Mark(o) {
-				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
 				toDelete = append(toDelete, o)
 			}
 		}
@@ -60,7 +61,7 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil

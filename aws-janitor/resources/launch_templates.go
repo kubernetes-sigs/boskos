@@ -30,6 +30,7 @@ import (
 type LaunchTemplates struct{}
 
 func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*launchTemplate // Paged call, defer deletion until we have the whole list.
@@ -43,7 +44,7 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 				Name:    *lt.LaunchTemplateName,
 			}
 			if set.Mark(l) {
-				logrus.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -60,7 +61,7 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteLaunchTemplate(deleteReq); err != nil {
-			logrus.Warningf("%s: delete failed: %v", lt.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", lt.ARN(), err)
 		}
 	}
 

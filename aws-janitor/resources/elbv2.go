@@ -30,6 +30,7 @@ import (
 type LoadBalancers struct{}
 
 func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*loadBalancer // Paged call, defer deletion until we have the whole list.
@@ -38,7 +39,7 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 		for _, lb := range page.LoadBalancers {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn}
 			if set.Mark(a) {
-				logrus.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
+				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -55,7 +56,7 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
-			logrus.Warningf("%s: delete failed: %v", lb.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", lb.ARN(), err)
 		}
 	}
 

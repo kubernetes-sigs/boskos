@@ -30,6 +30,7 @@ import (
 type Subnets struct{}
 
 func (Subnets) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	descReq := &ec2.DescribeSubnetsInput{
@@ -49,9 +50,9 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 	for _, sub := range resp.Subnets {
 		s := &subnet{Account: opts.Account, Region: opts.Region, ID: *sub.SubnetId}
 		if set.Mark(s) {
-			logrus.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+			logger.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
 			if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
-				logrus.Warningf("%s: delete failed: %v", s.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", s.ARN(), err)
 			}
 		}
 	}

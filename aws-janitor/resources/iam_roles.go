@@ -51,6 +51,7 @@ func roleIsManaged(role *iam.Role) bool {
 }
 
 func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*iamRole // Paged call, defer deletion until we have the whole list.
@@ -63,7 +64,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 
 			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(r.RoleId), roleName: aws.StringValue(r.RoleName)}
 			if set.Mark(l) {
-				logrus.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
 				toDelete = append(toDelete, l)
 			}
 		}
@@ -75,8 +76,8 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 	}
 
 	for _, r := range toDelete {
-		if err := r.delete(svc); err != nil {
-			logrus.Warningf("%s: delete failed: %v", r.ARN(), err)
+		if err := r.delete(svc, logger); err != nil {
+			logger.Warningf("%s: delete failed: %v", r.ARN(), err)
 		}
 	}
 
@@ -120,7 +121,7 @@ func (r iamRole) ResourceKey() string {
 	return r.roleID + "::" + r.ARN()
 }
 
-func (r iamRole) delete(svc *iam.IAM) error {
+func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 	roleName := r.roleName
 
 	var policyNames []string
@@ -138,7 +139,7 @@ func (r iamRole) delete(svc *iam.IAM) error {
 	}
 
 	for _, policyName := range policyNames {
-		logrus.Debugf("Deleting IAM role policy %q %q", roleName, policyName)
+		logger.Debugf("Deleting IAM role policy %q %q", roleName, policyName)
 
 		deletePolicyReq := &iam.DeleteRolePolicyInput{
 			RoleName:   aws.String(roleName),
@@ -150,7 +151,7 @@ func (r iamRole) delete(svc *iam.IAM) error {
 		}
 	}
 
-	logrus.Debugf("Deleting IAM role %q", roleName)
+	logger.Debugf("Deleting IAM role %q", roleName)
 
 	deleteReq := &iam.DeleteRoleInput{
 		RoleName: aws.String(roleName),

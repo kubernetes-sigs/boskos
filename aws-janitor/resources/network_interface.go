@@ -31,6 +31,7 @@ import (
 type NetworkInterfaces struct{}
 
 func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*networkInterface // Paged call, defer deletion until we have the whole list.
@@ -42,7 +43,7 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 				a.AttachmentID = *eni.Attachment.AttachmentId
 			}
 			if set.Mark(a) {
-				logrus.Warningf("%s: deleting %T", a.ARN(), a)
+				logger.Warningf("%s: deleting %T", a.ARN(), a)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -59,7 +60,7 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 				AttachmentId: aws.String(eni.AttachmentID),
 			}
 			if _, err := svc.DetachNetworkInterface(detachInput); err != nil {
-				logrus.Warningf("%s: detach failed: %v", eni.ARN(), err)
+				logger.Warningf("%s: detach failed: %v", eni.ARN(), err)
 			}
 		}
 
@@ -68,7 +69,7 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteNetworkInterface(deleteInput); err != nil {
-			logrus.Warningf("%s: delete failed: %v", eni.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", eni.ARN(), err)
 		}
 	}
 

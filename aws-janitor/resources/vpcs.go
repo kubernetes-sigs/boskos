@@ -31,6 +31,7 @@ import (
 type VPCs struct{}
 
 func (VPCs) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeVpcs(&ec2.DescribeVpcsInput{
@@ -48,7 +49,7 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 	for _, vp := range resp.Vpcs {
 		v := &vpc{Account: opts.Account, Region: opts.Region, ID: *vp.VpcId}
 		if set.Mark(v) {
-			logrus.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
+			logger.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
 
 			if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
 				disReq := &ec2.AssociateDhcpOptionsInput{
@@ -57,12 +58,12 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 				}
 
 				if _, err := svc.AssociateDhcpOptions(disReq); err != nil {
-					logrus.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
+					logger.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
 				}
 			}
 
 			if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
-				logrus.Warningf("%s: delete failed: %v", v.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", v.ARN(), err)
 			}
 		}
 	}

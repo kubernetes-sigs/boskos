@@ -31,6 +31,7 @@ import (
 type DHCPOptions struct{}
 
 func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	// This is a little gross, but I can't find an easier way to
@@ -73,16 +74,16 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 
 		dh := &dhcpOption{Account: opts.Account, Region: opts.Region, ID: *dhcp.DhcpOptionsId}
 		if set.Mark(dh) {
-			logrus.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+			logger.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
 
 			if _, err := svc.DeleteDhcpOptions(&ec2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
-				logrus.Warningf("%s: delete failed: %v", dh.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", dh.ARN(), err)
 			}
 		}
 	}
 
 	if len(defaults) > 1 {
-		logrus.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
+		logger.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
 	}
 
 	return nil

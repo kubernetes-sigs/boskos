@@ -32,6 +32,7 @@ import (
 type Instances struct{}
 
 func (Instances) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	inp := &ec2.DescribeInstancesInput{
@@ -55,7 +56,7 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 				}
 
 				if set.Mark(i) {
-					logrus.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
+					logger.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
 					toDelete = append(toDelete, inst.InstanceId)
 				}
 			}
@@ -71,7 +72,7 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 		// TODO(zmerlynn): In theory this should be split up into
 		// blocks of 1000, but burn that bridge if it ever happens...
 		if _, err := svc.TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: toDelete}); err != nil {
-			logrus.Warningf("Termination failed for instances: %s : %v", strings.Join(aws.StringValueSlice(toDelete), ", "), err)
+			logger.Warningf("Termination failed for instances: %s : %v", strings.Join(aws.StringValueSlice(toDelete), ", "), err)
 		}
 	}
 

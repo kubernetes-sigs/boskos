@@ -57,13 +57,15 @@ func CleanAll(sess *session.Session, region string) error {
 	}
 	for _, r := range regionList {
 		opts.Region = r
+		logger := logrus.WithField("options", opts)
 		for _, typ := range RegionalTypeList {
+			logger.Debugf("Cleaning resource type %T", typ)
 			set, err := typ.ListAll(opts)
 			if err != nil {
 				// ignore errors for resources we do not have permissions to list
 				if reqerr, ok := errors.Cause(err).(awserr.RequestFailure); ok {
 					if reqerr.StatusCode() == http.StatusForbidden {
-						logrus.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
+						logger.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
 						continue
 					}
 				}
@@ -71,7 +73,7 @@ func CleanAll(sess *session.Session, region string) error {
 				continue
 			}
 			if err := typ.MarkAndSweep(opts, set); err != nil {
-				errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
+				errs = append(errs, errors.Wrapf(err, "Failed to mark and sweep resources of type %T", typ))
 			}
 		}
 	}
@@ -84,7 +86,7 @@ func CleanAll(sess *session.Session, region string) error {
 			continue
 		}
 		if err := typ.MarkAndSweep(opts, set); err != nil {
-			errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
+			errs = append(errs, errors.Wrapf(err, "Failed to mark and sweep resources of type %T", typ))
 		}
 	}
 

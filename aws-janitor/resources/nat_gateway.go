@@ -33,6 +33,7 @@ type NATGateway struct{}
 
 // MarkAndSweep looks at the provided set, and removes resources older than its TTL that have been previously tagged.
 func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	inp := &ec2.DescribeNatGatewaysInput{}
@@ -47,7 +48,7 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 			if set.Mark(g) {
 				inp := &ec2.DeleteNatGatewayInput{NatGatewayId: gw.NatGatewayId}
 				if _, err := svc.DeleteNatGateway(inp); err != nil {
-					logrus.Warningf("%s: delete failed: %v", g.ARN(), err)
+					logger.Warningf("%s: delete failed: %v", g.ARN(), err)
 				}
 			}
 		}

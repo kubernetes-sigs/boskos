@@ -31,6 +31,7 @@ import (
 type InternetGateways struct{}
 
 func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeInternetGateways(nil)
@@ -63,7 +64,7 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 		if set.Mark(i) {
 			isDefault := false
-			logrus.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
+			logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
 
 			for _, att := range ig.Attachments {
 				if defaultVPC[aws.StringValue(att.VpcId)] {
@@ -77,12 +78,12 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 				}
 
 				if _, err := svc.DetachInternetGateway(detachReq); err != nil {
-					logrus.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
+					logger.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
 				}
 			}
 
 			if isDefault {
-				logrus.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
+				logger.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
 				continue
 			}
 
@@ -91,7 +92,7 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 			}
 
 			if _, err := svc.DeleteInternetGateway(deleteReq); err != nil {
-				logrus.Warningf("%s: delete failed: %v", i.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", i.ARN(), err)
 			}
 		}
 	}

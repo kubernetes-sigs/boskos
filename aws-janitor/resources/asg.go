@@ -30,6 +30,7 @@ import (
 type AutoScalingGroups struct{}
 
 func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
 	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*autoScalingGroup // Paged call, defer deletion until we have the whole list.
@@ -38,7 +39,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 		for _, asg := range page.AutoScalingGroups {
 			a := &autoScalingGroup{ID: *asg.AutoScalingGroupARN, Name: *asg.AutoScalingGroupName}
 			if set.Mark(a) {
-				logrus.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
+				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
 				toDelete = append(toDelete, a)
 			}
 		}
@@ -56,7 +57,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		if _, err := svc.DeleteAutoScalingGroup(deleteInput); err != nil {
-			logrus.Warningf("%s: delete failed: %v", asg.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", asg.ARN(), err)
 		}
 	}
 
@@ -64,14 +65,14 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 	// resources, so this just makes the rest go more smoothly (and
 	// prevents a second pass).
 	for _, asg := range toDelete {
-		logrus.Warningf("%s: waiting for delete", asg.ARN())
+		logger.Warningf("%s: waiting for delete", asg.ARN())
 
 		describeInput := &autoscaling.DescribeAutoScalingGroupsInput{
 			AutoScalingGroupNames: []*string{aws.String(asg.Name)},
 		}
 
 		if err := svc.WaitUntilGroupNotExists(describeInput); err != nil {
-			logrus.Warningf("%s: wait failed: %v", asg.ARN(), err)
+			logger.Warningf("%s: wait failed: %v", asg.ARN(), err)
 		}
 	}
 
