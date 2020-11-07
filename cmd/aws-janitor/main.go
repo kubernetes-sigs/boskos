@@ -93,16 +93,22 @@ func markAndSweep(sess *session.Session, region string) error {
 		return errors.Wrapf(err, "Error loading %q", *path)
 	}
 
+	opts := resources.Options{
+		Session: sess,
+		Account: acct,
+	}
 	for _, region := range regionList {
+		opts.Region = region
 		for _, typ := range resources.RegionalTypeList {
-			if err := typ.MarkAndSweep(sess, acct, region, res); err != nil {
+			if err := typ.MarkAndSweep(opts, res); err != nil {
 				return errors.Wrapf(err, "Error sweeping %T", typ)
 			}
 		}
 	}
 
+	opts.Region = regions.Default
 	for _, typ := range resources.GlobalTypeList {
-		if err := typ.MarkAndSweep(sess, acct, regions.Default, res); err != nil {
+		if err := typ.MarkAndSweep(opts, res); err != nil {
 			return errors.Wrapf(err, "Error sweeping %T", typ)
 		}
 	}

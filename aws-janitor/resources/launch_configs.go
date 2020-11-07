@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,8 +28,8 @@ import (
 // LaunchConfigurations: http://docs.aws.amazon.com/sdk-for-go/api/service/autoscaling/#AutoScaling.DescribeLaunchConfigurations
 type LaunchConfigurations struct{}
 
-func (LaunchConfigurations) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := autoscaling.New(sess, &aws.Config{Region: aws.String(region)})
+func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
+	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*launchConfiguration // Paged call, defer deletion until we have the whole list.
 
@@ -62,8 +61,8 @@ func (LaunchConfigurations) MarkAndSweep(sess *session.Session, acct string, reg
 	return nil
 }
 
-func (LaunchConfigurations) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := autoscaling.New(sess, aws.NewConfig().WithRegion(region))
+func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
+	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &autoscaling.DescribeLaunchConfigurationsInput{}
 
@@ -80,7 +79,7 @@ func (LaunchConfigurations) ListAll(sess *session.Session, acct, region string) 
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't list launch configurations for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't list launch configurations for %q in %q", opts.Account, opts.Region)
 }
 
 type launchConfiguration struct {

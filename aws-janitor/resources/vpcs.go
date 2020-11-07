@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ import (
 
 type VPCs struct{}
 
-func (VPCs) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (VPCs) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeVpcs(&ec2.DescribeVpcsInput{
 		Filters: []*ec2.Filter{
@@ -47,7 +46,7 @@ func (VPCs) MarkAndSweep(sess *session.Session, acct string, region string, set 
 	}
 
 	for _, vp := range resp.Vpcs {
-		v := &vpc{Account: acct, Region: region, ID: *vp.VpcId}
+		v := &vpc{Account: opts.Account, Region: opts.Region, ID: *vp.VpcId}
 		if set.Mark(v) {
 			logrus.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
 
@@ -71,21 +70,21 @@ func (VPCs) MarkAndSweep(sess *session.Session, acct string, region string, set 
 	return nil
 }
 
-func (VPCs) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (VPCs) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeVpcsInput{}
 
 	vpcs, err := svc.DescribeVpcs(inp)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't describe VPCs for %q in %q", acct, region)
+		return nil, errors.Wrapf(err, "couldn't describe VPCs for %q in %q", opts.Account, opts.Region)
 	}
 
 	now := time.Now()
 	for _, v := range vpcs.Vpcs {
 		arn := vpc{
-			Account: acct,
-			Region:  region,
+			Account: opts.Account,
+			Region:  opts.Region,
 			ID:      *v.VpcId,
 		}.ARN()
 		set.firstSeen[arn] = now

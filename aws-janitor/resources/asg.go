@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,8 +29,8 @@ import (
 
 type AutoScalingGroups struct{}
 
-func (AutoScalingGroups) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := autoscaling.New(sess, &aws.Config{Region: aws.String(region)})
+func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
+	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*autoScalingGroup // Paged call, defer deletion until we have the whole list.
 
@@ -79,8 +78,8 @@ func (AutoScalingGroups) MarkAndSweep(sess *session.Session, acct string, region
 	return nil
 }
 
-func (AutoScalingGroups) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := autoscaling.New(sess, aws.NewConfig().WithRegion(region))
+func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
+	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &autoscaling.DescribeAutoScalingGroupsInput{}
 
@@ -97,7 +96,7 @@ func (AutoScalingGroups) ListAll(sess *session.Session, acct, region string) (*S
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe auto scaling groups for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe auto scaling groups for %q in %q", opts.Account, opts.Region)
 }
 
 type autoScalingGroup struct {

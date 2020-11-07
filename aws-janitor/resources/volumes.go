@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,14 +29,14 @@ import (
 // Volumes: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeVolumes
 type Volumes struct{}
 
-func (Volumes) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (Volumes) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*volume // Paged call, defer deletion until we have the whole list.
 
 	pageFunc := func(page *ec2.DescribeVolumesOutput, _ bool) bool {
 		for _, vol := range page.Volumes {
-			v := &volume{Account: acct, Region: region, ID: *vol.VolumeId}
+			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
 			if set.Mark(v) {
 				logrus.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
 				toDelete = append(toDelete, v)
@@ -63,8 +62,8 @@ func (Volumes) MarkAndSweep(sess *session.Session, acct string, region string, s
 	return nil
 }
 
-func (Volumes) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (Volumes) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeVolumesInput{}
 
@@ -72,8 +71,8 @@ func (Volumes) ListAll(sess *session.Session, acct, region string) (*Set, error)
 		now := time.Now()
 		for _, vol := range vols.Volumes {
 			arn := volume{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *vol.VolumeId,
 			}.ARN()
 
@@ -83,7 +82,7 @@ func (Volumes) ListAll(sess *session.Session, acct, region string) (*Set, error)
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe volumes for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe volumes for %q in %q", opts.Account, opts.Region)
 }
 
 type volume struct {

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -32,8 +31,8 @@ import (
 
 type Instances struct{}
 
-func (Instances) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (Instances) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	inp := &ec2.DescribeInstancesInput{
 		Filters: []*ec2.Filter{
@@ -50,8 +49,8 @@ func (Instances) MarkAndSweep(sess *session.Session, acct string, region string,
 		for _, res := range page.Reservations {
 			for _, inst := range res.Instances {
 				i := &instance{
-					Account:    acct,
-					Region:     region,
+					Account:    opts.Account,
+					Region:     opts.Region,
 					InstanceID: *inst.InstanceId,
 				}
 
@@ -79,8 +78,8 @@ func (Instances) MarkAndSweep(sess *session.Session, acct string, region string,
 	return nil
 }
 
-func (Instances) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (Instances) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeInstancesInput{}
 
@@ -89,8 +88,8 @@ func (Instances) ListAll(sess *session.Session, acct, region string) (*Set, erro
 			for _, inst := range res.Instances {
 				now := time.Now()
 				arn := instance{
-					Account:    acct,
-					Region:     region,
+					Account:    opts.Account,
+					Region:     opts.Region,
 					InstanceID: *inst.InstanceId,
 				}.ARN()
 
@@ -101,7 +100,7 @@ func (Instances) ListAll(sess *session.Session, acct, region string) (*Set, erro
 
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe instances for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe instances for %q in %q", opts.Account, opts.Region)
 }
 
 type instance struct {

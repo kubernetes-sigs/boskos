@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ import (
 
 type InternetGateways struct{}
 
-func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeInternetGateways(nil)
 	if err != nil {
@@ -60,7 +59,7 @@ func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region 
 	}
 
 	for _, ig := range resp.InternetGateways {
-		i := &internetGateway{Account: acct, Region: region, ID: *ig.InternetGatewayId}
+		i := &internetGateway{Account: opts.Account, Region: opts.Region, ID: *ig.InternetGatewayId}
 
 		if set.Mark(i) {
 			isDefault := false
@@ -100,20 +99,20 @@ func (InternetGateways) MarkAndSweep(sess *session.Session, acct string, region 
 	return nil
 }
 
-func (InternetGateways) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (InternetGateways) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeInternetGatewaysInput{}
 
 	gateways, err := svc.DescribeInternetGateways(input)
 	if err != nil {
-		return set, errors.Wrapf(err, "couldn't describe internet gateways for %q in %q", acct, region)
+		return set, errors.Wrapf(err, "couldn't describe internet gateways for %q in %q", opts.Account, opts.Region)
 	}
 	now := time.Now()
 	for _, gateway := range gateways.InternetGateways {
 		arn := internetGateway{
-			Account: acct,
-			Region:  region,
+			Account: opts.Account,
+			Region:  opts.Region,
 			ID:      *gateway.InternetGatewayId,
 		}.ARN()
 		set.firstSeen[arn] = now

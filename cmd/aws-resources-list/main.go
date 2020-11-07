@@ -35,7 +35,7 @@ var (
 func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
 	fmt.Printf("==%T==\n", res)
 	for _, region := range regions {
-		set, err := res.ListAll(sess, acct, region)
+		set, err := res.ListAll(resources.Options{Session: sess, Account: acct, Region: region})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
 			continue

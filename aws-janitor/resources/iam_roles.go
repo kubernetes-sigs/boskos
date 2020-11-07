@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -51,8 +50,8 @@ func roleIsManaged(role *iam.Role) bool {
 	return false
 }
 
-func (IAMRoles) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := iam.New(sess, &aws.Config{Region: aws.String(region)})
+func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*iamRole // Paged call, defer deletion until we have the whole list.
 
@@ -84,8 +83,8 @@ func (IAMRoles) MarkAndSweep(sess *session.Session, acct string, region string, 
 	return nil
 }
 
-func (IAMRoles) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := iam.New(sess, aws.NewConfig().WithRegion(region))
+func (IAMRoles) ListAll(opts Options) (*Set, error) {
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &iam.ListRolesInput{}
 
@@ -104,7 +103,7 @@ func (IAMRoles) ListAll(sess *session.Session, acct, region string) (*Set, error
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe iam roles for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe iam roles for %q in %q", opts.Account, opts.Region)
 }
 
 type iamRole struct {

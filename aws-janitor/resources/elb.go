@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,14 +29,14 @@ import (
 
 type ClassicLoadBalancers struct{}
 
-func (ClassicLoadBalancers) MarkAndSweep(sess *session.Session, account string, region string, set *Set) error {
-	svc := elb.New(sess, &aws.Config{Region: aws.String(region)})
+func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
+	svc := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*classicLoadBalancer // Paged call, defer deletion until we have the whole list.
 
 	pageFunc := func(page *elb.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancerDescriptions {
-			a := &classicLoadBalancer{region: region, account: account, name: *lb.LoadBalancerName, dnsName: *lb.DNSName}
+			a := &classicLoadBalancer{region: opts.Region, account: opts.Account, name: *lb.LoadBalancerName, dnsName: *lb.DNSName}
 			if set.Mark(a) {
 				logrus.Warningf("%s: deleting %T: %s", a.ARN(), lb, a.name)
 				toDelete = append(toDelete, a)
@@ -63,8 +62,8 @@ func (ClassicLoadBalancers) MarkAndSweep(sess *session.Session, account string, 
 	return nil
 }
 
-func (ClassicLoadBalancers) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := elb.New(sess, aws.NewConfig().WithRegion(region))
+func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
+	c := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &elb.DescribeLoadBalancersInput{}
 
@@ -72,8 +71,8 @@ func (ClassicLoadBalancers) ListAll(sess *session.Session, acct, region string) 
 		now := time.Now()
 		for _, lb := range lbs.LoadBalancerDescriptions {
 			arn := classicLoadBalancer{
-				region:  region,
-				account: acct,
+				region:  opts.Region,
+				account: opts.Account,
 				name:    *lb.LoadBalancerName,
 				dnsName: *lb.DNSName,
 			}.ARN()
@@ -83,7 +82,7 @@ func (ClassicLoadBalancers) ListAll(sess *session.Session, acct, region string) 
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe classic load balancers for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe classic load balancers for %q in %q", opts.Account, opts.Region)
 }
 
 type classicLoadBalancer struct {

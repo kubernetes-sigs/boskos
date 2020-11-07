@@ -51,9 +51,14 @@ func CleanAll(sess *session.Session, region string) error {
 
 	var errs []error
 
+	opts := Options{
+		Session: sess,
+		Account: acct,
+	}
 	for _, r := range regionList {
+		opts.Region = r
 		for _, typ := range RegionalTypeList {
-			set, err := typ.ListAll(sess, acct, r)
+			set, err := typ.ListAll(opts)
 			if err != nil {
 				// ignore errors for resources we do not have permissions to list
 				if reqerr, ok := errors.Cause(err).(awserr.RequestFailure); ok {
@@ -65,19 +70,20 @@ func CleanAll(sess *session.Session, region string) error {
 				errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 				continue
 			}
-			if err := typ.MarkAndSweep(sess, acct, r, set); err != nil {
+			if err := typ.MarkAndSweep(opts, set); err != nil {
 				errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 			}
 		}
 	}
 
+	opts.Region = regions.Default
 	for _, typ := range GlobalTypeList {
-		set, err := typ.ListAll(sess, acct, regions.Default)
+		set, err := typ.ListAll(opts)
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 			continue
 		}
-		if err := typ.MarkAndSweep(sess, acct, regions.Default, set); err != nil {
+		if err := typ.MarkAndSweep(opts, set); err != nil {
 			errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 		}
 	}

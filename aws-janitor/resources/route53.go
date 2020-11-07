@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -75,8 +74,8 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 	return false
 }
 
-func (Route53ResourceRecordSets) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := route53.New(sess, &aws.Config{Region: aws.String(region)})
+func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
+	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var listError error
 
@@ -159,8 +158,8 @@ func (Route53ResourceRecordSets) MarkAndSweep(sess *session.Session, acct string
 	return nil
 }
 
-func (Route53ResourceRecordSets) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := route53.New(sess, aws.NewConfig().WithRegion(region))
+func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
+	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 
 	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {
@@ -181,14 +180,14 @@ func (Route53ResourceRecordSets) ListAll(sess *session.Session, acct, region str
 				return true
 			})
 			if err != nil {
-				errors.Wrapf(err, "couldn't describe route53 resources for %q in %q zone %q", acct, region, *z.Id)
+				errors.Wrapf(err, "couldn't describe route53 resources for %q in %q zone %q", opts.Account, opts.Region, *z.Id)
 			}
 
 		}
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe route53 instance profiles for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe route53 instance profiles for %q in %q", opts.Account, opts.Region)
 
 }
 

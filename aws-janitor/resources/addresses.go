@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ import (
 
 type Addresses struct{}
 
-func (Addresses) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (Addresses) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeAddresses(nil)
 	if err != nil {
@@ -40,7 +39,7 @@ func (Addresses) MarkAndSweep(sess *session.Session, acct string, region string,
 	}
 
 	for _, addr := range resp.Addresses {
-		a := &address{Account: acct, Region: region, ID: *addr.AllocationId}
+		a := &address{Account: opts.Account, Region: opts.Region, ID: *addr.AllocationId}
 		if set.Mark(a) {
 			logrus.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
 
@@ -61,21 +60,21 @@ func (Addresses) MarkAndSweep(sess *session.Session, acct string, region string,
 	return nil
 }
 
-func (Addresses) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (Addresses) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeAddressesInput{}
 
 	addrs, err := svc.DescribeAddresses(inp)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't describe EC2 addresses for %q in %q", acct, region)
+		return nil, errors.Wrapf(err, "couldn't describe EC2 addresses for %q in %q", opts.Account, opts.Region)
 	}
 
 	now := time.Now()
 	for _, addr := range addrs.Addresses {
 		arn := address{
-			Account: acct,
-			Region:  region,
+			Account: opts.Account,
+			Region:  opts.Region,
 			ID:      *addr.AllocationId,
 		}.ARN()
 		set.firstSeen[arn] = now

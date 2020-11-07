@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,8 @@ import (
 
 type RouteTables struct{}
 
-func (RouteTables) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeRouteTables(nil)
 	if err != nil {
@@ -53,7 +52,7 @@ func (RouteTables) MarkAndSweep(sess *session.Session, acct string, region strin
 			continue
 		}
 
-		r := &routeTable{Account: acct, Region: region, ID: *rt.RouteTableId}
+		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
 		if set.Mark(r) {
 			for _, assoc := range rt.Associations {
 				logrus.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
@@ -82,8 +81,8 @@ func (RouteTables) MarkAndSweep(sess *session.Session, acct string, region strin
 	return nil
 }
 
-func (RouteTables) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (RouteTables) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeRouteTablesInput{}
 
@@ -91,8 +90,8 @@ func (RouteTables) ListAll(sess *session.Session, acct, region string) (*Set, er
 		now := time.Now()
 		for _, table := range tables.RouteTables {
 			arn := routeTable{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *table.RouteTableId,
 			}.ARN()
 			set.firstSeen[arn] = now
@@ -101,7 +100,7 @@ func (RouteTables) ListAll(sess *session.Session, acct, region string) (*Set, er
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe route tables for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe route tables for %q in %q", opts.Account, opts.Region)
 }
 
 type routeTable struct {

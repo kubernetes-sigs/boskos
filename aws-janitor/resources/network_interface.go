@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,14 +30,14 @@ import (
 
 type NetworkInterfaces struct{}
 
-func (NetworkInterfaces) MarkAndSweep(sess *session.Session, account string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*networkInterface // Paged call, defer deletion until we have the whole list.
 
 	pageFunc := func(page *ec2.DescribeNetworkInterfacesOutput, _ bool) bool {
 		for _, eni := range page.NetworkInterfaces {
-			a := &networkInterface{Region: region, Account: account, ID: *eni.NetworkInterfaceId}
+			a := &networkInterface{Region: opts.Region, Account: opts.Account, ID: *eni.NetworkInterfaceId}
 			if eni.Attachment != nil {
 				a.AttachmentID = *eni.Attachment.AttachmentId
 			}
@@ -76,8 +75,8 @@ func (NetworkInterfaces) MarkAndSweep(sess *session.Session, account string, reg
 	return nil
 }
 
-func (NetworkInterfaces) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (NetworkInterfaces) ListAll(opts Options) (*Set, error) {
+	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeNetworkInterfacesInput{}
 
@@ -85,8 +84,8 @@ func (NetworkInterfaces) ListAll(sess *session.Session, acct, region string) (*S
 		now := time.Now()
 		for _, eni := range enis.NetworkInterfaces {
 			arn := networkInterface{
-				Region:  region,
-				Account: acct,
+				Region:  opts.Region,
+				Account: opts.Account,
 				ID:      aws.StringValue(eni.NetworkInterfaceId),
 			}.ARN()
 			set.firstSeen[arn] = now
@@ -95,7 +94,7 @@ func (NetworkInterfaces) ListAll(sess *session.Session, acct, region string) (*S
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe network interfaces for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe network interfaces for %q in %q", opts.Account, opts.Region)
 }
 
 type networkInterface struct {

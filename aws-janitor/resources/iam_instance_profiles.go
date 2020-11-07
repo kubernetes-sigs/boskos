@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,8 +28,8 @@ import (
 // IAM Instance Profiles
 type IAMInstanceProfiles struct{}
 
-func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := iam.New(sess, &aws.Config{Region: aws.String(region)})
+func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*iamInstanceProfile // Paged call, defer deletion until we have the whole list.
 
@@ -75,8 +74,8 @@ func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, regi
 	return nil
 }
 
-func (IAMInstanceProfiles) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := iam.New(sess, aws.NewConfig().WithRegion(region))
+func (IAMInstanceProfiles) ListAll(opts Options) (*Set, error) {
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &iam.ListInstanceProfilesInput{}
 
@@ -93,7 +92,7 @@ func (IAMInstanceProfiles) ListAll(sess *session.Session, acct, region string) (
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe iam instance profiles for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe iam instance profiles for %q in %q", opts.Account, opts.Region)
 }
 
 type iamInstanceProfile struct {
