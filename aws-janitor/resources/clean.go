@@ -38,14 +38,9 @@ func CleanAll(sess *session.Session, region string) error {
 	}
 	logrus.Debugf("Account: %s", acct)
 
-	var regionList []string
-	if region == "" {
-		regionList, err = regions.GetAll(sess)
-		if err != nil {
-			return errors.Wrap(err, "Couldn't retrieve list of regions")
-		}
-	} else {
-		regionList = []string{region}
+	regionList, err := regions.ParseRegion(sess, region)
+	if err != nil {
+		return err
 	}
 	logrus.Infof("Regions: %s", strings.Join(regionList, ", "))
 

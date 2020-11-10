@@ -77,14 +77,9 @@ func markAndSweep(sess *session.Session, region string) error {
 	}
 	logrus.Debugf("account: %s", acct)
 
-	var regionList []string
-	if region == "" {
-		regionList, err = regions.GetAll(sess)
-		if err != nil {
-			return errors.Wrap(err, "Error getting available regions")
-		}
-	} else {
-		regionList = []string{region}
+	regionList, err := regions.ParseRegion(sess, region)
+	if err != nil {
+		return err
 	}
 	logrus.Infof("Regions: %+v", regionList)
 

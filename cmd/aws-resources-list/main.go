@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sort"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"sigs.k8s.io/boskos/aws-janitor/account"
@@ -53,19 +52,14 @@ func main() {
 	session := session.Must(session.NewSession())
 	acct, err := account.GetAccount(session, *region)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error retrieving account: %v", err)
+		fmt.Fprintf(os.Stderr, "error retrieving account: %v\n", err)
 		os.Exit(1)
 	}
 
-	var regionList []string
-	if *region == "" {
-		regionList, err = regions.GetAll(session)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "couldn't retrieve list of regions: %v", err)
-		}
-		sort.Strings(regionList)
-	} else {
-		regionList = []string{*region}
+	regionList, err := regions.ParseRegion(session, *region)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing region: %v\n", err)
+		os.Exit(1)
 	}
 
 	for _, r := range resources.RegionalTypeList {
