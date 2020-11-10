@@ -74,6 +74,31 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 	return false
 }
 
+// route53ResourceRecordSetsForZone marks all ResourceRecordSets in the provided zone and returns a slice containing those that should be deleted.
+func route53ResourceRecordSetsForZone(logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, set *Set) ([]*route53ResourceRecordSet, error) {
+	var toDelete []*route53ResourceRecordSet
+
+	recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
+		for _, rrs := range records.ResourceRecordSets {
+			if !resourceRecordSetIsManaged(rrs) {
+				continue
+			}
+
+			o := &route53ResourceRecordSet{zone: zone, obj: rrs}
+			if set.Mark(o) {
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+			}
+		}
+		return true
+	}
+
+	err := svc.ListResourceRecordSetsPages(&route53.ListResourceRecordSetsInput{HostedZoneId: zone.Id}, recordsPageFunc)
+	if err != nil {
+		return nil, err
+	}
+	return toDelete, nil
+}
+
 func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
@@ -81,36 +106,19 @@ func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 	var listError error
 
 	pageFunc := func(zones *route53.ListHostedZonesOutput, _ bool) bool {
+		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
 		for _, z := range zones.HostedZones {
 			if !zoneIsManaged(z) {
 				continue
 			}
 
-			// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
-
-			var toDelete []*route53ResourceRecordSet
-
-			recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
-				for _, rrs := range records.ResourceRecordSets {
-					if !resourceRecordSetIsManaged(rrs) {
-						continue
-					}
-
-					o := &route53ResourceRecordSet{zone: z, obj: rrs}
-					if set.Mark(o) {
-						logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
-						if !opts.DryRun {
-							toDelete = append(toDelete, o)
-						}
-					}
-				}
-				return true
-			}
-
-			err := svc.ListResourceRecordSetsPages(&route53.ListResourceRecordSetsInput{HostedZoneId: z.Id}, recordsPageFunc)
+			toDelete, err := route53ResourceRecordSetsForZone(logger, svc, z, set)
 			if err != nil {
 				listError = err
 				return false
+			}
+			if opts.DryRun {
+				continue
 			}
 
 			var changes []*route53.Change
@@ -165,6 +173,7 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 
+	var rrsErr error
 	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {
 		for _, z := range zones.HostedZones {
 			if !zoneIsManaged(z) {
@@ -183,13 +192,17 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 				return true
 			})
 			if err != nil {
-				errors.Wrapf(err, "couldn't describe route53 resources for %q in %q zone %q", opts.Account, opts.Region, *z.Id)
+				rrsErr = errors.Wrapf(err, "couldn't describe route53 resources for %q in %q zone %q", opts.Account, opts.Region, *z.Id)
+				return false
 			}
 
 		}
 		return true
 	})
 
+	if rrsErr != nil {
+		return set, rrsErr
+	}
 	return set, errors.Wrapf(err, "couldn't describe route53 instance profiles for %q in %q", opts.Account, opts.Region)
 
 }
