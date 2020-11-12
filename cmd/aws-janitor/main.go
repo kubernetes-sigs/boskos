@@ -38,6 +38,7 @@ var (
 	path     = flag.String("path", "", "S3 path for mark data (required when -all=false)")
 	cleanAll = flag.Bool("all", false, "Clean all resources (ignores -path)")
 	logLevel = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	dryRun   = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
 )
 
 func main() {
@@ -57,7 +58,7 @@ func main() {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{Config: aws.Config{MaxRetries: aws.Int(100)}}))
 
 	if *cleanAll {
-		if err := resources.CleanAll(sess, *region); err != nil {
+		if err := resources.CleanAll(sess, *region, *dryRun); err != nil {
 			logrus.Fatalf("Error cleaning all resources: %v", err)
 		}
 	} else if err := markAndSweep(sess, *region); err != nil {
@@ -93,16 +94,23 @@ func markAndSweep(sess *session.Session, region string) error {
 		return errors.Wrapf(err, "Error loading %q", *path)
 	}
 
+	opts := resources.Options{
+		Session: sess,
+		Account: acct,
+		DryRun:  *dryRun,
+	}
 	for _, region := range regionList {
+		opts.Region = region
 		for _, typ := range resources.RegionalTypeList {
-			if err := typ.MarkAndSweep(sess, acct, region, res); err != nil {
+			if err := typ.MarkAndSweep(opts, res); err != nil {
 				return errors.Wrapf(err, "Error sweeping %T", typ)
 			}
 		}
 	}
 
+	opts.Region = regions.Default
 	for _, typ := range resources.GlobalTypeList {
-		if err := typ.MarkAndSweep(sess, acct, regions.Default, res); err != nil {
+		if err := typ.MarkAndSweep(opts, res); err != nil {
 			return errors.Wrapf(err, "Error sweeping %T", typ)
 		}
 	}

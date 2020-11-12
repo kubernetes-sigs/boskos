@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,8 +28,9 @@ import (
 // IAM Instance Profiles
 type IAMInstanceProfiles struct{}
 
-func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := iam.New(sess, &aws.Config{Region: aws.String(region)})
+func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*iamInstanceProfile // Paged call, defer deletion until we have the whole list.
 
@@ -50,14 +50,16 @@ func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, regi
 			}
 
 			if !managed {
-				logrus.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
+				logger.Infof("%s: ignoring unmanaged profile", aws.StringValue(p.Arn))
 				continue
 			}
 
 			o := &iamInstanceProfile{profile: p}
 			if set.Mark(o) {
-				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
-				toDelete = append(toDelete, o)
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
+				if !opts.DryRun {
+					toDelete = append(toDelete, o)
+				}
 			}
 		}
 		return true
@@ -69,14 +71,14 @@ func (IAMInstanceProfiles) MarkAndSweep(sess *session.Session, acct string, regi
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil
 }
 
-func (IAMInstanceProfiles) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := iam.New(sess, aws.NewConfig().WithRegion(region))
+func (IAMInstanceProfiles) ListAll(opts Options) (*Set, error) {
+	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &iam.ListInstanceProfilesInput{}
 
@@ -93,7 +95,7 @@ func (IAMInstanceProfiles) ListAll(sess *session.Session, acct, region string) (
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe iam instance profiles for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe iam instance profiles for %q in %q", opts.Account, opts.Region)
 }
 
 type iamInstanceProfile struct {

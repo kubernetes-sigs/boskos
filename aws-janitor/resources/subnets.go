@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,8 +29,9 @@ import (
 // Subnets: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeSubnets
 type Subnets struct{}
 
-func (Subnets) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (Subnets) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	descReq := &ec2.DescribeSubnetsInput{
 		Filters: []*ec2.Filter{
@@ -48,11 +48,14 @@ func (Subnets) MarkAndSweep(sess *session.Session, acct string, region string, s
 	}
 
 	for _, sub := range resp.Subnets {
-		s := &subnet{Account: acct, Region: region, ID: *sub.SubnetId}
+		s := &subnet{Account: opts.Account, Region: opts.Region, ID: *sub.SubnetId}
 		if set.Mark(s) {
-			logrus.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+			logger.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+			if opts.DryRun {
+				continue
+			}
 			if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
-				logrus.Warningf("%s: delete failed: %v", s.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", s.ARN(), err)
 			}
 		}
 	}
@@ -60,8 +63,8 @@ func (Subnets) MarkAndSweep(sess *session.Session, acct string, region string, s
 	return nil
 }
 
-func (Subnets) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (Subnets) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeSubnetsInput{}
 
@@ -70,14 +73,14 @@ func (Subnets) ListAll(sess *session.Session, acct, region string) (*Set, error)
 	now := time.Now()
 	for _, sn := range subnets.Subnets {
 		arn := subnet{
-			Account: acct,
-			Region:  region,
+			Account: opts.Account,
+			Region:  opts.Region,
 			ID:      *sn.SubnetId,
 		}.ARN()
 		set.firstSeen[arn] = now
 	}
 
-	return set, errors.Wrapf(err, "couldn't describe subnets for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe subnets for %q in %q", opts.Account, opts.Region)
 }
 
 type subnet struct {

@@ -20,15 +20,25 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
+// Options holds parameters for resource functions.
+type Options struct {
+	Session *session.Session `json:"-"`
+	Account string
+	Region  string
+
+	// Whether to actually delete resources, or just report what would be deleted.
+	DryRun bool
+}
+
 type Type interface {
 	// MarkAndSweep queries the resource in a specific region, using
 	// the provided session (which has account-number acct), calling
 	// res.Mark(<resource>) on each resource and deleting
 	// appropriately.
-	MarkAndSweep(sess *session.Session, acct string, region string, res *Set) error
+	MarkAndSweep(opts Options, res *Set) error
 
 	// ListAll queries all the resources this account has access to
-	ListAll(sess *session.Session, acct string, region string) (*Set, error)
+	ListAll(opts Options) (*Set, error)
 }
 
 // AWS resource types known to this script, in dependency order.

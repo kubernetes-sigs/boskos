@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,8 +29,9 @@ import (
 
 type LoadBalancers struct{}
 
-func (LoadBalancers) MarkAndSweep(sess *session.Session, account string, region string, set *Set) error {
-	svc := elbv2.New(sess, aws.NewConfig().WithRegion(region))
+func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*loadBalancer // Paged call, defer deletion until we have the whole list.
 
@@ -39,8 +39,10 @@ func (LoadBalancers) MarkAndSweep(sess *session.Session, account string, region 
 		for _, lb := range page.LoadBalancers {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn}
 			if set.Mark(a) {
-				logrus.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
-				toDelete = append(toDelete, a)
+				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
+				if !opts.DryRun {
+					toDelete = append(toDelete, a)
+				}
 			}
 		}
 		return true
@@ -56,15 +58,15 @@ func (LoadBalancers) MarkAndSweep(sess *session.Session, account string, region 
 		}
 
 		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
-			logrus.Warningf("%s: delete failed: %v", lb.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", lb.ARN(), err)
 		}
 	}
 
 	return nil
 }
 
-func (LoadBalancers) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := elbv2.New(sess, aws.NewConfig().WithRegion(region))
+func (LoadBalancers) ListAll(opts Options) (*Set, error) {
+	c := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &elbv2.DescribeLoadBalancersInput{}
 
@@ -78,7 +80,7 @@ func (LoadBalancers) ListAll(sess *session.Session, acct, region string) (*Set, 
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe load balancers for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe load balancers for %q in %q", opts.Account, opts.Region)
 }
 
 type loadBalancer struct {

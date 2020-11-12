@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,8 +30,9 @@ import (
 // DHCPOptions: https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeDhcpOptions
 type DHCPOptions struct{}
 
-func (DHCPOptions) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	// This is a little gross, but I can't find an easier way to
 	// figure out the DhcpOptions associated with the default VPC.
@@ -67,44 +67,47 @@ func (DHCPOptions) MarkAndSweep(sess *session.Session, acct string, region strin
 		}
 
 		// Separately, skip any "default looking" DHCP Option Sets. See comment below.
-		if defaultLookingDHCPOptions(dhcp, region) {
+		if defaultLookingDHCPOptions(dhcp, opts.Region) {
 			defaults = append(defaults, *dhcp.DhcpOptionsId)
 			continue
 		}
 
-		dh := &dhcpOption{Account: acct, Region: region, ID: *dhcp.DhcpOptionsId}
+		dh := &dhcpOption{Account: opts.Account, Region: opts.Region, ID: *dhcp.DhcpOptionsId}
 		if set.Mark(dh) {
-			logrus.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+			logger.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+			if opts.DryRun {
+				continue
+			}
 
 			if _, err := svc.DeleteDhcpOptions(&ec2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
-				logrus.Warningf("%s: delete failed: %v", dh.ARN(), err)
+				logger.Warningf("%s: delete failed: %v", dh.ARN(), err)
 			}
 		}
 	}
 
 	if len(defaults) > 1 {
-		logrus.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
+		logger.Errorf("Found more than one default-looking DHCP option set: %s", strings.Join(defaults, ", "))
 	}
 
 	return nil
 }
 
-func (DHCPOptions) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (DHCPOptions) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeDhcpOptionsInput{}
 
 	optsList, err := svc.DescribeDhcpOptions(inp)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't describe DHCP Options for %q in %q", acct, region)
+		return nil, errors.Wrapf(err, "couldn't describe DHCP Options for %q in %q", opts.Account, opts.Region)
 	}
 
 	now := time.Now()
-	for _, opts := range optsList.DhcpOptions {
+	for _, dhcpOpts := range optsList.DhcpOptions {
 		arn := dhcpOption{
-			Account: acct,
-			Region:  region,
-			ID:      *opts.DhcpOptionsId,
+			Account: opts.Account,
+			Region:  opts.Region,
+			ID:      *dhcpOpts.DhcpOptionsId,
 		}.ARN()
 		set.firstSeen[arn] = now
 	}

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -33,22 +32,27 @@ import (
 type NATGateway struct{}
 
 // MarkAndSweep looks at the provided set, and removes resources older than its TTL that have been previously tagged.
-func (NATGateway) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	inp := &ec2.DescribeNatGatewaysInput{}
 	if err := svc.DescribeNatGatewaysPages(inp, func(page *ec2.DescribeNatGatewaysOutput, _ bool) bool {
 		for _, gw := range page.NatGateways {
 			g := &natGateway{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *gw.NatGatewayId,
 			}
 
 			if set.Mark(g) {
+				logger.Warningf("%s: deleting %T: %s", g.ARN(), gw, g.ID)
+				if opts.DryRun {
+					continue
+				}
 				inp := &ec2.DeleteNatGatewayInput{NatGatewayId: gw.NatGatewayId}
 				if _, err := svc.DeleteNatGateway(inp); err != nil {
-					logrus.Warningf("%s: delete failed: %v", g.ARN(), err)
+					logger.Warningf("%s: delete failed: %v", g.ARN(), err)
 				}
 			}
 		}
@@ -61,8 +65,8 @@ func (NATGateway) MarkAndSweep(sess *session.Session, acct string, region string
 }
 
 // ListAll populates a set will all available NATGateway resources.
-func (NATGateway) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (NATGateway) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &ec2.DescribeNatGatewaysInput{}
 
@@ -70,8 +74,8 @@ func (NATGateway) ListAll(sess *session.Session, acct, region string) (*Set, err
 		for _, gw := range page.NatGateways {
 			now := time.Now()
 			arn := natGateway{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *gw.NatGatewayId,
 			}.ARN()
 
@@ -81,7 +85,7 @@ func (NATGateway) ListAll(sess *session.Session, acct, region string) (*Set, err
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe nat gateways for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe nat gateways for %q in %q", opts.Account, opts.Region)
 }
 
 type natGateway struct {

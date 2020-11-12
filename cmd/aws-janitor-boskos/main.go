@@ -43,6 +43,7 @@ var (
 	sweepSleep         = flag.String("sweep-sleep", "30s", "The duration to pause between sweeps")
 	sweepSleepDuration time.Duration
 	logLevel           = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	dryRun             = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
 )
 
 const (
@@ -121,7 +122,7 @@ func cleanResource(res *common.Resource) error {
 	start := time.Now()
 
 	for i := 0; i < *sweepCount; i++ {
-		if err := resources.CleanAll(s, *region); err != nil {
+		if err := resources.CleanAll(s, *region, *dryRun); err != nil {
 			if i == *sweepCount-1 {
 				logrus.WithError(err).Warningf("Failed to clean resource %q", res.Name)
 			}

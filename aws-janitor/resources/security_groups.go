@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,19 +34,20 @@ type sgRef struct {
 	perm *ec2.IpPermission
 }
 
-func addRefs(refs map[string][]*sgRef, id string, acct string, perms []*ec2.IpPermission) {
+func addRefs(refs map[string][]*sgRef, id string, account string, perms []*ec2.IpPermission) {
 	for _, perm := range perms {
 		for _, pair := range perm.UserIdGroupPairs {
 			// Ignore cross-account for now, and skip circular refs.
-			if *pair.UserId == acct && *pair.GroupId != id {
+			if *pair.UserId == account && *pair.GroupId != id {
 				refs[*pair.GroupId] = append(refs[*pair.GroupId], &sgRef{id: id, perm: perm})
 			}
 		}
 	}
 }
 
-func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (SecurityGroups) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	resp, err := svc.DescribeSecurityGroups(nil)
 	if err != nil {
@@ -63,12 +63,14 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 			continue
 		}
 
-		s := &securityGroup{Account: acct, Region: region, ID: *sg.GroupId}
-		addRefs(ingress, *sg.GroupId, acct, sg.IpPermissions)
-		addRefs(egress, *sg.GroupId, acct, sg.IpPermissionsEgress)
+		s := &securityGroup{Account: opts.Account, Region: opts.Region, ID: *sg.GroupId}
+		addRefs(ingress, *sg.GroupId, opts.Account, sg.IpPermissions)
+		addRefs(egress, *sg.GroupId, opts.Account, sg.IpPermissionsEgress)
 		if set.Mark(s) {
-			logrus.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
-			toDelete = append(toDelete, s)
+			logger.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
+			if !opts.DryRun {
+				toDelete = append(toDelete, s)
+			}
 		}
 	}
 
@@ -76,7 +78,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 
 		// Revoke all ingress rules.
 		for _, ref := range ingress[sg.ID] {
-			logrus.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
+			logger.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
 
 			revokeReq := &ec2.RevokeSecurityGroupIngressInput{
 				GroupId:       aws.String(ref.id),
@@ -84,13 +86,13 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 			}
 
 			if _, err := svc.RevokeSecurityGroupIngress(revokeReq); err != nil {
-				logrus.Warningf("%v: failed to revoke ingress reference from %s: %v", sg.ARN(), ref.id, err)
+				logger.Warningf("%v: failed to revoke ingress reference from %s: %v", sg.ARN(), ref.id, err)
 			}
 		}
 
 		// Revoke all egress rules.
 		for _, ref := range egress[sg.ID] {
-			logrus.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
+			logger.Infof("%s: revoking reference from %s", sg.ARN(), ref.id)
 
 			revokeReq := &ec2.RevokeSecurityGroupEgressInput{
 				GroupId:       aws.String(ref.id),
@@ -98,7 +100,7 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 			}
 
 			if _, err := svc.RevokeSecurityGroupEgress(revokeReq); err != nil {
-				logrus.Warningf("%s: failed to revoke egress reference from %s: %v", sg.ARN(), ref.id, err)
+				logger.Warningf("%s: failed to revoke egress reference from %s: %v", sg.ARN(), ref.id, err)
 			}
 		}
 
@@ -108,15 +110,15 @@ func (SecurityGroups) MarkAndSweep(sess *session.Session, acct string, region st
 		}
 
 		if _, err := svc.DeleteSecurityGroup(deleteReq); err != nil {
-			logrus.Warningf("%s: delete failed: %v", sg.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", sg.ARN(), err)
 		}
 	}
 
 	return nil
 }
 
-func (SecurityGroups) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (SecurityGroups) ListAll(opts Options) (*Set, error) {
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeSecurityGroupsInput{}
 
@@ -124,8 +126,8 @@ func (SecurityGroups) ListAll(sess *session.Session, acct, region string) (*Set,
 		now := time.Now()
 		for _, sg := range groups.SecurityGroups {
 			arn := securityGroup{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *sg.GroupId,
 			}.ARN()
 
@@ -136,7 +138,7 @@ func (SecurityGroups) ListAll(sess *session.Session, acct, region string) (*Set,
 
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe security groups for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe security groups for %q in %q", opts.Account, opts.Region)
 
 }
 

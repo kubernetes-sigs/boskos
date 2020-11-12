@@ -62,7 +62,7 @@ func (s *Set) GetARNs() []string {
 
 func LoadSet(sess *session.Session, p *s3path.Path, ttl time.Duration) (*Set, error) {
 	s := NewSet(ttl)
-	svc := s3.New(sess, &aws.Config{Region: aws.String(p.Region)})
+	svc := s3.New(sess, aws.NewConfig().WithRegion(p.Region))
 
 	resp, err := svc.GetObject(&s3.GetObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(p.Key)})
 	if err != nil {
@@ -87,7 +87,7 @@ func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
 		return err
 	}
 
-	svc := s3.New(sess, &aws.Config{Region: aws.String(p.Region)})
+	svc := s3.New(sess, aws.NewConfig().WithRegion(p.Region))
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
 		Bucket:       aws.String(p.Bucket),

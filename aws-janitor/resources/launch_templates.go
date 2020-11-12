@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,22 +29,25 @@ import (
 // LaunchTemplates https://docs.aws.amazon.com/sdk-for-go/api/service/ec2/#EC2.DescribeLaunchTemplates
 type LaunchTemplates struct{}
 
-func (LaunchTemplates) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(region)})
+func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*launchTemplate // Paged call, defer deletion until we have the whole list.
 
 	pageFunc := func(page *ec2.DescribeLaunchTemplatesOutput, _ bool) bool {
 		for _, lt := range page.LaunchTemplates {
 			l := &launchTemplate{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *lt.LaunchTemplateId,
 				Name:    *lt.LaunchTemplateName,
 			}
 			if set.Mark(l) {
-				logrus.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
-				toDelete = append(toDelete, l)
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
+				if !opts.DryRun {
+					toDelete = append(toDelete, l)
+				}
 			}
 		}
 		return true
@@ -61,15 +63,15 @@ func (LaunchTemplates) MarkAndSweep(sess *session.Session, acct string, region s
 		}
 
 		if _, err := svc.DeleteLaunchTemplate(deleteReq); err != nil {
-			logrus.Warningf("%s: delete failed: %v", lt.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", lt.ARN(), err)
 		}
 	}
 
 	return nil
 }
 
-func (LaunchTemplates) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	c := ec2.New(sess, aws.NewConfig().WithRegion(region))
+func (LaunchTemplates) ListAll(opts Options) (*Set, error) {
+	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	input := &ec2.DescribeLaunchTemplatesInput{}
 
@@ -77,8 +79,8 @@ func (LaunchTemplates) ListAll(sess *session.Session, acct, region string) (*Set
 		now := time.Now()
 		for _, lt := range lts.LaunchTemplates {
 			arn := launchTemplate{
-				Account: acct,
-				Region:  region,
+				Account: opts.Account,
+				Region:  opts.Region,
 				ID:      *lt.LaunchTemplateId,
 				Name:    *lt.LaunchTemplateName,
 			}.ARN()
@@ -88,7 +90,7 @@ func (LaunchTemplates) ListAll(sess *session.Session, acct, region string) (*Set
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't list launch templates for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't list launch templates for %q in %q", opts.Account, opts.Region)
 }
 
 type launchTemplate struct {

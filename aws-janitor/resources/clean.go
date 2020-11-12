@@ -31,7 +31,7 @@ import (
 
 // CleanAll cleans all of the resources for all of the regions visible to
 // the provided AWS session.
-func CleanAll(sess *session.Session, region string) error {
+func CleanAll(sess *session.Session, region string, dryRun bool) error {
 	acct, err := account.GetAccount(sess, regions.Default)
 	if err != nil {
 		return errors.Wrap(err, "Failed to retrieve account")
@@ -51,34 +51,43 @@ func CleanAll(sess *session.Session, region string) error {
 
 	var errs []error
 
+	opts := Options{
+		Session: sess,
+		Account: acct,
+		DryRun:  dryRun,
+	}
 	for _, r := range regionList {
+		opts.Region = r
+		logger := logrus.WithField("options", opts)
 		for _, typ := range RegionalTypeList {
-			set, err := typ.ListAll(sess, acct, r)
+			logger.Debugf("Cleaning resource type %T", typ)
+			set, err := typ.ListAll(opts)
 			if err != nil {
 				// ignore errors for resources we do not have permissions to list
 				if reqerr, ok := errors.Cause(err).(awserr.RequestFailure); ok {
 					if reqerr.StatusCode() == http.StatusForbidden {
-						logrus.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
+						logger.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
 						continue
 					}
 				}
 				errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 				continue
 			}
-			if err := typ.MarkAndSweep(sess, acct, r, set); err != nil {
-				errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
+			if err := typ.MarkAndSweep(opts, set); err != nil {
+				errs = append(errs, errors.Wrapf(err, "Failed to mark and sweep resources of type %T", typ))
 			}
 		}
 	}
 
+	opts.Region = regions.Default
 	for _, typ := range GlobalTypeList {
-		set, err := typ.ListAll(sess, acct, regions.Default)
+		set, err := typ.ListAll(opts)
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
 			continue
 		}
-		if err := typ.MarkAndSweep(sess, acct, regions.Default, set); err != nil {
-			errs = append(errs, errors.Wrapf(err, "Failed to list resources of type %T", typ))
+		if err := typ.MarkAndSweep(opts, set); err != nil {
+			errs = append(errs, errors.Wrapf(err, "Failed to mark and sweep resources of type %T", typ))
 		}
 	}
 

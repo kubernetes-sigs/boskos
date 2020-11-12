@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,8 +28,9 @@ import (
 // Cloud Formation Stacks
 type CloudFormationStacks struct{}
 
-func (CloudFormationStacks) MarkAndSweep(sess *session.Session, acct string, region string, set *Set) error {
-	svc := cf.New(sess, &aws.Config{Region: aws.String(region)})
+func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
+	logger := logrus.WithField("options", opts)
+	svc := cf.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var toDelete []*cloudFormationStack // Paged call, defer deletion until we have the whole list.
 
@@ -48,8 +48,10 @@ func (CloudFormationStacks) MarkAndSweep(sess *session.Session, acct string, reg
 				name: aws.StringValue(stack.StackName),
 			}
 			if set.Mark(o) {
-				logrus.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
-				toDelete = append(toDelete, o)
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
+				if !opts.DryRun {
+					toDelete = append(toDelete, o)
+				}
 			}
 		}
 		return true
@@ -61,14 +63,14 @@ func (CloudFormationStacks) MarkAndSweep(sess *session.Session, acct string, reg
 
 	for _, o := range toDelete {
 		if err := o.delete(svc); err != nil {
-			logrus.Warningf("%s: delete failed: %v", o.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", o.ARN(), err)
 		}
 	}
 	return nil
 }
 
-func (CloudFormationStacks) ListAll(sess *session.Session, acct, region string) (*Set, error) {
-	svc := cf.New(sess, aws.NewConfig().WithRegion(region))
+func (CloudFormationStacks) ListAll(opts Options) (*Set, error) {
+	svc := cf.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 	set := NewSet(0)
 	inp := &cf.ListStacksInput{}
 
@@ -81,7 +83,7 @@ func (CloudFormationStacks) ListAll(sess *session.Session, acct, region string) 
 		return true
 	})
 
-	return set, errors.Wrapf(err, "couldn't describe cloud formation stacks for %q in %q", acct, region)
+	return set, errors.Wrapf(err, "couldn't describe cloud formation stacks for %q in %q", opts.Account, opts.Region)
 }
 
 type cloudFormationStack struct {
