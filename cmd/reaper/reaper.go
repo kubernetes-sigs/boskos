@@ -65,24 +65,35 @@ func main() {
 }
 
 func sync(c *client.Client, res string) {
+	log := logrus.WithField("resource_type", res).WithField("target_state", *targetState)
+
 	// kubetest busted
+	log = log.WithField("source_state", common.Busy)
 	if owners, err := c.Reset(res, common.Busy, *expiryDuration, *targetState); err != nil {
-		logrus.WithError(err).Error("Reset busy failed!")
+		log.WithError(err).Error("Reset failed")
 	} else {
-		logrus.Infof("Reset busy to %s! Proj-owner: %v", *targetState, owners)
+		logResponses(log, owners)
 	}
 
 	// janitor, mason busted
+	log = log.WithField("source_state", common.Cleaning)
 	if owners, err := c.Reset(res, common.Cleaning, *expiryDuration, *targetState); err != nil {
-		logrus.WithError(err).Error("Reset cleaning failed!")
+		log.WithError(err).Error("Reset failed")
 	} else {
-		logrus.Infof("Reset cleaning to %s! Proj-owner: %v", *targetState, owners)
+		logResponses(log, owners)
 	}
 
 	// mason busted
+	log = log.WithField("source_state", common.Leased)
 	if owners, err := c.Reset(res, common.Leased, *expiryDuration, *targetState); err != nil {
-		logrus.WithError(err).Error("Reset busy failed!")
+		log.WithError(err).Error("Reset failed")
 	} else {
-		logrus.Infof("Reset leased to %s! Proj-owner: %v", *targetState, owners)
+		logResponses(log, owners)
+	}
+}
+
+func logResponses(parent *logrus.Entry, response map[string]string) {
+	for name, previousOwner := range response {
+		parent.WithField("resource_name", name).WithField("previous_owner", previousOwner).Info("Reset resource")
 	}
 }
