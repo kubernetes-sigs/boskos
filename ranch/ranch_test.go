@@ -18,16 +18,17 @@ package ranch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"errors"
-
 	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1386,10 +1387,96 @@ func TestSyncResources(t *testing.T) {
 				},
 			}},
 		},
+		{
+			name: "Dynamic boskos config adopts pre-existing static resources",
+			config: &common.BoskosConfig{Resources: []common.ResourceEntry{{
+				Type:     "test-resource",
+				State:    common.Free,
+				MinCount: 10,
+				MaxCount: 10,
+			}}},
+			currentRes: []runtime.Object{
+				newResource("test-resource-0", "test-resource", common.Free, "", startTime),
+				newResource("test-resource-1", "test-resource", common.Free, "", startTime),
+				newResource("test-resource-2", "test-resource", common.Free, "", startTime),
+			},
+			expectedRes: &crds.ResourceObjectList{Items: []crds.ResourceObject{
+				*newResource("test-resource-0", "test-resource", common.Free, "", startTime),
+				*newResource("test-resource-1", "test-resource", common.Free, "", startTime),
+				*newResource("test-resource-2", "test-resource", common.Free, "", startTime),
+				*newResource("new-dynamic-res-1", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-2", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-3", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-4", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-5", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-6", "test-resource", common.Free, "", fakeNow),
+				*newResource("new-dynamic-res-7", "test-resource", common.Free, "", fakeNow),
+			}},
+			expectedLCs: &crds.DRLCObjectList{Items: []crds.DRLCObject{{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-resource"},
+				Spec: crds.DRLCSpec{
+					InitialState: common.Free,
+					MinCount:     10,
+					MaxCount:     10,
+				},
+			}}},
+		},
+		{
+			name: "Dynamic config that adopted static resources gets changed back to static",
+			config: &common.BoskosConfig{Resources: []common.ResourceEntry{{
+				Type:  "test-resource",
+				State: common.Free,
+				Names: []string{
+					"test-resource-0",
+					"test-resource-1",
+					"test-resource-2",
+				},
+			}}},
+			currentRes: []runtime.Object{
+				newResource("test-resource-0", "test-resource", common.Free, "", startTime),
+				newResource("test-resource-1", "test-resource", common.Free, "", startTime),
+				newResource("test-resource-2", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e54", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e55", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e56", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e57", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e58", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e59", "test-resource", common.Free, "", startTime),
+				newResource("fd957edc-4148-49e8-af83-53d38bcd4e60", "test-resource", common.Free, "", startTime),
+				&crds.DRLCObject{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-resource"},
+					Spec: crds.DRLCSpec{
+						MinCount: 10,
+						MaxCount: 10,
+					},
+				},
+			},
+			expectedRes: &crds.ResourceObjectList{Items: []crds.ResourceObject{
+				*newResource("test-resource-0", "test-resource", common.Free, "", startTime),
+				*newResource("test-resource-1", "test-resource", common.Free, "", startTime),
+				*newResource("test-resource-2", "test-resource", common.Free, "", startTime),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e54", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e55", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e56", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e57", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e58", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e59", "test-resource", common.ToBeDeleted, "", fakeNow),
+				*newResource("fd957edc-4148-49e8-af83-53d38bcd4e60", "test-resource", common.ToBeDeleted, "", fakeNow),
+			}},
+			expectedLCs: &crds.DRLCObjectList{Items: []crds.DRLCObject{{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-resource"},
+				Spec: crds.DRLCSpec{
+					MinCount: 0,
+					MaxCount: 0,
+				},
+			}}},
+		},
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			c := makeTestRanch(tc.currentRes)
 			if err := c.Storage.SyncResources(tc.config); err != nil {
 				t.Fatalf("syncResources failed: %v, type: %T", err, err)
@@ -1408,7 +1495,7 @@ func TestSyncResources(t *testing.T) {
 					tc.expectedRes.Items[idx].Status.UserData = &common.UserData{}
 				}
 			}
-			if diff := compareResourceObjectsLists(resources, tc.expectedRes); diff != nil {
+			if diff := compareResourceObjectsLists(resources, tc.expectedRes); diff != "" {
 				t.Errorf("received resource differs from expected, diff: %v", diff)
 			}
 			lfs, err := c.Storage.GetDynamicResourceLifeCycles()
@@ -1421,8 +1508,8 @@ func TestSyncResources(t *testing.T) {
 			for idx := range tc.expectedLCs.Items {
 				tc.expectedLCs.Items[idx].Namespace = testNS
 			}
-			if diff := compareDRLCLists(lfs, tc.expectedLCs); diff != nil {
-				t.Errorf("received drlc do not match expected, diff: %v", deep.Equal(lfs, tc.expectedLCs))
+			if diff := compareDRLCLists(lfs, tc.expectedLCs); diff != "" {
+				t.Errorf("received drlc do not match expected, diff: %s", diff)
 			}
 		})
 	}
@@ -1704,9 +1791,11 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			c := makeTestRanch(tc.currentRes)
-			err := c.Storage.UpdateAllDynamicResources()
+			err := c.Storage.UpdateAllDynamicResources(nil)
 			if err != nil {
 				t.Fatalf("error updating dynamic resources: %v", err)
 			}
@@ -1733,22 +1822,22 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 				}
 			}
 
-			if diff := compareResourceObjectsLists(resources, tc.expectedRes); diff != nil {
-				t.Errorf("diff:\n%v", deep.Equal(resources, tc.expectedRes))
+			if diff := compareResourceObjectsLists(resources, tc.expectedRes); diff != "" {
+				t.Errorf("diff:\n%v", diff)
 			}
 			lfs, err := c.Storage.GetDynamicResourceLifeCycles()
 			if err != nil {
 				t.Fatalf("failed to get dynamic resource life cycles: %v", err)
 			}
 
-			if diff := compareDRLCLists(lfs, tc.expectedLCs); diff != nil {
-				t.Errorf("diff: %v", deep.Equal(lfs, tc.expectedLCs))
+			if diff := compareDRLCLists(lfs, tc.expectedLCs); diff != "" {
+				t.Errorf("diff: %s", diff)
 			}
 		})
 	}
 }
 
-func compareResourceObjectsLists(a, b *crds.ResourceObjectList) []string {
+func compareResourceObjectsLists(a, b *crds.ResourceObjectList) string {
 	sortResourcesLists(a, b)
 	a.TypeMeta = metav1.TypeMeta{}
 	a.ResourceVersion = ""
@@ -1762,10 +1851,10 @@ func compareResourceObjectsLists(a, b *crds.ResourceObjectList) []string {
 		b.Items[idx].TypeMeta = metav1.TypeMeta{}
 		b.Items[idx].ResourceVersion = ""
 	}
-	return deep.Equal(a, b)
+	return cmp.Diff(a, b, cmp.AllowUnexported(sync.Map{}, sync.Mutex{}, atomic.Value{}))
 }
 
-func compareDRLCLists(a, b *crds.DRLCObjectList) []string {
+func compareDRLCLists(a, b *crds.DRLCObjectList) string {
 	sortDRLCList(a, b)
 	a.TypeMeta = metav1.TypeMeta{}
 	a.ResourceVersion = ""
@@ -1779,7 +1868,7 @@ func compareDRLCLists(a, b *crds.DRLCObjectList) []string {
 		b.Items[idx].TypeMeta = metav1.TypeMeta{}
 		b.Items[idx].ResourceVersion = ""
 	}
-	return deep.Equal(a, b)
+	return cmp.Diff(a, b)
 }
 
 func newResource(name, rtype, state, owner string, t time.Time) *crds.ResourceObject {

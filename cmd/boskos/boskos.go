@@ -201,7 +201,7 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 		return fmt.Errorf("failed to watch boskos resources: %w", err)
 	}
 	if err := ctrl.Watch(&source.Kind{Type: &crds.DRLCObject{}}, constHandler()); err != nil {
-		return fmt.Errorf("failed to watch boskos dyanmic resources: %w", err)
+		return fmt.Errorf("failed to watch boskos dynamic resources: %w", err)
 	}
 	if err := ctrl.Watch(&source.Channel{Source: configChangeEvent}, constHandler()); err != nil {
 		return fmt.Errorf("failed to create source channel for config change event: %w", err)
