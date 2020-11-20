@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -140,7 +141,21 @@ func (s *Storage) DeleteDynamicResourceLifeCycle(name string) error {
 			Namespace: s.namespace,
 		},
 	}
-	return s.client.Delete(s.ctx, o)
+	if err := s.client.Delete(s.ctx, o); err != nil {
+		return err
+	}
+	if err := wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		if err := s.client.Get(s.ctx, ctrlruntimeclient.ObjectKey{Namespace: s.namespace, Name: name}, o); err != nil {
+			if kerrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	}); err != nil {
+		return fmt.Errorf("failed for deleted dynamic resource lifecycle %s/%s to vanish from cache: %w", s.namespace, name, err)
+	}
+	return nil
 }
 
 // UpdateDynamicResourceLifeCycle updates a dynamic resource life cycle. if it exists, errors otherwise
@@ -314,7 +329,11 @@ func (s *Storage) updateDynamicResources(lifecycle *crds.DRLCObject, resources [
 			toDelete = append(toDelete, res)
 		}
 	}
-	logrus.Infof("DRLC type %s: adding %+v, deleting %+v", lifecycle.Name, toAdd, toDelete)
+	logrus.WithFields(logrus.Fields{
+		"type":               lifecycle.Name,
+		"add_items_count":    len(toAdd),
+		"delete_items_count": len(toDelete),
+	}).Info("Updating DLRCs")
 	return
 }
 
