@@ -61,6 +61,7 @@ var RegionalTypeList = []Type{
 	NATGateway{},
 	VPCs{},
 	DHCPOptions{},
+	Snapshots{},
 	Volumes{},
 	Addresses{},
 }
