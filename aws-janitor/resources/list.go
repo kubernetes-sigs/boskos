@@ -63,6 +63,7 @@ var RegionalTypeList = []Type{
 	DHCPOptions{},
 	Volumes{},
 	Addresses{},
+	ElasticFileSystems{},
 }
 
 // Non-regional AWS resource types, in dependency order
