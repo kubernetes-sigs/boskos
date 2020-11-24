@@ -76,6 +76,14 @@ RESOURCES_BY_API = {
         Resource('', 'logging', 'sinks', None, None, None, False, False, ['_Default', '_Required']),
     ],
 
+    # pubsub resources
+    'pubsub.googleapis.com': [
+        Resource('', 'pubsub', 'subscriptions', None, None, None, False, True, None),
+        Resource('', 'pubsub', 'topics', None, None, None, False, True,
+                 ['container-analysis-notes-v1', 'container-analysis-notes-v1beta1',
+                  'container-analysis-occurrences-v1', 'container-analysis-occurrences-v1beta1'])
+    ],
+
     # GKE hub memberships
     'gkehub.googleapis.com': [
         Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
