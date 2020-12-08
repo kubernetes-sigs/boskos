@@ -91,12 +91,6 @@ func NewRanch(config string, s *Storage, ttl time.Duration) (*Ranch, error) {
 		requestMgr: NewRequestManager(ttl),
 		now:        time.Now,
 	}
-	if config != "" {
-		if err := newRanch.SyncConfig(config); err != nil {
-			return nil, err
-		}
-		logrus.Infof("Loaded Boskos configuration successfully")
-	}
 	return newRanch, nil
 }
 
@@ -408,25 +402,6 @@ func (r *Ranch) SyncConfig(configPath string) error {
 		return err
 	}
 	return r.Storage.SyncResources(config)
-}
-
-// StartDynamicResourceUpdater starts a goroutine which periodically
-// updates all dynamic resources.
-func (r *Ranch) StartDynamicResourceUpdater(updatePeriod time.Duration) {
-	if updatePeriod == 0 {
-		return
-	}
-	go func() {
-		updateTick := time.NewTicker(updatePeriod).C
-		for {
-			select {
-			case <-updateTick:
-				if err := r.Storage.UpdateAllDynamicResources(); err != nil {
-					logrus.WithError(err).Error("UpdateAllDynamicResources failed")
-				}
-			}
-		}
-	}()
 }
 
 // StartRequestGC starts the GC of expired requests
