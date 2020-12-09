@@ -25,9 +25,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -72,12 +77,23 @@ func (o *KubernetesClientOptions) Client() (ctrlruntimeclient.Client, error) {
 	return ctrlruntimeclient.New(cfg, ctrlruntimeclient.Options{})
 }
 
-// CacheBackedClient returns a client whose Reader is cache backed. Namespace can be empty
+// Manager returns a Manager. It contains a client whose Reader is cache backed. Namespace can be empty
 // in which case the client will use all namespaces.
 // It blocks until the cache was synced for all types passed in startCacheFor.
-func (o *KubernetesClientOptions) CacheBackedClient(namespace string, startCacheFor ...runtime.Object) (ctrlruntimeclient.Client, error) {
+func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...runtime.Object) (manager.Manager, error) {
 	if o.inMemory {
-		return fakectrlruntimeclient.NewFakeClient(), nil
+		return manager.New(&rest.Config{}, manager.Options{
+			LeaderElection:     false,
+			MapperProvider:     func(_ *rest.Config) (meta.RESTMapper, error) { return &fakeRESTMapper{}, nil },
+			MetricsBindAddress: "0",
+			NewCache: func(_ *rest.Config, _ cache.Options) (cache.Cache, error) {
+				return &informertest.FakeInformers{}, nil
+			},
+			NewClient: func(_ cache.Cache, _ *rest.Config, _ ctrlruntimeclient.Options) (ctrlruntimeclient.Client, error) {
+				return fakectrlruntimeclient.NewFakeClient(), nil
+			},
+			EventBroadcaster: record.NewBroadcasterForTests(time.Hour),
+		})
 	}
 
 	cfg, err := o.Cfg()
@@ -126,7 +142,7 @@ func (o *KubernetesClientOptions) CacheBackedClient(namespace string, startCache
 	}
 	logrus.WithField("sync-duration", time.Since(startSyncTime).String()).Info("Cache synced")
 
-	return mgr.GetClient(), nil
+	return mgr, nil
 }
 
 // Cfg returns the *rest.Config for the configured cluster
@@ -151,4 +167,39 @@ type Type struct {
 	Singular, Plural string
 	Object           runtime.Object
 	Collection       runtime.Object
+}
+
+// fakeRESTMapper is a RESTMapper
+var _ meta.RESTMapper = &fakeRESTMapper{}
+
+// fakeRESTMapper is used for boskos in-memory mode
+type fakeRESTMapper struct {
+}
+
+func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, nil
+}
+
+func (f *fakeRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+
+func (f *fakeRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
 }

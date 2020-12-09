@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -108,26 +107,10 @@ func main() {
 	// main server with the main mux until we're ready
 	health := pjutil.NewHealth()
 
-	cfg, err := kubeClientOptions.Cfg()
+	mgr, err := kubeClientOptions.Manager(*namespace, &crds.ResourceObject{}, &crds.DRLCObject{})
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to get kubeconfig")
+		logrus.WithError(err).Fatal("Failed to get mgr")
 	}
-	cfg.QPS = 100
-	cfg.Burst = 200
-	mgr, err := manager.New(cfg, manager.Options{
-		LeaderElection:     false,
-		Namespace:          *namespace,
-		MetricsBindAddress: "0",
-	})
-	if err != nil {
-		logrus.WithError(err).Fatal("Failed to construct mgr.")
-	}
-	interrupts.Run(func(ctx context.Context) {
-		if err := mgr.Start(ctx.Done()); err != nil {
-			logrus.WithError(err).Fatal("Mgr failed.")
-		}
-		logrus.Info("Mgr finished gracefully.")
-	})
 
 	storage := ranch.NewStorage(interrupts.Context(), mgr.GetClient(), *namespace)
 
@@ -158,6 +141,12 @@ func main() {
 
 	syncConfig := func() error {
 		return r.SyncConfig(*configPath)
+	}
+
+	// Make sure config is not broken by syncing at least once. Also
+	// needed for in memory mode where the controller never gets triggered.
+	if err := syncConfig(); err != nil {
+		logrus.WithError(err).Fatal("Failed to sync config")
 	}
 	if err := addConfigSyncReconcilerToManager(mgr, syncConfig, configChangeEventChan); err != nil {
 		logrus.WithError(err).Fatal("Failed to set up config sync controller")
