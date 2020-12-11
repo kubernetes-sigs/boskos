@@ -27,7 +27,7 @@ GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 
-export GO_VERSION=1.15.5
+export GO_VERSION=1.15.6
 export GO111MODULE=on
 export DOCKER_REPO
 export DOCKER_TAG
