@@ -43,7 +43,8 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *ec2.DescribeSnapshotsOutput, _ bool) bool {
 		for _, ss := range page.Snapshots {
 			s := &snapshot{ID: *ss.SnapshotId}
-			if set.Mark(s) {
+			// StartTime is probably close enough to a creation timestamp
+			if set.Mark(s, ss.StartTime) {
 				logger.Warningf("%s: deleting %T", s.ARN(), s)
 				if !opts.DryRun {
 					toDelete = append(toDelete, s)

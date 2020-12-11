@@ -49,7 +49,7 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, sub := range resp.Subnets {
 		s := &subnet{Account: opts.Account, Region: opts.Region, ID: *sub.SubnetId}
-		if set.Mark(s) {
+		if set.Mark(s, nil) {
 			logger.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
 			if opts.DryRun {
 				continue

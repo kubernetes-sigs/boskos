@@ -48,25 +48,26 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, vp := range resp.Vpcs {
 		v := &vpc{Account: opts.Account, Region: opts.Region, ID: *vp.VpcId}
-		if set.Mark(v) {
-			logger.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
-			if opts.DryRun {
-				continue
-			}
-			if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
-				disReq := &ec2.AssociateDhcpOptionsInput{
-					VpcId:         vp.VpcId,
-					DhcpOptionsId: aws.String("default"),
-				}
-
-				if _, err := svc.AssociateDhcpOptions(disReq); err != nil {
-					logger.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
-				}
+		if !set.Mark(v, nil) {
+			continue
+		}
+		logger.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
+		if opts.DryRun {
+			continue
+		}
+		if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
+			disReq := &ec2.AssociateDhcpOptionsInput{
+				VpcId:         vp.VpcId,
+				DhcpOptionsId: aws.String("default"),
 			}
 
-			if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
-				logger.Warningf("%s: delete failed: %v", v.ARN(), err)
+			if _, err := svc.AssociateDhcpOptions(disReq); err != nil {
+				logger.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
 			}
+		}
+
+		if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
+			logger.Warningf("%s: delete failed: %v", v.ARN(), err)
 		}
 	}
 

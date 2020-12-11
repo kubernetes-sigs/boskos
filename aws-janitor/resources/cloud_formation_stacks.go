@@ -47,7 +47,7 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 				id:   aws.StringValue(stack.StackId),
 				name: aws.StringValue(stack.StackName),
 			}
-			if set.Mark(o) {
+			if set.Mark(o, stack.CreationTime) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, o)

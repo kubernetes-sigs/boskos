@@ -55,7 +55,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 			}
 
 			o := &iamInstanceProfile{profile: p}
-			if set.Mark(o) {
+			if set.Mark(o, p.CreateDate) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
 				if !opts.DryRun {
 					toDelete = append(toDelete, o)

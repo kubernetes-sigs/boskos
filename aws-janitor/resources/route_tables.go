@@ -54,7 +54,7 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
-		if set.Mark(r) {
+		if set.Mark(r, nil) {
 			logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
 			if opts.DryRun {
 				continue

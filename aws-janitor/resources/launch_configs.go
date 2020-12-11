@@ -37,7 +37,7 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *autoscaling.DescribeLaunchConfigurationsOutput, _ bool) bool {
 		for _, lc := range page.LaunchConfigurations {
 			l := &launchConfiguration{ID: *lc.LaunchConfigurationARN, Name: *lc.LaunchConfigurationName}
-			if set.Mark(l) {
+			if set.Mark(l, lc.CreatedTime) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, l)

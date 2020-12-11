@@ -99,32 +99,34 @@ func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
 	return err
 }
 
-// Mark marks a particular resource as currently present, and advises
-// on whether it should be deleted. If Mark(r) returns true, the TTL
-// has expired for r and it should be deleted.
-func (s *Set) Mark(r Interface) bool {
+// Mark marks a particular resource as currently present, records when it was
+// created or first seen, and advises on whether it should be deleted.
+// If Mark(r) returns true, the TTL has expired for r and it should be deleted.
+// If the created time is not provided, the current time is used instead.
+func (s *Set) Mark(r Interface, created *time.Time) bool {
 	key := r.ResourceKey()
-	now := time.Now()
-
 	s.marked[key] = true
-	if t, ok := s.firstSeen[key]; ok {
-		since := now.Sub(t)
-		if since > s.ttl {
-			s.swept = append(s.swept, key)
-			return true
-		}
-		logrus.Debugf("%s: seen for %v", key, since)
-		return false
+
+	// Calculate the most likely creation time based on whichever is first:
+	// - the current time
+	// - the creation time passed to this function
+	// - any previous record of this resource's creation time
+	now := time.Now()
+	firstSeen := now
+	if created != nil && created.Before(now) && !created.IsZero() && !created.Equal(time.Unix(0, 0)) {
+		firstSeen = *created
 	}
 
-	s.firstSeen[key] = now
-	logrus.Debugf("%s: first seen", key)
-	if s.ttl == 0 {
-		// If the TTL is 0, it should be deleted now.
+	if t, ok := s.firstSeen[key]; ok && t.Before(firstSeen) {
+		firstSeen = t
+	}
+	s.firstSeen[key] = firstSeen
+
+	// If the TTL is 0, it should be deleted now.
+	if s.ttl == 0 || now.Sub(firstSeen) > s.ttl {
 		s.swept = append(s.swept, key)
 		return true
 	}
-
 	return false
 }
 

@@ -85,7 +85,7 @@ func route53ResourceRecordSetsForZone(logger logrus.FieldLogger, svc *route53.Ro
 			}
 
 			o := &route53ResourceRecordSet{zone: zone, obj: rrs}
-			if set.Mark(o) {
+			if set.Mark(o, nil) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
 			}
 		}

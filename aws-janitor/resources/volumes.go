@@ -38,7 +38,7 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *ec2.DescribeVolumesOutput, _ bool) bool {
 		for _, vol := range page.Volumes {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
-			if set.Mark(v) {
+			if set.Mark(v, vol.CreateTime) {
 				logger.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
 				if !opts.DryRun {
 					toDelete = append(toDelete, v)

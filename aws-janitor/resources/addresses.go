@@ -41,24 +41,25 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, addr := range resp.Addresses {
 		a := &address{Account: opts.Account, Region: opts.Region, ID: *addr.AllocationId}
-		if set.Mark(a) {
-			logger.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
-			if opts.DryRun {
-				continue
-			}
+		if !set.Mark(a, nil) {
+			continue
+		}
+		logger.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
+		if opts.DryRun {
+			continue
+		}
 
-			if addr.AssociationId != nil {
-				logger.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)
-				_, err := svc.DisassociateAddress(&ec2.DisassociateAddressInput{AssociationId: addr.AssociationId})
-				if err != nil {
-					logger.Warningf("%s: disassociating %T failed: %v", a.ARN(), addr, err)
-				}
-			}
-
-			_, err := svc.ReleaseAddress(&ec2.ReleaseAddressInput{AllocationId: addr.AllocationId})
+		if addr.AssociationId != nil {
+			logger.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)
+			_, err := svc.DisassociateAddress(&ec2.DisassociateAddressInput{AssociationId: addr.AssociationId})
 			if err != nil {
-				logger.Warningf("%s: delete failed: %v", a.ARN(), err)
+				logger.Warningf("%s: disassociating %T failed: %v", a.ARN(), addr, err)
 			}
+		}
+
+		_, err := svc.ReleaseAddress(&ec2.ReleaseAddressInput{AllocationId: addr.AllocationId})
+		if err != nil {
+			logger.Warningf("%s: delete failed: %v", a.ARN(), err)
 		}
 	}
 	return nil
