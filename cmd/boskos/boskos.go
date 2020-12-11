@@ -43,6 +43,7 @@ import (
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
+
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/crds"
 	"sigs.k8s.io/boskos/handlers"
@@ -63,6 +64,7 @@ var (
 	requestTTL = flag.Duration("request-ttl", defaultRequestTTL, "request TTL before losing priority in the queue")
 	logLevel   = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	namespace  = flag.String("namespace", corev1.NamespaceDefault, "namespace to install on")
+	port       = flag.Int("port", 8080, "Port to serve on")
 
 	httpRequestDuration = prowmetrics.HttpRequestDuration("boskos", 0.005, 1200)
 	httpResponseSize    = prowmetrics.HttpResponseSize("boskos", 128, 65536)
@@ -121,7 +123,7 @@ func main() {
 
 	boskos := &http.Server{
 		Handler: traceHandler(handlers.NewBoskosHandler(r)),
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%d", *port),
 	}
 
 	// Viper defaults the configfile name to `config` and `SetConfigFile` only
