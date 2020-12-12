@@ -44,6 +44,7 @@ type Type interface {
 // AWS resource types known to this script, in dependency order.
 var RegionalTypeList = []Type{
 	CloudFormationStacks{},
+	EKS{},
 	ClassicLoadBalancers{},
 	LoadBalancers{},
 	AutoScalingGroups{},
