@@ -188,18 +188,35 @@ func TestRecycleLeasedResources(t *testing.T) {
 	}
 
 	rStorage, mClient, _ := createFakeBoskos(tc)
-	res1CRD, _ := rStorage.GetResource("type1_0")
+
+	res1CRD, err := rStorage.GetResource("type1_0")
+	if err != nil {
+		t.Fatalf("failed to get resource: %v", err)
+	}
+	res1ResourceVersion := res1CRD.ResourceVersion
 	res1 := res1CRD.ToResource()
 	res1.State = "type2_0"
-	rStorage.UpdateResource(crds.FromResource(res1))
-	res2CRD, _ := rStorage.GetResource("type2_0")
+	res1CRD = crds.FromResource(res1)
+	res1CRD.ResourceVersion = res1ResourceVersion
+	if _, err := rStorage.UpdateResource(res1CRD); err != nil {
+		t.Fatalf("failed to update resource: %v", err)
+	}
+
+	res2CRD, err := rStorage.GetResource("type2_0")
+	if err != nil {
+		t.Fatalf("failed to get resource: %v", err)
+	}
 	res2 := res2CRD.ToResource()
+	res2ResourceVersion := res2CRD.ResourceVersion
 	if err := res2.UserData.Set(LeasedResources, &[]string{"type1_0"}); err != nil {
 		t.Fatalf("setting userdata failed: %v", err)
 	}
-	if _, err := rStorage.UpdateResource(crds.FromResource(res2)); err != nil {
+	res2CRD = crds.FromResource(res2)
+	res2CRD.ResourceVersion = res2ResourceVersion
+	if _, err := rStorage.UpdateResource(res2CRD); err != nil {
 		t.Fatalf("failed to update: %v", err)
 	}
+
 	m := NewMason(1, mClient.basic, defaultWaitPeriod, defaultWaitPeriod, rStorage)
 	m.RegisterConfigConverter(fakeConfigType, fakeConfigConverter)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -212,8 +229,14 @@ func TestRecycleLeasedResources(t *testing.T) {
 		t.Errorf("Timeout")
 	}
 	m.Stop()
-	res1CRD, _ = rStorage.GetResource("type1_0")
-	res2CRD, _ = rStorage.GetResource("type2_0")
+	res1CRD, err = rStorage.GetResource("type1_0")
+	if err != nil {
+		t.Fatalf("failed to get res1CRD: %v", err)
+	}
+	res2CRD, err = rStorage.GetResource("type2_0")
+	if err != nil {
+		t.Fatalf("failed to get res2CRD: %v", err)
+	}
 	res1 = res1CRD.ToResource()
 	res2 = res2CRD.ToResource()
 	if res2.State != common.Cleaning {

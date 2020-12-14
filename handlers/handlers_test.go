@@ -34,7 +34,6 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -64,7 +63,7 @@ var (
 	testTTL = time.Millisecond
 )
 
-func MakeTestRanch(resources []runtime.Object) *ranch.Ranch {
+func MakeTestRanch(resources []ctrlruntimeclient.Object) *ranch.Ranch {
 	const ns = "test"
 	for _, obj := range resources {
 		obj.(metav1.Object).SetNamespace(ns)
@@ -78,7 +77,7 @@ func MakeTestRanch(resources []runtime.Object) *ranch.Ranch {
 func TestAcquire(t *testing.T) {
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		path      string
 		code      int
 		method    string
@@ -127,7 +126,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "no match type",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -144,7 +143,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "no match state",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -161,7 +160,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "busy",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -179,7 +178,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -247,7 +246,7 @@ func TestAcquire(t *testing.T) {
 func TestRelease(t *testing.T) {
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		path      string
 		code      int
 		method    string
@@ -290,7 +289,7 @@ func TestRelease(t *testing.T) {
 		},
 		{
 			name: "wrong owner",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -308,7 +307,7 @@ func TestRelease(t *testing.T) {
 		},
 		{
 			name: "no match name",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -326,7 +325,7 @@ func TestRelease(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -386,7 +385,7 @@ func TestRelease(t *testing.T) {
 func TestReset(t *testing.T) {
 	var testcases = []struct {
 		name       string
-		resources  []runtime.Object
+		resources  []ctrlruntimeclient.Object
 		path       string
 		code       int
 		method     string
@@ -436,7 +435,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - has no owner",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -454,7 +453,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - not expire",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -472,7 +471,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - no match type",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -490,7 +489,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - no match state",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -508,7 +507,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -573,7 +572,7 @@ func TestUpdate(t *testing.T) {
 
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		path      string
 		code      int
 		method    string
@@ -616,7 +615,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "wrong owner",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -634,7 +633,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "wrong state",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -652,7 +651,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "no matched resource",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -670,7 +669,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -727,7 +726,7 @@ func TestUpdate(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		path      string
 		code      int
 		method    string
@@ -753,7 +752,7 @@ func TestGetMetric(t *testing.T) {
 		},
 		{
 			name: "wrong type",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -771,7 +770,7 @@ func TestGetMetric(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{&crds.ResourceObject{
+			resources: []ctrlruntimeclient.Object{&crds.ResourceObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "res",
 				},
@@ -876,7 +875,7 @@ type onceConflictingClient struct {
 	ctrlruntimeclient.Client
 }
 
-func (occ *onceConflictingClient) Update(ctx context.Context, obj runtime.Object, opts ...ctrlruntimeclient.UpdateOption) error {
+func (occ *onceConflictingClient) Update(ctx context.Context, obj ctrlruntimeclient.Object, opts ...ctrlruntimeclient.UpdateOption) error {
 	if !occ.didConflict {
 		occ.didConflict = true
 		return kerrors.NewConflict(schema.GroupResource{}, "obj", errors.New("conflicting as requested"))

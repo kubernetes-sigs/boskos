@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -107,7 +109,7 @@ func main() {
 	// signal to the world that we are healthy
 	// this needs to be in a separate port as we don't start the
 	// main server with the main mux until we're ready
-	health := pjutil.NewHealth()
+	health := pjutil.NewHealthOnPort(instrumentationOptions.HealthPort)
 
 	mgr, err := kubeClientOptions.Manager(*namespace, &crds.ResourceObject{}, &crds.DRLCObject{})
 	if err != nil {
@@ -168,7 +170,8 @@ type configSyncReconciler struct {
 	sync func() error
 }
 
-func (r *configSyncReconciler) Reconcile(_ reconcile.Request) (reconcile.Result, error) {
+func (r *configSyncReconciler) Reconcile(_ context.Context, _ reconcile.Request) (reconcile.Result, error) {
+	// TODO(alvaroaleman): figure out how to use the context in the sync
 	err := r.sync()
 	if err != nil {
 		logrus.WithError(err).Error("Config sync failed")
@@ -205,11 +208,10 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 }
 
 func constHandler() handler.EventHandler {
-	return &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(func(handler.MapObject) []reconcile.Request {
+	return handler.EnqueueRequestsFromMapFunc(
+		func(object ctrlruntimeclient.Object) []reconcile.Request {
 			return []reconcile.Request{{}}
-		}),
-	}
+		})
 }
 
 // resourceUpdatePredicate prevents the config reconciler from reacting to resource update events
