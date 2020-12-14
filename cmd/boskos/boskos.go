@@ -109,7 +109,7 @@ func main() {
 	// signal to the world that we are healthy
 	// this needs to be in a separate port as we don't start the
 	// main server with the main mux until we're ready
-	health := pjutil.NewHealth()
+	health := pjutil.NewHealthOnPort(instrumentationOptions.HealthPort)
 
 	mgr, err := kubeClientOptions.Manager(*namespace, &crds.ResourceObject{}, &crds.DRLCObject{})
 	if err != nil {
