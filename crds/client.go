@@ -80,7 +80,7 @@ func (o *KubernetesClientOptions) Client() (ctrlruntimeclient.Client, error) {
 // Manager returns a Manager. It contains a client whose Reader is cache backed. Namespace can be empty
 // in which case the client will use all namespaces.
 // It blocks until the cache was synced for all types passed in startCacheFor.
-func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...runtime.Object) (manager.Manager, error) {
+func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...ctrlruntimeclient.Object) (manager.Manager, error) {
 	if o.inMemory {
 		return manager.New(&rest.Config{}, manager.Options{
 			LeaderElection:     false,
@@ -115,8 +115,9 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...run
 	// Allocate an informer so our cache actually waits for these types to
 	// be synced. Must be done before we start the mgr, else this may block
 	// indefinitely if there is an issue.
+	ctx := interrupts.Context()
 	for _, t := range startCacheFor {
-		if _, err := mgr.GetCache().GetInformer(t); err != nil {
+		if _, err := mgr.GetCache().GetInformer(ctx, t); err != nil {
 			return nil, fmt.Errorf("failed to get informer for type %T: %v", t, err)
 		}
 	}
@@ -126,7 +127,7 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...run
 		// doesn't allow us to stop the app. Furthermore, the behaviour
 		// of the reading client is undefined after the manager stops,
 		// so we should bail ASAP.
-		if err := mgr.Start(ctx.Done()); err != nil {
+		if err := mgr.Start(ctx); err != nil {
 			logrus.WithError(err).Fatal("Mgr failed.")
 		}
 		logrus.Info("Mgr finished gracefully.")
@@ -137,7 +138,7 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...run
 	defer cancel()
 
 	startSyncTime := time.Now()
-	if synced := mgr.GetCache().WaitForCacheSync(ctx.Done()); !synced {
+	if synced := mgr.GetCache().WaitForCacheSync(ctx); !synced {
 		return nil, errors.New("timeout waiting for cache sync")
 	}
 	logrus.WithField("sync-duration", time.Since(startSyncTime).String()).Info("Cache synced")

@@ -32,7 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,7 +72,7 @@ func fakeTime(t time.Time) time.Time {
 
 const testNS = "test"
 
-func makeTestRanch(objects []runtime.Object) *Ranch {
+func makeTestRanch(objects []ctrlruntimeclient.Object) *Ranch {
 	for _, obj := range objects {
 		obj.(metav1.Object).SetNamespace(testNS)
 	}
@@ -137,7 +136,7 @@ func AreErrorsEqual(got error, expect error) bool {
 func TestAcquire(t *testing.T) {
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		owner     string
 		rtype     string
 		state     string
@@ -154,7 +153,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "no match type",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "wrong", "s", "", startTime),
 			},
 			owner:     "user",
@@ -165,7 +164,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "no match state",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "wrong", "", startTime),
 			},
 			owner:     "user",
@@ -176,7 +175,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: common.Busy,
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "foo", startTime),
 			},
 			owner:     "user",
@@ -187,7 +186,7 @@ func TestAcquire(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "", startTime),
 			},
 			owner:     "user",
@@ -291,7 +290,7 @@ func TestAcquirePriority(t *testing.T) {
 }
 
 func TestAcquireRoundRobin(t *testing.T) {
-	var resources []runtime.Object
+	var resources []ctrlruntimeclient.Object
 	for i := 1; i < 5; i++ {
 		resources = append(resources, newResource(fmt.Sprintf("res-%d", i), "t", "s", "", startTime))
 	}
@@ -319,7 +318,7 @@ func TestAcquireOnDemand(t *testing.T) {
 	requestID2 := "req12345"
 	requestID3 := "req123456"
 	now := time.Now()
-	dRLCs := []runtime.Object{
+	dRLCs := []ctrlruntimeclient.Object{
 		&crds.DRLCObject{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: rType,
@@ -461,7 +460,7 @@ func TestRelease(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			var objs []runtime.Object
+			var objs []ctrlruntimeclient.Object
 			if tc.resource != nil {
 				objs = append(objs, tc.resource)
 			}
@@ -499,7 +498,7 @@ func diffResourceObjects(a, b *crds.ResourceObject) []string {
 func TestReset(t *testing.T) {
 	var testcases = []struct {
 		name       string
-		resources  []runtime.Object
+		resources  []ctrlruntimeclient.Object
 		rtype      string
 		state      string
 		dest       string
@@ -509,7 +508,7 @@ func TestReset(t *testing.T) {
 
 		{
 			name: "empty - has no owner",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "", startTime.Add(-time.Minute*20)),
 			},
 			rtype:  "t",
@@ -519,7 +518,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - not expire",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "", startTime),
 			},
 			rtype:  "t",
@@ -529,7 +528,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - no match type",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "wrong", "s", "", startTime.Add(-time.Minute*20)),
 			},
 			rtype:  "t",
@@ -539,7 +538,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "empty - no match state",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "wrong", "", startTime.Add(-time.Minute*20)),
 			},
 			rtype:  "t",
@@ -549,7 +548,7 @@ func TestReset(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "user", startTime.Add(-time.Minute*20)),
 			},
 			rtype:      "t",
@@ -590,7 +589,7 @@ func TestReset(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	var testcases = []struct {
 		name      string
-		resources []runtime.Object
+		resources []ctrlruntimeclient.Object
 		resName   string
 		owner     string
 		state     string
@@ -605,7 +604,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "wrong owner",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", startTime),
 			},
 			resName:   "res",
@@ -615,7 +614,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "wrong state",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", startTime),
 			},
 			resName:   "res",
@@ -625,7 +624,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "no matched resource",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("foo", "t", "s", "merlin", startTime),
 			},
 			resName:   "res",
@@ -635,7 +634,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "ok",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", startTime),
 			},
 			resName: "res",
@@ -679,7 +678,7 @@ func TestUpdate(t *testing.T) {
 func TestMetric(t *testing.T) {
 	var testcases = []struct {
 		name         string
-		resources    []runtime.Object
+		resources    []ctrlruntimeclient.Object
 		metricType   string
 		expectErr    error
 		expectMetric common.Metric
@@ -691,7 +690,7 @@ func TestMetric(t *testing.T) {
 		},
 		{
 			name: "no matching resource",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", time.Now()),
 			},
 			metricType: "foo",
@@ -699,7 +698,7 @@ func TestMetric(t *testing.T) {
 		},
 		{
 			name: "one resource",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", time.Now()),
 			},
 			metricType: "t",
@@ -715,7 +714,7 @@ func TestMetric(t *testing.T) {
 		},
 		{
 			name: "multiple resources",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", "s", "merlin", time.Now()),
 				newResource("res-2", "t", "p", "pony", time.Now()),
 				newResource("res-3", "t", "s", "pony", time.Now()),
@@ -757,7 +756,7 @@ func TestMetric(t *testing.T) {
 func TestAllMetrics(t *testing.T) {
 	var testcases = []struct {
 		name          string
-		resources     []runtime.Object
+		resources     []ctrlruntimeclient.Object
 		expectMetrics []common.Metric
 	}{
 		{
@@ -766,7 +765,7 @@ func TestAllMetrics(t *testing.T) {
 		},
 		{
 			name: "one resource",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res", "t", "s", "merlin", time.Now()),
 			},
 			expectMetrics: []common.Metric{
@@ -783,7 +782,7 @@ func TestAllMetrics(t *testing.T) {
 		},
 		{
 			name: "multiple resources",
-			resources: []runtime.Object{
+			resources: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", "s", "merlin", time.Now()),
 				newResource("res-2", "t", "p", "pony", time.Now()),
 				newResource("res-3", "t", "s", "pony", time.Now()),
@@ -850,14 +849,14 @@ func setExpiration(res *crds.ResourceObject, exp time.Time) *crds.ResourceObject
 func TestSyncResources(t *testing.T) {
 	var testcases = []struct {
 		name        string
-		currentRes  []runtime.Object
+		currentRes  []ctrlruntimeclient.Object
 		expectedRes *crds.ResourceObjectList
 		expectedLCs *crds.DRLCObjectList
 		config      *common.BoskosConfig
 	}{
 		{
 			name: "migration from mason resource to dynamic resource does not delete resource",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", "", "", startTime),
 				newResource("dt_1", "mason", "", "", startTime),
 				newResource("dt_2", "mason", "", "", startTime),
@@ -895,7 +894,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "append",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", "", "", startTime),
 			},
 			config: &common.BoskosConfig{
@@ -928,7 +927,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "should not change anything",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", "", "", startTime),
 				newResource("dt_1", "dt", "", "", startTime),
 				&crds.DRLCObject{
@@ -968,7 +967,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete, lifecycle should not delete dynamic res until all associated resources are gone",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res", "t", "", "", startTime),
 				newResource("dt_1", "dt", "", "", startTime),
 				&crds.DRLCObject{
@@ -995,7 +994,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete, life cycle should be deleted as all resources are deleted",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				&crds.DRLCObject{
 					ObjectMeta: metav1.ObjectMeta{Name: "dt"},
 					Spec: crds.DRLCSpec{
@@ -1008,7 +1007,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete busy",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res", "t", common.Busy, "o", startTime),
 				newResource("dt_1", "dt", common.Busy, "o", startTime),
 				&crds.DRLCObject{
@@ -1036,7 +1035,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "append and delete",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", common.Tombstone, "", startTime),
 				newResource("dt_1", "dt", common.ToBeDeleted, "", startTime),
 				newResource("dt_2", "dt", "", "", startTime),
@@ -1093,7 +1092,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "append and delete busy",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", common.Busy, "o", startTime),
 				newResource("dt_1", "dt", "", "", startTime),
 				newResource("dt_2", "dt", common.Tombstone, "", startTime),
@@ -1150,7 +1149,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "append/delete mixed type",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("res-1", "t", common.Tombstone, "", startTime),
 			},
 			config: &common.BoskosConfig{
@@ -1172,7 +1171,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete expired resource",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", "", "", startTime),
 					startTime),
@@ -1217,7 +1216,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete expired resource / do not delete busy",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", common.Tombstone, "", startTime),
 					startTime),
@@ -1262,7 +1261,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "delete expired resource, recreate up to Min",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", "", "", startTime),
 					startTime),
@@ -1308,7 +1307,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "decrease max count with resources being deleted",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.Free, "", startTime),
 				newResource("dt_3", "dt", common.Free, "", startTime),
@@ -1349,7 +1348,7 @@ func TestSyncResources(t *testing.T) {
 		},
 		{
 			name: "increase min count with resources being deleted",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.ToBeDeleted, "", startTime),
 				newResource("dt_3", "dt", common.ToBeDeleted, "", startTime),
@@ -1395,7 +1394,7 @@ func TestSyncResources(t *testing.T) {
 				MinCount: 10,
 				MaxCount: 10,
 			}}},
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("test-resource-0", "test-resource", common.Free, "", startTime),
 				newResource("test-resource-1", "test-resource", common.Free, "", startTime),
 				newResource("test-resource-2", "test-resource", common.Free, "", startTime),
@@ -1432,7 +1431,7 @@ func TestSyncResources(t *testing.T) {
 					"test-resource-2",
 				},
 			}}},
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("test-resource-0", "test-resource", common.Free, "", startTime),
 				newResource("test-resource-1", "test-resource", common.Free, "", startTime),
 				newResource("test-resource-2", "test-resource", common.Free, "", startTime),
@@ -1518,7 +1517,7 @@ func TestSyncResources(t *testing.T) {
 func TestUpdateAllDynamicResources(t *testing.T) {
 	var testcases = []struct {
 		name        string
-		currentRes  []runtime.Object
+		currentRes  []ctrlruntimeclient.Object
 		expectedRes *crds.ResourceObjectList
 		expectedLCs *crds.DRLCObjectList
 	}{
@@ -1527,7 +1526,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "do nothing",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("t_1", "t", common.Free, "", startTime),
 				&crds.DRLCObject{
@@ -1553,7 +1552,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "delete expired free resources",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", common.Free, "", startTime),
 					fakeNow.Add(time.Hour)),
@@ -1603,7 +1602,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "no dynamic resources, nothing to make",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				&crds.DRLCObject{
 					ObjectMeta: metav1.ObjectMeta{Name: "dt"},
 					Spec: crds.DRLCSpec{
@@ -1623,7 +1622,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "no dynamic resources, make some",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				&crds.DRLCObject{
 					ObjectMeta: metav1.ObjectMeta{Name: "dt"},
 					Spec: crds.DRLCSpec{
@@ -1647,7 +1646,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "scale down",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.Free, "", startTime),
 				newResource("dt_4", "dt", common.Busy, "owner", startTime),
@@ -1675,7 +1674,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "replace some resources",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.Busy, "owner", startTime),
 				newResource("dt_3", "dt", common.ToBeDeleted, "", startTime),
@@ -1705,7 +1704,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "scale down, busy > maxcount",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.Busy, "owner", startTime),
 				newResource("dt_3", "dt", common.Busy, "owner", startTime),
@@ -1735,7 +1734,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "delete all free when DRLC is being removed",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Free, "", startTime),
 				newResource("dt_2", "dt", common.Free, "", startTime),
 				newResource("dt_3", "dt", common.Tombstone, "", startTime),
@@ -1764,7 +1763,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "delete DRLC when no resources remain",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				&crds.DRLCObject{
 					ObjectMeta: metav1.ObjectMeta{Name: "dt"},
 					Spec: crds.DRLCSpec{
@@ -1776,7 +1775,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 		},
 		{
 			name: "delete DRLC when all resources tombstoned",
-			currentRes: []runtime.Object{
+			currentRes: []ctrlruntimeclient.Object{
 				newResource("dt_1", "dt", common.Tombstone, "", startTime),
 				newResource("dt_3", "dt", common.Tombstone, "", startTime),
 				&crds.DRLCObject{
@@ -1921,7 +1920,7 @@ type onceConflictingClient struct {
 	ctrlruntimeclient.Client
 }
 
-func (occ *onceConflictingClient) Update(ctx context.Context, obj runtime.Object, opts ...ctrlruntimeclient.UpdateOption) error {
+func (occ *onceConflictingClient) Update(ctx context.Context, obj ctrlruntimeclient.Object, opts ...ctrlruntimeclient.UpdateOption) error {
 	if !occ.didConflict {
 		occ.didConflict = true
 		return kerrors.NewConflict(schema.GroupResource{}, "obj", errors.New("conflicting as requested"))

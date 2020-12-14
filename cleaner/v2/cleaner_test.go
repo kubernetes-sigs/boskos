@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -53,7 +52,7 @@ func TestReconcile(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		objects []runtime.Object
+		objects []ctrlruntimeclient.Object
 		verify  func(ctrlruntimeclient.Client) error
 	}{
 		{
@@ -110,7 +109,7 @@ func TestReconcile(t *testing.T) {
 
 			request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: testResourceName}}
 
-			if _, err := r.Reconcile(request); err != nil {
+			if _, err := r.Reconcile(context.Background(), request); err != nil {
 				t.Fatalf("reconciliation failed: %v", err)
 			}
 			if tc.verify == nil {
@@ -126,8 +125,7 @@ func TestReconcile(t *testing.T) {
 
 type testObjectModifier func(*crds.ResourceObject, *crds.DRLCObject)
 
-func createTestObjects(modifiers ...testObjectModifier) []runtime.Object {
-
+func createTestObjects(modifiers ...testObjectModifier) []ctrlruntimeclient.Object {
 	drlcObject := &crds.DRLCObject{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,
@@ -153,5 +151,5 @@ func createTestObjects(modifiers ...testObjectModifier) []runtime.Object {
 		modify(resourceObject, drlcObject)
 	}
 
-	return []runtime.Object{drlcObject, resourceObject}
+	return []ctrlruntimeclient.Object{drlcObject, resourceObject}
 }

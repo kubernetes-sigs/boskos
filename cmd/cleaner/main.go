@@ -144,7 +144,7 @@ func v2Main(client *client.Client) {
 		logrus.WithError(err).Fatal("failed to add controller to manager.")
 	}
 
-	if err := mgr.Start(interrupts.Context().Done()); err != nil {
+	if err := mgr.Start(interrupts.Context()); err != nil {
 		logrus.WithError(err).Fatal("manager failed")
 	} else {
 		logrus.Info("manager ended gracefully.")

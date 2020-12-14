@@ -69,7 +69,8 @@ type reconciler struct {
 	namespace    string
 }
 
-func (r *reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *reconciler) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
+	// TODO(alvaroaleman): figure out how to use the context
 	log := logrus.WithField("resource-name", request.Name)
 	err := r.reconcile(log, request)
 	if err != nil {
