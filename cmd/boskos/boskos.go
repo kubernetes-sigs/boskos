@@ -200,9 +200,6 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 	if err := ctrl.Watch(&source.Channel{Source: configChangeEvent}, constHandler()); err != nil {
 		return fmt.Errorf("failed to create source channel for config change event: %w", err)
 	}
-	if err := mgr.Add(ctrl); err != nil {
-		return fmt.Errorf("failed to add controller to manager: %w", err)
-	}
 
 	return nil
 }
