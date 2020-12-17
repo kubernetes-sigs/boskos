@@ -52,10 +52,10 @@ func ValidateConfig(config *BoskosConfig) error {
 		if e.IsDRLC() {
 			// Dynamic Resource
 			if e.MaxCount == 0 {
-				errs = append(errs, fmt.Errorf(".%d.max: must be >0", idx))
+				errs = append(errs, fmt.Errorf(".%d.max-count: must be >0", idx))
 			}
 			if e.MinCount > e.MaxCount {
-				errs = append(errs, fmt.Errorf(".%d.min: must be <= .%d.max", idx, idx))
+				errs = append(errs, fmt.Errorf(".%d.min-count: must be <= .%d.max-count", idx, idx))
 			}
 			for i := 0; i < e.MaxCount; i++ {
 				name := GenerateDynamicResourceName()
@@ -67,6 +67,13 @@ func ValidateConfig(config *BoskosConfig) error {
 				resourcesNeeds[k] += v * e.MaxCount
 			}
 
+		} else {
+			if e.MinCount != 0 {
+				errs = append(errs, fmt.Errorf(".%d.min-count must be unset when the names property is set", idx))
+			}
+			if e.MaxCount != 0 {
+				errs = append(errs, fmt.Errorf(".%d.max-count must be unset when the names property is set", idx))
+			}
 		}
 		actualResources[e.Type] += len(names)
 		for nameIdx, name := range names {

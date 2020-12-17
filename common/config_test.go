@@ -68,7 +68,7 @@ func TestValidateConfig(t *testing.T) {
 					MaxCount: 0,
 				},
 			}},
-			expectedErrMsg: "[.0.type: must be set, .0.max: must be >0]",
+			expectedErrMsg: "[.0.type: must be set, .0.max-count: must be >0]",
 		},
 		{
 			name: "Min is < max",
@@ -79,7 +79,18 @@ func TestValidateConfig(t *testing.T) {
 					MinCount: 2,
 				},
 			}},
-			expectedErrMsg: "[.0.type: must be set, .0.min: must be <= .0.max]",
+			expectedErrMsg: "[.0.type: must be set, .0.min-count: must be <= .0.max-count]",
+		},
+		{
+			name: "Resource is both static and dynamic",
+			in: &BoskosConfig{Resources: []ResourceEntry{{
+				State:    "free",
+				Type:     "some-type",
+				MaxCount: 1,
+				MinCount: 1,
+				Names:    []string{"my-resource"},
+			}}},
+			expectedErrMsg: "[.0.min-count must be unset when the names property is set, .0.max-count must be unset when the names property is set]",
 		},
 	}
 
