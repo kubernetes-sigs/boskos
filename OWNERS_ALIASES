@@ -1,4 +1,8 @@
 aliases:
   aws-janitor-contributors:
-  - detiber
   - justinsb
+  - richardcase
+  - randomvariable
+
+  aws-janitor-emeritus-contributors:
+  - detiber
