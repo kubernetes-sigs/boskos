@@ -62,41 +62,42 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 	for _, ig := range resp.InternetGateways {
 		i := &internetGateway{Account: opts.Account, Region: opts.Region, ID: *ig.InternetGatewayId}
 
-		if set.Mark(i) {
-			isDefault := false
-			logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
-			if opts.DryRun {
-				continue
+		if !set.Mark(i, nil) {
+			continue
+		}
+		isDefault := false
+		logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
+		if opts.DryRun {
+			continue
+		}
+
+		for _, att := range ig.Attachments {
+			if defaultVPC[aws.StringValue(att.VpcId)] {
+				isDefault = true
+				break
 			}
 
-			for _, att := range ig.Attachments {
-				if defaultVPC[aws.StringValue(att.VpcId)] {
-					isDefault = true
-					break
-				}
-
-				detachReq := &ec2.DetachInternetGatewayInput{
-					InternetGatewayId: ig.InternetGatewayId,
-					VpcId:             att.VpcId,
-				}
-
-				if _, err := svc.DetachInternetGateway(detachReq); err != nil {
-					logger.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
-				}
-			}
-
-			if isDefault {
-				logger.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
-				continue
-			}
-
-			deleteReq := &ec2.DeleteInternetGatewayInput{
+			detachReq := &ec2.DetachInternetGatewayInput{
 				InternetGatewayId: ig.InternetGatewayId,
+				VpcId:             att.VpcId,
 			}
 
-			if _, err := svc.DeleteInternetGateway(deleteReq); err != nil {
-				logger.Warningf("%s: delete failed: %v", i.ARN(), err)
+			if _, err := svc.DetachInternetGateway(detachReq); err != nil {
+				logger.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
 			}
+		}
+
+		if isDefault {
+			logger.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
+			continue
+		}
+
+		deleteReq := &ec2.DeleteInternetGatewayInput{
+			InternetGatewayId: ig.InternetGatewayId,
+		}
+
+		if _, err := svc.DeleteInternetGateway(deleteReq); err != nil {
+			logger.Warningf("%s: delete failed: %v", i.ARN(), err)
 		}
 	}
 

@@ -38,7 +38,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *autoscaling.DescribeAutoScalingGroupsOutput, _ bool) bool {
 		for _, asg := range page.AutoScalingGroups {
 			a := &autoScalingGroup{ID: *asg.AutoScalingGroupARN, Name: *asg.AutoScalingGroupName}
-			if set.Mark(a) {
+			if set.Mark(a, asg.CreatedTime) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, a)

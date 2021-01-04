@@ -38,7 +38,7 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *elb.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancerDescriptions {
 			a := &classicLoadBalancer{region: opts.Region, account: opts.Account, name: *lb.LoadBalancerName, dnsName: *lb.DNSName}
-			if set.Mark(a) {
+			if set.Mark(a, lb.CreatedTime) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, a.name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, a)

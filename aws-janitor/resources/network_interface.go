@@ -39,10 +39,13 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *ec2.DescribeNetworkInterfacesOutput, _ bool) bool {
 		for _, eni := range page.NetworkInterfaces {
 			a := &networkInterface{Region: opts.Region, Account: opts.Account, ID: *eni.NetworkInterfaceId}
+			var attachTime *time.Time = nil
 			if eni.Attachment != nil {
 				a.AttachmentID = *eni.Attachment.AttachmentId
+				attachTime = eni.Attachment.AttachTime
 			}
-			if set.Mark(a) {
+			// AttachTime isn't exactly the creation time, but it's better than nothing.
+			if set.Mark(a, attachTime) {
 				logger.Warningf("%s: deleting %T", a.ARN(), a)
 				if !opts.DryRun {
 					toDelete = append(toDelete, a)

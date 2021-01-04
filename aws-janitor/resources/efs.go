@@ -51,7 +51,7 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 			f := &elasticFileSystem{
 				ID: *fs.FileSystemId,
 			}
-			if set.Mark(f) {
+			if set.Mark(f, fs.CreationTime) {
 				logger.Warningf("%s: deleting %T: %s", f.ARN(), fs, *fs.Name)
 				if !opts.DryRun {
 					fileSystemsToDelete = append(fileSystemsToDelete, f)

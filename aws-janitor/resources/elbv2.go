@@ -38,7 +38,7 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *elbv2.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancers {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn}
-			if set.Mark(a) {
+			if set.Mark(a, lb.CreatedTime) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, *lb.LoadBalancerName)
 				if !opts.DryRun {
 					toDelete = append(toDelete, a)

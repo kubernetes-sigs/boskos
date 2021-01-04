@@ -54,8 +54,8 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 					Region:     opts.Region,
 					InstanceID: *inst.InstanceId,
 				}
-
-				if set.Mark(i) {
+				// Instances don't have a creation date, but launch time is better than nothing.
+				if set.Mark(i, inst.LaunchTime) {
 					logger.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
 					if !opts.DryRun {
 						toDelete = append(toDelete, inst.InstanceId)

@@ -45,7 +45,7 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 				ID:      *gw.NatGatewayId,
 			}
 
-			if set.Mark(g) {
+			if set.Mark(g, gw.CreateTime) {
 				logger.Warningf("%s: deleting %T: %s", g.ARN(), gw, g.ID)
 				if opts.DryRun {
 					continue
