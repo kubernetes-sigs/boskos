@@ -26,6 +26,13 @@ type Options struct {
 	Account string
 	Region  string
 
+	// Only resources which contain all IncludeTags will be considered for cleanup.
+	IncludeTags TagMatcher
+	// Any resources with at least one tag in ExcludeTags will be excluded from cleanup.
+	// ExcludeTags takes precedence over IncludeTags - i.e. a resource that matches both
+	// will be excluded.
+	ExcludeTags TagMatcher
+
 	// Whether to actually delete resources, or just report what would be deleted.
 	DryRun bool
 }
