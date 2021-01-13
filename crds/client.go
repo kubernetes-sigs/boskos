@@ -43,12 +43,14 @@ import (
 // KubernetesClientOptions are flag options used to create a kube client.
 // It implements the k8s.io/test-infra/pkg/flagutil.OptionGroup interface.
 type KubernetesClientOptions struct {
-	inMemory   bool
-	kubeConfig string
+	inMemory           bool
+	kubeConfig         string
+	projectedTokenFile string
 }
 
 // AddFlags adds kube client flags to existing FlagSet.
 func (o *KubernetesClientOptions) AddFlags(fs *flag.FlagSet) {
+	fs.StringVar(&o.projectedTokenFile, "projected-token-file", "", "A projected serviceaccount token file. If set, this will be configured as token file in the in-cluster config.")
 	fs.StringVar(&o.kubeConfig, "kubeconfig", "", "absolute path to the kubeConfig file")
 	fs.BoolVar(&o.inMemory, "in_memory", false, "Use in memory client instead of CRD")
 }
@@ -152,6 +154,11 @@ func (o *KubernetesClientOptions) Cfg() (*rest.Config, error) {
 	var err error
 	if o.kubeConfig == "" {
 		cfg, err = rest.InClusterConfig()
+		if cfg != nil && o.projectedTokenFile != "" {
+			cfg.BearerToken = ""
+			cfg.BearerTokenFile = o.projectedTokenFile
+			logrus.WithField("tokenfile", o.projectedTokenFile).Info("Using projected token file")
+		}
 	} else {
 		cfg, err = clientcmd.BuildConfigFromFlags("", o.kubeConfig)
 	}
