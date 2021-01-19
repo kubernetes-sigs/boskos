@@ -2,6 +2,18 @@
 
 `boskosctl` is a minimal command-line utility for leasing resources from a `boskos` server.
 
+## Install
+
+The simplest way to install the `boskosctl` CLI is via go get:
+
+```
+GO111MODULE=on go get sigs.k8s.io/boskos/cmd/boskosctl
+```
+
+This will install `boskosctl` to `$(go env GOPATH)/bin/boskosctl`.
+
+## Workflow
+
 The workflow for using the command-line utility is:
 
 ```sh
