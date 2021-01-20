@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -37,7 +38,12 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *elb.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancerDescriptions {
-			a := &classicLoadBalancer{region: opts.Region, account: opts.Account, name: *lb.LoadBalancerName, dnsName: *lb.DNSName}
+			a := &classicLoadBalancer{
+				region:  opts.Region,
+				account: opts.Account,
+				name:    aws.StringValue(lb.LoadBalancerName),
+				dnsName: aws.StringValue(lb.DNSName),
+			}
 			if set.Mark(a, lb.CreatedTime) {
 				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, a.name)
 				if !opts.DryRun {
@@ -76,8 +82,8 @@ func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
 			arn := classicLoadBalancer{
 				region:  opts.Region,
 				account: opts.Account,
-				name:    *lb.LoadBalancerName,
-				dnsName: *lb.DNSName,
+				name:    aws.StringValue(lb.LoadBalancerName),
+				dnsName: aws.StringValue(lb.DNSName),
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -96,7 +102,7 @@ type classicLoadBalancer struct {
 }
 
 func (lb classicLoadBalancer) ARN() string {
-	return "fakearn:elb:" + lb.region + ":" + lb.account + ":" + lb.dnsName
+	return fmt.Sprintf("arn:aws:elb:%s:%s:classicelb/%s", lb.region, lb.account, lb.dnsName)
 }
 
 func (lb classicLoadBalancer) ResourceKey() string {

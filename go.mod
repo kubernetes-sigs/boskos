@@ -14,7 +14,7 @@ replace (
 )
 
 require (
-	github.com/aws/aws-sdk-go v1.31.12
+	github.com/aws/aws-sdk-go v1.36.32
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-test/deep v1.0.4
 	github.com/google/go-cmp v0.5.2

@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"regexp"
 	"time"
 
@@ -176,7 +177,8 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 	var rrsErr error
 	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {
 		for _, z := range zones.HostedZones {
-			if !zoneIsManaged(z) {
+			zone := z
+			if !zoneIsManaged(zone) {
 				continue
 			}
 			inp := &route53.ListResourceRecordSetsInput{HostedZoneId: z.Id}
@@ -184,8 +186,10 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 				now := time.Now()
 				for _, recordSet := range recordSets.ResourceRecordSets {
 					arn := route53ResourceRecordSet{
-						zone: z,
-						obj:  recordSet,
+						account: opts.Account,
+						region:  opts.Region,
+						zone:    zone,
+						obj:     recordSet,
 					}.ARN()
 					set.firstSeen[arn] = now
 				}
@@ -208,12 +212,14 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 }
 
 type route53ResourceRecordSet struct {
-	zone *route53.HostedZone
-	obj  *route53.ResourceRecordSet
+	account string
+	region  string
+	zone    *route53.HostedZone
+	obj     *route53.ResourceRecordSet
 }
 
 func (r route53ResourceRecordSet) ARN() string {
-	return "route53::" + aws.StringValue(r.zone.Id) + "::" + aws.StringValue(r.obj.Type) + "::" + aws.StringValue(r.obj.Name)
+	return fmt.Sprintf("arn:aws:route53:%s:%s:%s/%s/%s", r.region, r.account, aws.StringValue(r.obj.Type), aws.StringValue(r.zone.Id), aws.StringValue(r.obj.Name))
 }
 
 func (r route53ResourceRecordSet) ResourceKey() string {

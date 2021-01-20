@@ -49,7 +49,8 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	fsPageFunc := func(page *efs.DescribeFileSystemsOutput, _ bool) bool {
 		for _, fs := range page.FileSystems {
 			f := &elasticFileSystem{
-				ID: *fs.FileSystemId,
+				id:  aws.StringValue(fs.FileSystemId),
+				arn: aws.StringValue(fs.FileSystemArn),
 			}
 			if set.Mark(f, fs.CreationTime) {
 				logger.Warningf("%s: deleting %T: %s", f.ARN(), fs, *fs.Name)
@@ -69,7 +70,7 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	mtPageFunc := func(page *efs.DescribeMountTargetsOutput, _ bool) bool {
 		for _, mt := range page.MountTargets {
 			m := &mountTarget{
-				ID: *mt.MountTargetId,
+				ID: aws.StringValue(mt.MountTargetId),
 			}
 			logger.Warningf("%s: deleting %T", m.ID, mt)
 			mountTargetsToDelete = append(mountTargetsToDelete, m)
@@ -78,7 +79,7 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	}
 	for _, fs := range fileSystemsToDelete {
 		describeInput := &efs.DescribeMountTargetsInput{
-			FileSystemId: aws.String(fs.ID),
+			FileSystemId: aws.String(fs.id),
 		}
 		if err := describeMountTargetsPages(svc, describeInput, mtPageFunc); err != nil {
 			return err
@@ -93,10 +94,10 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	// Delete marked file systems.
 	for _, fs := range fileSystemsToDelete {
 		deleteInput := &efs.DeleteFileSystemInput{
-			FileSystemId: aws.String(fs.ID),
+			FileSystemId: aws.String(fs.id),
 		}
 		if _, err := svc.DeleteFileSystem(deleteInput); err != nil {
-			logger.Warningf("%s: delete failed: %v", fs.ID, err)
+			logger.Warningf("%s: delete failed: %v", fs.id, err)
 		}
 	}
 
@@ -111,10 +112,11 @@ func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
 	err := svc.DescribeFileSystemsPages(input, func(page *efs.DescribeFileSystemsOutput, _ bool) bool {
 		now := time.Now()
 		for _, fs := range page.FileSystems {
-			arn := elasticFileSystem{
-				ID: *fs.FileSystemId,
+			efs := elasticFileSystem{
+				arn: aws.StringValue(fs.FileSystemArn),
+				id:  aws.StringValue(fs.FileSystemId),
 			}.ARN()
-			set.firstSeen[arn] = now
+			set.firstSeen[efs] = now
 		}
 		return true
 	})
@@ -123,12 +125,12 @@ func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
 }
 
 type elasticFileSystem struct {
-	ID string
+	arn string
+	id  string
 }
 
 func (efs elasticFileSystem) ARN() string {
-	// The current client library does not provide ARNs for file systems.
-	return efs.ID
+	return efs.arn
 }
 
 func (efs elasticFileSystem) ResourceKey() string {
@@ -152,7 +154,7 @@ func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileS
 	logger.Debug("waiting for mount targets to be deleted")
 	for _, fs := range fileSystemsToDelete {
 		describeInput := &efs.DescribeFileSystemsInput{
-			FileSystemId: aws.String(fs.ID),
+			FileSystemId: aws.String(fs.id),
 		}
 		i := 0
 		for ; i < maxRetries; i++ {
@@ -161,7 +163,7 @@ func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileS
 				return err
 			}
 			if len(describeOutput.FileSystems) == 0 {
-				logger.Warningf("%s: no filesystem found", fs.ID)
+				logger.Warningf("%s: no filesystem found", fs.id)
 				break
 			}
 			if *describeOutput.FileSystems[0].NumberOfMountTargets == 0 {
@@ -170,7 +172,7 @@ func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileS
 			time.Sleep(pollInterval)
 		}
 		if i == maxRetries {
-			logger.Warningf("%s: exceeded max retries polling file system status", fs.ID)
+			logger.Warningf("%s: exceeded max retries polling file system status", fs.id)
 		}
 	}
 

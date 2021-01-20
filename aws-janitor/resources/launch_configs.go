@@ -36,9 +36,12 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *autoscaling.DescribeLaunchConfigurationsOutput, _ bool) bool {
 		for _, lc := range page.LaunchConfigurations {
-			l := &launchConfiguration{ID: *lc.LaunchConfigurationARN, Name: *lc.LaunchConfigurationName}
+			l := &launchConfiguration{
+				arn:  aws.StringValue(lc.LaunchConfigurationARN),
+				name: aws.StringValue(lc.LaunchConfigurationName),
+			}
 			if set.Mark(l, lc.CreatedTime) {
-				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.Name)
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, l)
 				}
@@ -53,7 +56,7 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, lc := range toDelete {
 		deleteReq := &autoscaling.DeleteLaunchConfigurationInput{
-			LaunchConfigurationName: aws.String(lc.Name),
+			LaunchConfigurationName: aws.String(lc.name),
 		}
 
 		if _, err := svc.DeleteLaunchConfiguration(deleteReq); err != nil {
@@ -73,8 +76,8 @@ func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
 		now := time.Now()
 		for _, lc := range lcs.LaunchConfigurations {
 			arn := launchConfiguration{
-				ID:   *lc.LaunchConfigurationARN,
-				Name: *lc.LaunchConfigurationName,
+				arn:  aws.StringValue(lc.LaunchConfigurationARN),
+				name: aws.StringValue(lc.LaunchConfigurationName),
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -86,12 +89,12 @@ func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
 }
 
 type launchConfiguration struct {
-	ID   string
-	Name string
+	arn  string
+	name string
 }
 
 func (lc launchConfiguration) ARN() string {
-	return lc.ID
+	return lc.arn
 }
 
 func (lc launchConfiguration) ResourceKey() string {
