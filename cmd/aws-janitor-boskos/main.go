@@ -27,6 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/test-infra/prow/logrusutil"
+	"sigs.k8s.io/boskos/aws-janitor/account"
+	"sigs.k8s.io/boskos/aws-janitor/regions"
 	"sigs.k8s.io/boskos/aws-janitor/resources"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -44,6 +46,12 @@ var (
 	sweepSleepDuration time.Duration
 	logLevel           = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	dryRun             = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
+	ttlTagKey          = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
+
+	excludeTags common.CommaSeparatedStrings
+	includeTags common.CommaSeparatedStrings
+	excludeTM   resources.TagMatcher
+	includeTM   resources.TagMatcher
 )
 
 const (
@@ -52,6 +60,10 @@ const (
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be cleaned up")
+	flag.Var(&excludeTags, "exclude-tags",
+		"Resources with any of these tags will not be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
+	flag.Var(&includeTags, "include-tags",
+		"Resources must include all of these tags in order to be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
 }
 
 func main() {
@@ -73,6 +85,15 @@ func main() {
 	if len(rTypes) == 0 {
 		logrus.Info("--resource-type is empty! Setting it to default: aws-account")
 		rTypes = []string{"aws-account"}
+	}
+
+	excludeTM, err = resources.TagMatcherForTags(excludeTags)
+	if err != nil {
+		logrus.Fatalf("Error parsing --exclude-tags: %v", err)
+	}
+	includeTM, err = resources.TagMatcherForTags(includeTags)
+	if err != nil {
+		logrus.Fatalf("Error parsing --include-tags: %v", err)
 	}
 
 	boskos, err := client.NewClient("AWSJanitor", *boskosURL, *username, *passwordFile)
@@ -116,13 +137,25 @@ func cleanResource(res *common.Resource) error {
 	s, err := session.NewSession(aws.NewConfig().WithCredentials(creds))
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create AWS session")
-
 	}
+	acct, err := account.GetAccount(s, regions.Default)
+	if err != nil {
+		return errors.Wrap(err, "Failed retrieving account")
+	}
+	opts := resources.Options{
+		Session:     s,
+		Account:     acct,
+		DryRun:      *dryRun,
+		ExcludeTags: excludeTM,
+		IncludeTags: includeTM,
+		TTLTagKey:   *ttlTagKey,
+	}
+
 	logrus.WithField("name", res.Name).Info("beginning cleaning")
 	start := time.Now()
 
 	for i := 0; i < *sweepCount; i++ {
-		if err := resources.CleanAll(s, *region, *dryRun); err != nil {
+		if err := resources.CleanAll(opts, *region); err != nil {
 			if i == *sweepCount-1 {
 				logrus.WithError(err).Warningf("Failed to clean resource %q", res.Name)
 			}
