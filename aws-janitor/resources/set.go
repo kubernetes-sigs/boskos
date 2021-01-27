@@ -101,9 +101,14 @@ func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
 
 // Mark marks a particular resource as currently present, records when it was
 // created or first seen, and advises on whether it should be deleted.
-// If Mark(r) returns true, the TTL has expired for r and it should be deleted.
+//
+// When determining whether a resource should be deleted, first the options for
+// IncludeTags and ExcludeTags are applied against the provided tags.
+// If the resource should be managed per tags, then the TTL is evaluated.
+// If Mark(r) returns true, the resource is managed per tags, and the TTL has expired
+// for r and it should be deleted.
 // If the created time is not provided, the current time is used instead.
-func (s *Set) Mark(r Interface, created *time.Time) bool {
+func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags []Tag) bool {
 	key := r.ResourceKey()
 	s.marked[key] = true
 
@@ -121,6 +126,10 @@ func (s *Set) Mark(r Interface, created *time.Time) bool {
 		firstSeen = t
 	}
 	s.firstSeen[key] = firstSeen
+
+	if !opts.ManagedPerTags(tags) {
+		return false
+	}
 
 	// If the TTL is 0, it should be deleted now.
 	if s.ttl == 0 || now.Sub(firstSeen) > s.ttl {

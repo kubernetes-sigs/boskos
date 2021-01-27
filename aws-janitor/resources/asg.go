@@ -41,11 +41,17 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 				arn:  aws.StringValue(asg.AutoScalingGroupARN),
 				name: aws.StringValue(asg.AutoScalingGroupName),
 			}
-			if set.Mark(a, asg.CreatedTime) {
-				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.name)
-				if !opts.DryRun {
-					toDelete = append(toDelete, a)
-				}
+			tags := make([]Tag, len(asg.Tags))
+			for _, t := range asg.Tags {
+				tags = append(tags, NewTag(t.Key, t.Value))
+			}
+			if !set.Mark(opts, a, asg.CreatedTime, tags) {
+				continue
+			}
+
+			logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, a)
 			}
 		}
 		return true

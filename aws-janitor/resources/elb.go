@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Clean-up Classic ELBs
@@ -34,22 +35,20 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
 	svc := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
-	var toDelete []*classicLoadBalancer // Paged call, defer deletion until we have the whole list.
+	var loadBalancers []*classicLoadBalancer
+	lbTags := make(map[string][]Tag)
 
 	pageFunc := func(page *elb.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancerDescriptions {
-			a := &classicLoadBalancer{
-				region:  opts.Region,
-				account: opts.Account,
-				name:    aws.StringValue(lb.LoadBalancerName),
-				dnsName: aws.StringValue(lb.DNSName),
+			clb := &classicLoadBalancer{
+				region:      opts.Region,
+				account:     opts.Account,
+				name:        aws.StringValue(lb.LoadBalancerName),
+				dnsName:     aws.StringValue(lb.DNSName),
+				createdTime: lb.CreatedTime,
 			}
-			if set.Mark(a, lb.CreatedTime) {
-				logger.Warningf("%s: deleting %T: %s", a.ARN(), lb, a.name)
-				if !opts.DryRun {
-					toDelete = append(toDelete, a)
-				}
-			}
+			loadBalancers = append(loadBalancers, clb)
+			lbTags[clb.name] = nil
 		}
 		return true
 	}
@@ -58,13 +57,46 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 		return err
 	}
 
-	for _, lb := range toDelete {
+	fetchTagErr := incrementalFetchTags(lbTags, 20, func(lbNames []*string) error {
+		tagsResp, err := svc.DescribeTags(&elb.DescribeTagsInput{LoadBalancerNames: lbNames})
+		if err != nil {
+			return err
+		}
+		var errs []error
+		for _, tagDesc := range tagsResp.TagDescriptions {
+			lbName := aws.StringValue(tagDesc.LoadBalancerName)
+			_, ok := lbTags[lbName]
+			if !ok {
+				errs = append(errs, fmt.Errorf("unknown load balancer in tag response: %s", lbName))
+				continue
+			}
+			for _, t := range tagDesc.Tags {
+				lbTags[lbName] = append(lbTags[lbName], NewTag(t.Key, t.Value))
+			}
+		}
+		return kerrors.NewAggregate(errs)
+	})
+
+	if fetchTagErr != nil {
+		return fetchTagErr
+	}
+
+	for _, clb := range loadBalancers {
+		if !set.Mark(opts, clb, clb.createdTime, lbTags[clb.name]) {
+			continue
+		}
+		logger.Warningf("%s: deleting %T: %s", clb.ARN(), clb, clb.name)
+
+		if opts.DryRun {
+			continue
+		}
+
 		deleteInput := &elb.DeleteLoadBalancerInput{
-			LoadBalancerName: aws.String(lb.name),
+			LoadBalancerName: aws.String(clb.name),
 		}
 
 		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
-			logger.Warningf("%s: delete failed: %v", lb.ARN(), err)
+			logger.Warningf("%s: delete failed: %v", clb.ARN(), err)
 		}
 	}
 
@@ -95,10 +127,11 @@ func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
 }
 
 type classicLoadBalancer struct {
-	region  string
-	account string
-	name    string
-	dnsName string
+	region      string
+	account     string
+	name        string
+	dnsName     string
+	createdTime *time.Time
 }
 
 func (lb classicLoadBalancer) ARN() string {

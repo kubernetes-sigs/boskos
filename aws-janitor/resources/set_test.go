@@ -70,6 +70,7 @@ func TestMarkCreationTimes(t *testing.T) {
 			ShouldDelete      bool
 			CreateTime        *time.Time
 			ExpectedFirstSeen time.Time
+			Tags              []Tag
 		}{
 			{
 				// New resource, no creation time -> should use time.Now()
@@ -124,7 +125,8 @@ func TestMarkCreationTimes(t *testing.T) {
 			},
 		} {
 			shouldDelete := deleteAll || tc.ShouldDelete
-			delete := s.Mark(tc.Resource, tc.CreateTime)
+			opts := Options{}
+			delete := s.Mark(opts, tc.Resource, tc.CreateTime, tc.Tags)
 			if delete != shouldDelete {
 				t.Errorf("%s: delete: expected=%v, got=%v", tc.Resource.Name, shouldDelete, delete)
 			}

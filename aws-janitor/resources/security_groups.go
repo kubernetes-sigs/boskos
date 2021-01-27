@@ -66,11 +66,12 @@ func (SecurityGroups) MarkAndSweep(opts Options, set *Set) error {
 		s := &securityGroup{Account: opts.Account, Region: opts.Region, ID: *sg.GroupId}
 		addRefs(ingress, *sg.GroupId, opts.Account, sg.IpPermissions)
 		addRefs(egress, *sg.GroupId, opts.Account, sg.IpPermissionsEgress)
-		if set.Mark(s, nil) {
-			logger.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
-			if !opts.DryRun {
-				toDelete = append(toDelete, s)
-			}
+		if !set.Mark(opts, s, nil, fromEC2Tags(sg.Tags)) {
+			continue
+		}
+		logger.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
+		if !opts.DryRun {
+			toDelete = append(toDelete, s)
 		}
 	}
 

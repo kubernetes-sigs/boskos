@@ -46,6 +46,17 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 			for _, r := range p.Roles {
 				if !roleIsManaged(r) {
 					managed = false
+					break
+				}
+				tags, err := roleTags(svc, r)
+				if err != nil {
+					logger.Warningf("failed fetching role tags: %v", err)
+					managed = false
+					break
+				}
+				if !opts.ManagedPerTags(tags) {
+					managed = false
+					break
 				}
 			}
 
@@ -55,7 +66,8 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 			}
 
 			o := &iamInstanceProfile{profile: p}
-			if set.Mark(o, p.CreateDate) {
+			// No tags for instance profiles
+			if set.Mark(opts, o, p.CreateDate, nil) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
 				if !opts.DryRun {
 					toDelete = append(toDelete, o)

@@ -43,11 +43,12 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 				ID:      *lt.LaunchTemplateId,
 				Name:    *lt.LaunchTemplateName,
 			}
-			if set.Mark(l, lt.CreateTime) {
-				logger.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
-				if !opts.DryRun {
-					toDelete = append(toDelete, l)
-				}
+			if !set.Mark(opts, l, lt.CreateTime, fromEC2Tags(lt.Tags)) {
+				continue
+			}
+			logger.Warningf("%s: deleting %T: %s", l.ARN(), lt, l.Name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, l)
 			}
 		}
 		return true

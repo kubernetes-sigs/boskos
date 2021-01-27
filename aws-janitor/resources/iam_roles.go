@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -30,8 +31,28 @@ import (
 
 type IAMRoles struct{}
 
-// roleIsManaged checks if the role should be managed (and thus deleted) by us
-// In particular, we want to avoid "system" AWS roles or roles that might support test-infra
+func roleTags(svc *iam.IAM, role *iam.Role) ([]Tag, error) {
+	var tags []Tag
+	roleTagsInput := &iam.ListRoleTagsInput{RoleName: role.RoleName}
+	for {
+		tagsResp, err := svc.ListRoleTags(roleTagsInput)
+		if err != nil {
+			return nil, fmt.Errorf("role %s: failed querying for tags: %v", aws.StringValue(role.RoleName), err)
+		}
+		for _, t := range tagsResp.Tags {
+			tags = append(tags, NewTag(t.Key, t.Value))
+		}
+		if !aws.BoolValue(tagsResp.IsTruncated) {
+			break
+		}
+		roleTagsInput.SetMarker(aws.StringValue(tagsResp.Marker))
+	}
+	return tags, nil
+}
+
+// roleIsManaged checks if the role should be managed (and thus deleted) by us.
+// In particular, we want to avoid "system" AWS roles or roles that might support test-infra.
+// Note that this function does not consider tags.
 func roleIsManaged(role *iam.Role) bool {
 	name := aws.StringValue(role.RoleName)
 	path := aws.StringValue(role.Path)
@@ -61,9 +82,14 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 			if !roleIsManaged(r) {
 				continue
 			}
+			tags, err := roleTags(svc, r)
+			if err != nil {
+				logger.Warningf("failed fetching role tags: %v", err)
+				continue
+			}
 
 			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(r.RoleId), roleName: aws.StringValue(r.RoleName)}
-			if set.Mark(l, r.CreateDate) {
+			if set.Mark(opts, l, r.CreateDate, tags) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
 				if !opts.DryRun {
 					toDelete = append(toDelete, l)

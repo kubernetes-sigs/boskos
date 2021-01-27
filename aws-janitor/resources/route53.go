@@ -76,7 +76,7 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 }
 
 // route53ResourceRecordSetsForZone marks all ResourceRecordSets in the provided zone and returns a slice containing those that should be deleted.
-func route53ResourceRecordSetsForZone(logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, set *Set) ([]*route53ResourceRecordSet, error) {
+func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, zoneTags []Tag, set *Set) ([]*route53ResourceRecordSet, error) {
 	var toDelete []*route53ResourceRecordSet
 
 	recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
@@ -86,9 +86,11 @@ func route53ResourceRecordSetsForZone(logger logrus.FieldLogger, svc *route53.Ro
 			}
 
 			o := &route53ResourceRecordSet{zone: zone, obj: rrs}
-			if set.Mark(o, nil) {
-				logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+			// no tags for ResourceRecordSets, so use zone tags instead
+			if !set.Mark(opts, o, nil, zoneTags) {
+				continue
 			}
+			logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
 		}
 		return true
 	}
@@ -100,71 +102,74 @@ func route53ResourceRecordSetsForZone(logger logrus.FieldLogger, svc *route53.Ro
 	return toDelete, nil
 }
 
-func (Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
+func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
-	var listError error
+	var zones []*route53.HostedZone
+	zoneTags := make(map[string][]Tag)
 
-	pageFunc := func(zones *route53.ListHostedZonesOutput, _ bool) bool {
+	pageFunc := func(zs *route53.ListHostedZonesOutput, _ bool) bool {
 		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
-		for _, z := range zones.HostedZones {
+		for _, z := range zs.HostedZones {
 			if !zoneIsManaged(z) {
 				continue
 			}
 
-			toDelete, err := route53ResourceRecordSetsForZone(logger, svc, z, set)
-			if err != nil {
-				listError = err
-				return false
-			}
-			if opts.DryRun {
-				continue
-			}
-
-			var changes []*route53.Change
-			for _, rrs := range toDelete {
-				change := &route53.Change{
-					Action:            aws.String(route53.ChangeActionDelete),
-					ResourceRecordSet: rrs.obj,
-				}
-
-				changes = append(changes, change)
-			}
-
-			for len(changes) != 0 {
-				// Limit of 1000 changes per request
-				chunk := changes
-				if len(chunk) > 1000 {
-					chunk = chunk[:1000]
-					changes = changes[1000:]
-				} else {
-					changes = nil
-				}
-
-				logger.Infof("Deleting %d route53 resource records", len(chunk))
-				deleteReq := &route53.ChangeResourceRecordSetsInput{
-					HostedZoneId: z.Id,
-					ChangeBatch:  &route53.ChangeBatch{Changes: chunk},
-				}
-
-				if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
-					logger.Warningf("unable to delete DNS records: %v", err)
-				}
-			}
+			zones = append(zones, z)
+			zoneTags[aws.StringValue(z.Id)] = nil
 		}
 
 		return true
 	}
 
-	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, pageFunc)
-
-	if listError != nil {
-		return listError
+	if err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, pageFunc); err != nil {
+		return err
 	}
 
-	if err != nil {
+	if err := rrs.fetchZoneTags(zoneTags, svc); err != nil {
 		return err
+	}
+
+	for _, zone := range zones {
+		toDelete, err := route53ResourceRecordSetsForZone(opts, logger, svc, zone, zoneTags[aws.StringValue(zone.Id)], set)
+		if err != nil {
+			return err
+		}
+		if opts.DryRun {
+			continue
+		}
+
+		var changes []*route53.Change
+		for _, rrs := range toDelete {
+			change := &route53.Change{
+				Action:            aws.String(route53.ChangeActionDelete),
+				ResourceRecordSet: rrs.obj,
+			}
+
+			changes = append(changes, change)
+		}
+
+		for len(changes) != 0 {
+			// Limit of 1000 changes per request
+			chunk := changes
+			if len(chunk) > 1000 {
+				chunk = chunk[:1000]
+				changes = changes[1000:]
+			} else {
+				changes = nil
+			}
+
+			logger.Infof("Deleting %d route53 resource records", len(chunk))
+			deleteReq := &route53.ChangeResourceRecordSetsInput{
+				HostedZoneId: zone.Id,
+				ChangeBatch:  &route53.ChangeBatch{Changes: chunk},
+			}
+
+			if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
+				logger.Warningf("unable to delete DNS records: %v", err)
+			}
+		}
 	}
 
 	return nil
@@ -209,6 +214,33 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 	}
 	return set, errors.Wrapf(err, "couldn't describe route53 instance profiles for %q in %q", opts.Account, opts.Region)
 
+}
+
+func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string][]Tag, svc *route53.Route53) error {
+	return incrementalFetchTags(zoneTags, 10, func(ids []*string) error {
+		output, err := svc.ListTagsForResources(&route53.ListTagsForResourcesInput{
+			ResourceType: aws.String(route53.TagResourceTypeHostedzone),
+			ResourceIds:  ids,
+		})
+		if err != nil {
+			return err
+		}
+		for _, rts := range output.ResourceTagSets {
+			rtype := aws.StringValue(rts.ResourceType)
+			if rtype != route53.TagResourceTypeHostedzone {
+				return fmt.Errorf("invalid type in ListTagsForResources output: %s", rtype)
+			}
+			id := aws.StringValue(rts.ResourceId)
+			_, ok := zoneTags[id]
+			if !ok {
+				return fmt.Errorf("unknown zone id in ListTagsForResources output: %s", id)
+			}
+			for _, tag := range rts.Tags {
+				zoneTags[id] = append(zoneTags[id], NewTag(tag.Key, tag.Value))
+			}
+		}
+		return nil
+	})
 }
 
 type route53ResourceRecordSet struct {

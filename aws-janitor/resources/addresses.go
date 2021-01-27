@@ -41,22 +41,20 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, addr := range resp.Addresses {
 		a := &address{Account: opts.Account, Region: opts.Region, ID: *addr.AllocationId}
-		if !set.Mark(a, nil) {
+		if !set.Mark(opts, a, nil, fromEC2Tags(addr.Tags)) {
 			continue
 		}
+		// Since tags and other metadata may not propagate to addresses from their associated instances,
+		// we avoid deleting any address that is currently attached. Once their associated instance is deleted,
+		// we can safely delete addresses in a later clean-up run (using the mark data we saved in this run).
+		if addr.AssociationId != nil {
+			continue
+		}
+
 		logger.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
 		if opts.DryRun {
 			continue
 		}
-
-		if addr.AssociationId != nil {
-			logger.Warningf("%s: disassociating %T from active instance", a.ARN(), addr)
-			_, err := svc.DisassociateAddress(&ec2.DisassociateAddressInput{AssociationId: addr.AssociationId})
-			if err != nil {
-				logger.Warningf("%s: disassociating %T failed: %v", a.ARN(), addr, err)
-			}
-		}
-
 		_, err := svc.ReleaseAddress(&ec2.ReleaseAddressInput{AllocationId: addr.AllocationId})
 		if err != nil {
 			logger.Warningf("%s: delete failed: %v", a.ARN(), err)

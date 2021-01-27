@@ -58,6 +58,27 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 				Name:     *attr.Attributes[sqs.QueueAttributeNameQueueArn],
 				QueueURL: *url,
 			}
+			unixTimestamp, _ := strconv.ParseInt(*attr.Attributes[sqs.QueueAttributeNameCreatedTimestamp], 10, 64)
+			creationTime := time.Unix(unixTimestamp, 0)
+
+			tagResp, err := svc.ListQueueTags(&sqs.ListQueueTagsInput{QueueUrl: url})
+			if err != nil {
+				logger.Warningf("%s: failed listing tags: %v", q.ARN(), err)
+				return false
+			}
+			tags := make([]Tag, len(tagResp.Tags))
+			for k, v := range tagResp.Tags {
+				tags = append(tags, NewTag(aws.String(k), v))
+			}
+			if !set.Mark(opts, q, &creationTime, tags) {
+				continue
+			}
+
+			logger.Warningf("%s: deleting %T: %s", q.ARN(), url, q.Name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, q)
+			}
+
 			svcRules := eventbridge.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 			// Only delete rules that uses SQS queue as target. There are default rules that should not be deleted.
@@ -72,14 +93,6 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 				deleteEventBridgeRule(rule, svcRules, logger)
 			}
 
-			unitTimestamp, _ := strconv.ParseInt(*attr.Attributes[sqs.QueueAttributeNameCreatedTimestamp], 10, 64)
-			creationTime := time.Unix(unitTimestamp, 0)
-			if set.Mark(q, &creationTime) {
-				logger.Warningf("%s: deleting %T: %s", q.ARN(), url, q.Name)
-				if !opts.DryRun {
-					toDelete = append(toDelete, q)
-				}
-			}
 		}
 		return true
 	}

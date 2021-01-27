@@ -49,11 +49,12 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 				ID:      aws.StringValue(ss.SnapshotId),
 			}
 			// StartTime is probably close enough to a creation timestamp
-			if set.Mark(s, ss.StartTime) {
-				logger.Warningf("%s: deleting %T", s.ARN(), s)
-				if !opts.DryRun {
-					toDelete = append(toDelete, s)
-				}
+			if !set.Mark(opts, s, ss.StartTime, fromEC2Tags(ss.Tags)) {
+				continue
+			}
+			logger.Warningf("%s: deleting %T", s.ARN(), s)
+			if !opts.DryRun {
+				toDelete = append(toDelete, s)
 			}
 		}
 		return true

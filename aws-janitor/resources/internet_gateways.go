@@ -61,16 +61,15 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, ig := range resp.InternetGateways {
 		i := &internetGateway{Account: opts.Account, Region: opts.Region, ID: *ig.InternetGatewayId}
-
-		if !set.Mark(i, nil) {
+		if !set.Mark(opts, i, nil, fromEC2Tags(ig.Tags)) {
 			continue
 		}
-		isDefault := false
 		logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
 		if opts.DryRun {
 			continue
 		}
 
+		isDefault := false
 		for _, att := range ig.Attachments {
 			if defaultVPC[aws.StringValue(att.VpcId)] {
 				isDefault = true
