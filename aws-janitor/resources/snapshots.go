@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -42,7 +43,7 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *ec2.DescribeSnapshotsOutput, _ bool) bool {
 		for _, ss := range page.Snapshots {
-			s := &snapshot{ID: *ss.SnapshotId}
+			s := &snapshot{ID: aws.StringValue(ss.SnapshotId)}
 			// StartTime is probably close enough to a creation timestamp
 			if set.Mark(s, ss.StartTime) {
 				logger.Warningf("%s: deleting %T", s.ARN(), s)
@@ -83,7 +84,9 @@ func (Snapshots) ListAll(opts Options) (*Set, error) {
 		now := time.Now()
 		for _, ss := range page.Snapshots {
 			arn := snapshot{
-				ID: *ss.SnapshotId,
+				Account: opts.Account,
+				Region:  opts.Region,
+				ID:      aws.StringValue(ss.SnapshotId),
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -95,12 +98,13 @@ func (Snapshots) ListAll(opts Options) (*Set, error) {
 }
 
 type snapshot struct {
-	// The current client library does not provide ARNs for snapshots.
-	ID string
+	Account string
+	Region  string
+	ID      string
 }
 
 func (s snapshot) ARN() string {
-	return s.ID
+	return fmt.Sprintf("arn:aws:ec2:%s:%s:snapshots/%s", s.Region, s.Account, s.ID)
 }
 
 func (s snapshot) ResourceKey() string {

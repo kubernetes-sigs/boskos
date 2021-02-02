@@ -37,9 +37,12 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *autoscaling.DescribeAutoScalingGroupsOutput, _ bool) bool {
 		for _, asg := range page.AutoScalingGroups {
-			a := &autoScalingGroup{ID: *asg.AutoScalingGroupARN, Name: *asg.AutoScalingGroupName}
+			a := &autoScalingGroup{
+				arn:  aws.StringValue(asg.AutoScalingGroupARN),
+				name: aws.StringValue(asg.AutoScalingGroupName),
+			}
 			if set.Mark(a, asg.CreatedTime) {
-				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.Name)
+				logger.Warningf("%s: deleting %T: %s", a.ARN(), asg, a.name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, a)
 				}
@@ -54,7 +57,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, asg := range toDelete {
 		deleteInput := &autoscaling.DeleteAutoScalingGroupInput{
-			AutoScalingGroupName: aws.String(asg.Name),
+			AutoScalingGroupName: aws.String(asg.name),
 			ForceDelete:          aws.Bool(true),
 		}
 
@@ -70,7 +73,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 		logger.Warningf("%s: waiting for delete", asg.ARN())
 
 		describeInput := &autoscaling.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: []*string{aws.String(asg.Name)},
+			AutoScalingGroupNames: []*string{aws.String(asg.name)},
 		}
 
 		if err := svc.WaitUntilGroupNotExists(describeInput); err != nil {
@@ -90,8 +93,8 @@ func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
 		now := time.Now()
 		for _, asg := range asgs.AutoScalingGroups {
 			arn := autoScalingGroup{
-				ID:   *asg.AutoScalingGroupARN,
-				Name: *asg.AutoScalingGroupName,
+				arn:  aws.StringValue(asg.AutoScalingGroupARN),
+				name: aws.StringValue(asg.AutoScalingGroupName),
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -103,12 +106,12 @@ func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
 }
 
 type autoScalingGroup struct {
-	ID   string
-	Name string
+	arn  string
+	name string
 }
 
 func (asg autoScalingGroup) ARN() string {
-	return asg.ID
+	return asg.arn
 }
 
 func (asg autoScalingGroup) ResourceKey() string {
