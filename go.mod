@@ -1,6 +1,6 @@
 module sigs.k8s.io/boskos
 
-go 1.14
+go 1.15
 
 replace (
 	// Bazel is seemingly broken with newer versions of this package

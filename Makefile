@@ -19,11 +19,17 @@ OUTPUT_DIR ?= _output
 
 TOOLS_DIR := hack/tools
 BIN_DIR := bin
-TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
+TOOLS_BIN_DIR := $(abspath $(TOOLS_DIR)/$(BIN_DIR))
 OUTPUT_BIN_DIR := $(OUTPUT_DIR)/$(BIN_DIR)
+GO_INSTALL = ./hack/go_install.sh
 
-GOTESTSUM := $(TOOLS_BIN_DIR)/gotestsum
-GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
+GOTESTSUM_VER := v1.6.1
+GOTESTSUM_BIN := gotestsum
+GOTESTSUM := $(TOOLS_BIN_DIR)/$(GOTESTSUM_BIN)-$(GOTESTSUM_VER)
+
+GOLANGCI_LINT_VER := v1.35.2
+GOLANGCI_LINT_BIN := golangci-lint
+GOLANGCI_LINT := $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER)
 
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 
@@ -72,7 +78,6 @@ clean:
 .PHONY: update-modules
 update-modules:
 	go mod tidy
-	cd $(TOOLS_DIR) && go mod tidy
 
 .PHONY: verify-boilerplate
 verify-boilerplate:
@@ -91,8 +96,8 @@ verify-modules:
 verify: verify-boilerplate verify-lint verify-modules
 
 # Tools
-$(GOTESTSUM): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/gotestsum gotest.tools/gotestsum
+$(GOTESTSUM):
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) gotest.tools/gotestsum $(GOTESTSUM_BIN) $(GOTESTSUM_VER)
 
-$(GOLANGCI_LINT): $(TOOLS_DIR)/go.mod
-	cd $(TOOLS_DIR) && go build -o $(BIN_DIR)/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+$(GOLANGCI_LINT):
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/golangci/golangci-lint/cmd/golangci-lint $(GOLANGCI_LINT_BIN) $(GOLANGCI_LINT_VER)
