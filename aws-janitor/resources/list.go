@@ -66,6 +66,7 @@ var RegionalTypeList = []Type{
 	Volumes{},
 	Addresses{},
 	ElasticFileSystems{},
+	SQSQueues{},
 }
 
 // Non-regional AWS resource types, in dependency order
