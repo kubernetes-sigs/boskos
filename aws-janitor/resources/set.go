@@ -105,6 +105,10 @@ func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
 // When determining whether a resource should be deleted, first the options for
 // IncludeTags and ExcludeTags are applied against the provided tags.
 // If the resource should be managed per tags, then the TTL is evaluated.
+// Note that if the TTLTagKey option is set, the resource has a tag matching this key,
+// and the global TTL is not set to 0, then the TTL duration in this tag's value will
+// be used for this resource.
+//
 // If Mark(r) returns true, the resource is managed per tags, and the TTL has expired
 // for r and it should be deleted.
 // If the created time is not provided, the current time is used instead.
@@ -131,8 +135,24 @@ func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags []Tag) bo
 		return false
 	}
 
-	// If the TTL is 0, it should be deleted now.
-	if s.ttl == 0 || now.Sub(firstSeen) > s.ttl {
+	perResourceTTL := s.ttl
+	if opts.TTLTagKey != "" {
+		for _, tag := range tags {
+			if tag.Key == opts.TTLTagKey {
+				tagTTL, err := time.ParseDuration(tag.Value)
+				if err != nil {
+					logrus.Errorf("resource %s: invalid duration '%s' in tag '%s': %v", r.ResourceKey(), tag.Value, tag.Key, err)
+				} else {
+					perResourceTTL = tagTTL
+					logrus.Debugf("resource %s: TTL set to %v by tag", r.ResourceKey(), perResourceTTL)
+				}
+				break
+			}
+		}
+	}
+
+	// If the global TTL is 0, the resource should be deleted now. (This cannot be overridden by tags.)
+	if s.ttl == 0 || now.Sub(firstSeen) > perResourceTTL {
 		s.swept = append(s.swept, key)
 		return true
 	}
