@@ -100,10 +100,18 @@ func NewClient(owner string, urlString, username, passwordFile string) (*Client,
 		getPassword = sa.GetTokenGenerator(passwordFile)
 	}
 
+	return NewClientWithPasswordGetter(owner, urlString, username, getPassword)
+}
+
+// NewClientWithPasswordGetter creates a Boskos client for the specified URL and resource owner.
+//
+// Clients created with this function default to retrying failed connection
+// attempts three times with a ten second pause between each attempt.
+func NewClientWithPasswordGetter(owner string, urlString, username string, passwordGetter func() []byte) (*Client, error) {
 	client := &Client{
 		url:         urlString,
 		username:    username,
-		getPassword: getPassword,
+		getPassword: passwordGetter,
 		owner:       owner,
 		storage:     storage.NewMemoryStorage(),
 	}
