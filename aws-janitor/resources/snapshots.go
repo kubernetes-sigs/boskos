@@ -43,7 +43,11 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *ec2.DescribeSnapshotsOutput, _ bool) bool {
 		for _, ss := range page.Snapshots {
-			s := &snapshot{ID: aws.StringValue(ss.SnapshotId)}
+			s := &snapshot{
+				Account: opts.Account,
+				Region:  opts.Region,
+				ID:      aws.StringValue(ss.SnapshotId),
+			}
 			// StartTime is probably close enough to a creation timestamp
 			if set.Mark(s, ss.StartTime) {
 				logger.Warningf("%s: deleting %T", s.ARN(), s)

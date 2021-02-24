@@ -17,7 +17,6 @@ limitations under the License.
 package resources
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -45,10 +44,8 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 				continue
 			}
 			o := &cloudFormationStack{
-				account: opts.Account,
-				region:  opts.Region,
-				id:      aws.StringValue(stack.StackId),
-				name:    aws.StringValue(stack.StackName),
+				arn:  aws.StringValue(stack.StackId),
+				name: aws.StringValue(stack.StackName),
 			}
 			if set.Mark(o, stack.CreationTime) {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
@@ -81,10 +78,8 @@ func (CloudFormationStacks) ListAll(opts Options) (*Set, error) {
 		now := time.Now()
 		for _, stack := range stacks.StackSummaries {
 			arn := cloudFormationStack{
-				account: opts.Account,
-				region:  opts.Region,
-				id:      aws.StringValue(stack.StackId),
-				name:    aws.StringValue(stack.StackName),
+				arn:  aws.StringValue(stack.StackId),
+				name: aws.StringValue(stack.StackName),
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -96,18 +91,16 @@ func (CloudFormationStacks) ListAll(opts Options) (*Set, error) {
 }
 
 type cloudFormationStack struct {
-	account string
-	region  string
-	id      string
-	name    string
+	arn  string
+	name string
 }
 
 func (p cloudFormationStack) ARN() string {
-	return fmt.Sprintf("arn:aws:cloudformation:%s:%s:stack/%s", p.region, p.account, p.id)
+	return p.arn
 }
 
 func (p cloudFormationStack) ResourceKey() string {
-	return p.name
+	return p.ARN()
 }
 
 func (p cloudFormationStack) delete(svc *cf.CloudFormation) error {
