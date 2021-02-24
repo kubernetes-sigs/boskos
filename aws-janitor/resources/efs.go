@@ -60,7 +60,7 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 				continue
 			}
 
-			logger.Warningf("%s: deleting %T: %s", f.ARN(), fs, *fs.Name)
+			logger.Warningf("%s: deleting %T: %s (%s)", f.ARN(), fs, aws.StringValue(fs.FileSystemId), aws.StringValue(fs.Name))
 			if !opts.DryRun {
 				fileSystemsToDelete = append(fileSystemsToDelete, f)
 			}

@@ -38,7 +38,8 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *ec2.DescribeVolumesOutput, _ bool) bool {
 		for _, vol := range page.Volumes {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
-			if !set.Mark(opts, v, vol.CreateTime, fromEC2Tags(vol.Tags)) {
+			tags := fromEC2Tags(vol.Tags)
+			if !set.Mark(opts, v, vol.CreateTime, tags) {
 				continue
 			}
 			// Since tags and other metadata may not propagate to volumes from their attachments,
@@ -47,7 +48,7 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 			if len(vol.Attachments) > 0 {
 				continue
 			}
-			logger.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
+			logger.Warningf("%s: deleting %T: %s (%s)", v.ARN(), vol, v.ID, tags[NameTagKey])
 			if !opts.DryRun {
 				toDelete = append(toDelete, v)
 			}

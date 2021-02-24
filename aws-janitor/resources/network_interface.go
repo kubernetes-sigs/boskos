@@ -44,8 +44,9 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 				a.AttachmentID = *eni.Attachment.AttachmentId
 				attachTime = eni.Attachment.AttachTime
 			}
+			tags := fromEC2Tags(eni.TagSet)
 			// AttachTime isn't exactly the creation time, but it's better than nothing.
-			if !set.Mark(opts, a, attachTime, fromEC2Tags(eni.TagSet)) {
+			if !set.Mark(opts, a, attachTime, tags) {
 				continue
 			}
 			// Since tags and other metadata may not propagate to ENIs from their attachments,
@@ -54,7 +55,7 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 			if eni.Attachment != nil {
 				continue
 			}
-			logger.Warningf("%s: deleting %T", a.ARN(), a)
+			logger.Warningf("%s: deleting %T (%s)", a.ARN(), a, tags[NameTagKey])
 			if !opts.DryRun {
 				toDelete = append(toDelete, a)
 			}

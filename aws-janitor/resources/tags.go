@@ -25,6 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+const (
+	NameTagKey = "Name"
+)
+
 type Tags map[string]string
 
 func (tags Tags) Add(key *string, value *string) {

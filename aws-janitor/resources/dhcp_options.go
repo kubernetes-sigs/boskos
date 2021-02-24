@@ -73,11 +73,12 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		dh := &dhcpOption{Account: opts.Account, Region: opts.Region, ID: *dhcp.DhcpOptionsId}
-		if !set.Mark(opts, dh, nil, fromEC2Tags(dhcp.Tags)) {
+		tags := fromEC2Tags(dhcp.Tags)
+		if !set.Mark(opts, dh, nil, tags) {
 			continue
 		}
 
-		logger.Warningf("%s: deleting %T: %s", dh.ARN(), dhcp, dh.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", dh.ARN(), dhcp, dh.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}

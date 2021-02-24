@@ -61,10 +61,11 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, ig := range resp.InternetGateways {
 		i := &internetGateway{Account: opts.Account, Region: opts.Region, ID: *ig.InternetGatewayId}
-		if !set.Mark(opts, i, nil, fromEC2Tags(ig.Tags)) {
+		tags := fromEC2Tags(ig.Tags)
+		if !set.Mark(opts, i, nil, tags) {
 			continue
 		}
-		logger.Warningf("%s: deleting %T: %s", i.ARN(), ig, i.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", i.ARN(), ig, i.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}

@@ -45,10 +45,11 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 				ID:      *gw.NatGatewayId,
 			}
 
-			if !set.Mark(opts, g, gw.CreateTime, fromEC2Tags(gw.Tags)) {
+			tags := fromEC2Tags(gw.Tags)
+			if !set.Mark(opts, g, gw.CreateTime, tags) {
 				continue
 			}
-			logger.Warningf("%s: deleting %T: %s", g.ARN(), gw, g.ID)
+			logger.Warningf("%s: deleting %T: %s (%s)", g.ARN(), gw, g.ID, tags[NameTagKey])
 			if opts.DryRun {
 				continue
 			}

@@ -54,10 +54,11 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
-		if !set.Mark(opts, r, nil, fromEC2Tags(rt.Tags)) {
+		tags := fromEC2Tags(rt.Tags)
+		if !set.Mark(opts, r, nil, tags) {
 			continue
 		}
-		logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", r.ARN(), rt, r.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}

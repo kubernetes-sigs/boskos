@@ -41,7 +41,8 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, addr := range resp.Addresses {
 		a := &address{Account: opts.Account, Region: opts.Region, ID: *addr.AllocationId}
-		if !set.Mark(opts, a, nil, fromEC2Tags(addr.Tags)) {
+		tags := fromEC2Tags(addr.Tags)
+		if !set.Mark(opts, a, nil, tags) {
 			continue
 		}
 		// Since tags and other metadata may not propagate to addresses from their associated instances,
@@ -51,7 +52,7 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		logger.Warningf("%s: deleting %T: %s", a.ARN(), addr, a.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", a.ARN(), addr, a.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}

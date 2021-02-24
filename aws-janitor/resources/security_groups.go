@@ -69,7 +69,7 @@ func (SecurityGroups) MarkAndSweep(opts Options, set *Set) error {
 		if !set.Mark(opts, s, nil, fromEC2Tags(sg.Tags)) {
 			continue
 		}
-		logger.Warningf("%s: deleting %T: %s", s.ARN(), sg, s.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", s.ARN(), sg, s.ID, aws.StringValue(sg.GroupName))
 		if !opts.DryRun {
 			toDelete = append(toDelete, s)
 		}

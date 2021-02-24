@@ -49,11 +49,12 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, sub := range resp.Subnets {
 		s := &subnet{Account: opts.Account, Region: opts.Region, ID: *sub.SubnetId}
-		if !set.Mark(opts, s, nil, fromEC2Tags(sub.Tags)) {
+		tags := fromEC2Tags(sub.Tags)
+		if !set.Mark(opts, s, nil, tags) {
 			continue
 		}
 
-		logger.Warningf("%s: deleting %T: %s", s.ARN(), sub, s.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", s.ARN(), sub, s.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}
