@@ -25,16 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type Tag struct {
-	Key   string
-	Value string
-}
+type Tags map[string]string
 
-func NewTag(key *string, value *string) Tag {
-	return Tag{
-		Key:   aws.StringValue(key),
-		Value: aws.StringValue(value),
-	}
+func (tags Tags) Add(key *string, value *string) {
+	tags[aws.StringValue(key)] = aws.StringValue(value)
 }
 
 // TagMatcher maps keys to valid values. An empty set of values will result in matching tags with any value.
@@ -62,8 +56,8 @@ func TagMatcherForTags(tags []string) (TagMatcher, error) {
 	return tm, nil
 }
 
-func (tm TagMatcher) Matches(tag Tag) bool {
-	vals, ok := tm[tag.Key]
+func (tm TagMatcher) Matches(key, value string) bool {
+	vals, ok := tm[key]
 	if !ok {
 		// No tag matcher for this key
 		return false
@@ -72,38 +66,38 @@ func (tm TagMatcher) Matches(tag Tag) bool {
 		// This matcher matches all values for a given key.
 		return true
 	}
-	return vals.Has(tag.Value)
+	return vals.Has(value)
 }
 
 // ManagedPerTags returns whether the given list of tags is matched by all IncludeTags and no ExcludeTags.
-func (opts Options) ManagedPerTags(tags []Tag) bool {
+func (opts Options) ManagedPerTags(tags Tags) bool {
 	included := 0
-	for _, t := range tags {
-		if opts.ExcludeTags.Matches(t) {
+	for k, v := range tags {
+		if opts.ExcludeTags.Matches(k, v) {
 			return false
 		}
-		if opts.IncludeTags.Matches(t) {
+		if opts.IncludeTags.Matches(k, v) {
 			included++
 		}
 	}
 	return included == len(opts.IncludeTags)
 }
 
-func fromEC2Tags(ec2tags []*ec2.Tag) []Tag {
-	tags := make([]Tag, 0, len(ec2tags))
+func fromEC2Tags(ec2tags []*ec2.Tag) Tags {
+	tags := make(Tags, len(ec2tags))
 	for _, ec2t := range ec2tags {
-		tags = append(tags, NewTag(ec2t.Key, ec2t.Value))
+		tags.Add(ec2t.Key, ec2t.Value)
 	}
 	return tags
 }
 
-// incrementalFetchTags creates slices of IDs from tagMap no longer than inc at a time, calling
+// incrementalFetchTags creates slices of IDs from tagsMap no longer than inc at a time, calling
 // f with these slices.
 // This is intended to be used with APIs that allow querying for tags of a limited number of multiple resources at once.
 // If f errors, incrementalFetchTags returns early with the error.
-func incrementalFetchTags(tagMap map[string][]Tag, inc int, f func([]*string) error) error {
-	ids := make([]*string, 0, len(tagMap))
-	for id := range tagMap {
+func incrementalFetchTags(tagsMap map[string]Tags, inc int, f func([]*string) error) error {
+	ids := make([]*string, 0, len(tagsMap))
+	for id := range tagsMap {
 		ids = append(ids, aws.String(id))
 	}
 

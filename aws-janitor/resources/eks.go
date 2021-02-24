@@ -79,9 +79,9 @@ func (EKS) describeClusters(opts Options, set *Set, svc *eks.EKS, deleteFunc fun
 					arn:  aws.StringValue(out.Cluster.Arn),
 					name: aws.StringValue(clusterName),
 				}
-				tags := make([]Tag, len(out.Cluster.Tags))
+				tags := make(Tags, len(out.Cluster.Tags))
 				for k, v := range out.Cluster.Tags {
-					tags = append(tags, NewTag(aws.String(k), v))
+					tags.Add(aws.String(k), v)
 				}
 				if !set.Mark(opts, cluster, out.Cluster.CreatedAt, tags) {
 					continue

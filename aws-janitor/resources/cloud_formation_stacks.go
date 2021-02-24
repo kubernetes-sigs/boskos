@@ -30,8 +30,8 @@ import (
 // Cloud Formation Stacks
 type CloudFormationStacks struct{}
 
-func (CloudFormationStacks) fetchTags(svc *cf.CloudFormation, stackID string) ([]Tag, error) {
-	var tags []Tag
+func (CloudFormationStacks) fetchTags(svc *cf.CloudFormation, stackID string) (Tags, error) {
+	tags := make(Tags)
 	var errs []error
 
 	describeErr := svc.DescribeStacksPages(&cf.DescribeStacksInput{StackName: aws.String(stackID)},
@@ -42,7 +42,7 @@ func (CloudFormationStacks) fetchTags(svc *cf.CloudFormation, stackID string) ([
 					continue
 				}
 				for _, t := range stack.Tags {
-					tags = append(tags, NewTag(t.Key, t.Value))
+					tags.Add(t.Key, t.Value)
 				}
 			}
 			return true

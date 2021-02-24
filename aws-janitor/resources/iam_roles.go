@@ -31,8 +31,8 @@ import (
 
 type IAMRoles struct{}
 
-func roleTags(svc *iam.IAM, role *iam.Role) ([]Tag, error) {
-	var tags []Tag
+func roleTags(svc *iam.IAM, role *iam.Role) (Tags, error) {
+	tags := make(Tags)
 	roleTagsInput := &iam.ListRoleTagsInput{RoleName: role.RoleName}
 	for {
 		tagsResp, err := svc.ListRoleTags(roleTagsInput)
@@ -40,7 +40,7 @@ func roleTags(svc *iam.IAM, role *iam.Role) ([]Tag, error) {
 			return nil, fmt.Errorf("role %s: failed querying for tags: %v", aws.StringValue(role.RoleName), err)
 		}
 		for _, t := range tagsResp.Tags {
-			tags = append(tags, NewTag(t.Key, t.Value))
+			tags.Add(t.Key, t.Value)
 		}
 		if !aws.BoolValue(tagsResp.IsTruncated) {
 			break

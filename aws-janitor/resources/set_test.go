@@ -77,7 +77,7 @@ func TestMarkCreationTimes(t *testing.T) {
 			ShouldDelete      bool
 			CreateTime        *time.Time
 			ExpectedFirstSeen time.Time
-			Tags              []Tag
+			Tags              Tags
 			Unmanaged         bool
 		}{
 			{
@@ -136,7 +136,7 @@ func TestMarkCreationTimes(t *testing.T) {
 				ShouldDelete:      false,
 				CreateTime:        &sixHoursAgo,
 				ExpectedFirstSeen: sixHoursAgo,
-				Tags:              []Tag{{janitorExcludeKey, "true"}},
+				Tags:              Tags{janitorExcludeKey: "true"},
 				Unmanaged:         true,
 			},
 			{
@@ -144,14 +144,14 @@ func TestMarkCreationTimes(t *testing.T) {
 				ShouldDelete:      true,
 				CreateTime:        &sixHoursAgo,
 				ExpectedFirstSeen: sixHoursAgo,
-				Tags:              []Tag{{janitorTTLKey, "foo"}},
+				Tags:              Tags{janitorTTLKey: "foo"},
 			},
 			{
 				Resource:          fakeResource{"OverrideDurationTag"},
 				ShouldDelete:      false,
 				CreateTime:        &sixHoursAgo,
 				ExpectedFirstSeen: sixHoursAgo,
-				Tags:              []Tag{{janitorTTLKey, "12h"}},
+				Tags:              Tags{janitorTTLKey: "12h"},
 			},
 		} {
 			shouldDelete := (deleteAll || tc.ShouldDelete) && !tc.Unmanaged

@@ -41,9 +41,9 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 				arn:  aws.StringValue(asg.AutoScalingGroupARN),
 				name: aws.StringValue(asg.AutoScalingGroupName),
 			}
-			tags := make([]Tag, len(asg.Tags))
+			tags := make(Tags, len(asg.Tags))
 			for _, t := range asg.Tags {
-				tags = append(tags, NewTag(t.Key, t.Value))
+				tags.Add(t.Key, t.Value)
 			}
 			if !set.Mark(opts, a, asg.CreatedTime, tags) {
 				continue

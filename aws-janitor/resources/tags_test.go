@@ -34,73 +34,86 @@ func TestMatchesTag(t *testing.T) {
 		t.Fatalf("unexpected error creating tag matcher: %v", err)
 	}
 	for _, tc := range []struct {
-		Tag         Tag
+		Key         string
+		Value       string
 		ShouldMatch bool
 	}{
 		{
-			Tag:         Tag{"onlyKey", "some value"},
+			Key:         "onlyKey",
+			Value:       "some value",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"onlyKey", ""},
+			Key:         "onlyKey",
+			Value:       "",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"keyWithEquals=", "val"},
+			Key:         "keyWithEquals=",
+			Value:       "val",
 			ShouldMatch: false,
 		},
 		{
-			Tag:         Tag{"keyWithEquals=", ""},
+			Key:         "keyWithEquals=",
+			Value:       "",
 			ShouldMatch: false,
 		},
 		{
-			Tag:         Tag{"keyWithEquals", "val"},
+			Key:         "keyWithEquals",
+			Value:       "val",
 			ShouldMatch: false,
 		},
 		{
-			Tag:         Tag{"keyWithEquals", ""},
+			Key:         "keyWithEquals",
+			Value:       "",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"foo", "1"},
+			Key:         "foo",
+			Value:       "1",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"foo", "2"},
+			Key:         "foo",
+			Value:       "2",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"foo", "3"},
+			Key:         "foo",
+			Value:       "3",
 			ShouldMatch: false,
 		},
 		{
-			Tag:         Tag{"bar", "abc"},
+			Key:         "bar",
+			Value:       "abc",
 			ShouldMatch: true,
 		},
 		{
-			Tag:         Tag{"bar", ""},
+			Key:         "bar",
+			Value:       "",
 			ShouldMatch: false,
 		},
 		{
-			Tag:         Tag{"bar", "xyz"},
+			Key:         "bar",
+			Value:       "xyz",
 			ShouldMatch: false,
 		},
 	} {
-		matches := tm.Matches(tc.Tag)
+		matches := tm.Matches(tc.Key, tc.Value)
 		if matches != tc.ShouldMatch {
-			t.Errorf("Tag %+v: matches: expected=%v, got=%v", tc.Tag, tc.ShouldMatch, matches)
+			t.Errorf("Tag {%s: %s}: matches: expected=%v, got=%v", tc.Key, tc.Value, tc.ShouldMatch, matches)
 		}
 	}
 }
 
 func TestManagedPerTags(t *testing.T) {
 	// These tags and matchers aren't using values, since we test that in the other unit test.
-	metasynTags := []Tag{{"foo", ""}, {"bar", ""}, {"baz", ""}}
+	metasynTags := Tags{"foo": "", "bar": "", "baz": ""}
 	tmBar, err := TagMatcherForTags([]string{"bar"})
 	if err != nil {
 		t.Fatalf("unexpected error creating tag matcher: %v", err)
 	}
-	colorTags := []Tag{{"red", ""}, {"orange", ""}, {"yellow", ""}, {"green", ""}, {"blue", ""}, {"indigo", ""}, {"violet", ""}}
+	colorTags := Tags{"red": "", "orange": "", "yellow": "", "green": "", "blue": "", "indigo": "", "violet": ""}
 	tmRGB, err := TagMatcherForTags([]string{"red", "green", "blue"})
 	if err != nil {
 		t.Fatalf("unexpected error creating tag matcher: %v", err)
@@ -112,13 +125,14 @@ func TestManagedPerTags(t *testing.T) {
 
 	for _, tc := range []struct {
 		Desc         string
-		Tags         []Tag
+		Tags         Tags
 		IncludeTags  TagMatcher
 		ExcludeTags  TagMatcher
 		ShouldManage bool
 	}{
 		{
 			Desc:         "no tags, no matchers",
+			Tags:         nil,
 			IncludeTags:  tmEmpty,
 			ExcludeTags:  tmEmpty,
 			ShouldManage: true,
@@ -165,7 +179,7 @@ func TestManagedPerTags(t *testing.T) {
 		},
 		{
 			Desc:         "no include by tag, multi match (missing tags, no exclude)",
-			Tags:         []Tag{{"red", ""}},
+			Tags:         Tags{"red": ""},
 			IncludeTags:  tmRGB,
 			ExcludeTags:  tmEmpty,
 			ShouldManage: false,
@@ -179,7 +193,7 @@ func TestManagedPerTags(t *testing.T) {
 		},
 		{
 			Desc:         "include by tag, exclude by single matching",
-			Tags:         append(metasynTags, Tag{"green", ""}),
+			Tags:         Tags{"foo": "", "bar": "", "baz": "", "green": ""},
 			IncludeTags:  tmBar,
 			ExcludeTags:  tmRGB,
 			ShouldManage: false,
@@ -197,11 +211,11 @@ func TestManagedPerTags(t *testing.T) {
 }
 
 func TestIncrementalFetchTags(t *testing.T) {
-	tagMap := map[string][]Tag{"a": nil, "b": nil, "c": nil, "d": nil, "e": nil}
+	tagsMap := map[string]Tags{"a": nil, "b": nil, "c": nil, "d": nil, "e": nil}
 	funcCalls := 0
 	processedIDs := 0
 
-	err := incrementalFetchTags(tagMap, 2, func(ids []*string) error {
+	err := incrementalFetchTags(tagsMap, 2, func(ids []*string) error {
 		funcCalls++
 		if len(ids) > 2 {
 			t.Errorf("invalid number of ids in function call: expected<=%d, got=%d", 2, len(ids))
@@ -209,11 +223,14 @@ func TestIncrementalFetchTags(t *testing.T) {
 		for _, id := range ids {
 			processedIDs++
 			name := aws.StringValue(id)
-			if _, ok := tagMap[name]; !ok {
+			if _, ok := tagsMap[name]; !ok {
 				t.Errorf("id not in tag map: %v", id)
 				continue
 			}
-			tagMap[name] = append(tagMap[name], Tag{"seen", "true"})
+			if tagsMap[name] == nil {
+				tagsMap[name] = make(Tags)
+			}
+			tagsMap[name].Add(aws.String("seen"), aws.String("true"))
 		}
 		return nil
 	})
@@ -223,12 +240,15 @@ func TestIncrementalFetchTags(t *testing.T) {
 	if funcCalls != 3 {
 		t.Errorf("func called incorrect number of times: expected=%d, got=%d", 3, funcCalls)
 	}
-	if processedIDs != len(tagMap) {
-		t.Errorf("unexpected number of processed ids: expected=%d, got=%d", len(tagMap), processedIDs)
+	if processedIDs != len(tagsMap) {
+		t.Errorf("unexpected number of processed ids: expected=%d, got=%d", len(tagsMap), processedIDs)
 	}
-	for key, tags := range tagMap {
+	for key, tags := range tagsMap {
 		if len(tags) != 1 {
 			t.Errorf("expected 1 tag for key %s, got tags=%v", key, tags)
+		}
+		if _, ok := tags["seen"]; !ok {
+			t.Errorf("missing key 'seen' for key %s", key)
 		}
 	}
 }

@@ -76,7 +76,7 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 }
 
 // route53ResourceRecordSetsForZone marks all ResourceRecordSets in the provided zone and returns a slice containing those that should be deleted.
-func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, zoneTags []Tag, set *Set) ([]*route53ResourceRecordSet, error) {
+func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, zoneTags Tags, set *Set) ([]*route53ResourceRecordSet, error) {
 	var toDelete []*route53ResourceRecordSet
 
 	recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
@@ -107,7 +107,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var zones []*route53.HostedZone
-	zoneTags := make(map[string][]Tag)
+	zoneTags := make(map[string]Tags)
 
 	pageFunc := func(zs *route53.ListHostedZonesOutput, _ bool) bool {
 		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
@@ -216,7 +216,7 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 
 }
 
-func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string][]Tag, svc *route53.Route53) error {
+func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string]Tags, svc *route53.Route53) error {
 	return incrementalFetchTags(zoneTags, 10, func(ids []*string) error {
 		output, err := svc.ListTagsForResources(&route53.ListTagsForResourcesInput{
 			ResourceType: aws.String(route53.TagResourceTypeHostedzone),
@@ -235,8 +235,11 @@ func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string][]Tag, sv
 			if !ok {
 				return fmt.Errorf("unknown zone id in ListTagsForResources output: %s", id)
 			}
+			if zoneTags[id] == nil {
+				zoneTags[id] = make(Tags, len(rts.Tags))
+			}
 			for _, tag := range rts.Tags {
-				zoneTags[id] = append(zoneTags[id], NewTag(tag.Key, tag.Value))
+				zoneTags[id].Add(tag.Key, tag.Value)
 			}
 		}
 		return nil

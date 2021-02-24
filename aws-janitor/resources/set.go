@@ -112,7 +112,7 @@ func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
 // If Mark(r) returns true, the resource is managed per tags, and the TTL has expired
 // for r and it should be deleted.
 // If the created time is not provided, the current time is used instead.
-func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags []Tag) bool {
+func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags Tags) bool {
 	key := r.ResourceKey()
 	s.marked[key] = true
 
@@ -137,16 +137,13 @@ func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags []Tag) bo
 
 	perResourceTTL := s.ttl
 	if opts.TTLTagKey != "" {
-		for _, tag := range tags {
-			if tag.Key == opts.TTLTagKey {
-				tagTTL, err := time.ParseDuration(tag.Value)
-				if err != nil {
-					logrus.Errorf("resource %s: invalid duration '%s' in tag '%s': %v", r.ResourceKey(), tag.Value, tag.Key, err)
-				} else {
-					perResourceTTL = tagTTL
-					logrus.Debugf("resource %s: TTL set to %v by tag", r.ResourceKey(), perResourceTTL)
-				}
-				break
+		if val, ok := tags[opts.TTLTagKey]; ok {
+			tagTTL, err := time.ParseDuration(val)
+			if err != nil {
+				logrus.Errorf("resource %s: invalid duration '%s' in tag '%s': %v", r.ResourceKey(), val, opts.TTLTagKey, err)
+			} else {
+				perResourceTTL = tagTTL
+				logrus.Debugf("resource %s: TTL set to %v by tag", r.ResourceKey(), perResourceTTL)
 			}
 		}
 	}

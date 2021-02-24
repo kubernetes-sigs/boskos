@@ -36,7 +36,7 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	svc := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
 	var loadBalancers []*loadBalancer
-	lbTags := make(map[string][]Tag)
+	lbTags := make(map[string]Tags)
 
 	pageFunc := func(page *elbv2.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancers {
@@ -69,8 +69,11 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 				errs = append(errs, fmt.Errorf("unknown load balancer ARN in tag response: %s", arn))
 				continue
 			}
+			if lbTags[arn] == nil {
+				lbTags[arn] = make(Tags, len(tagDesc.Tags))
+			}
 			for _, t := range tagDesc.Tags {
-				lbTags[arn] = append(lbTags[arn], NewTag(t.Key, t.Value))
+				lbTags[arn].Add(t.Key, t.Value)
 			}
 		}
 		return kerrors.NewAggregate(errs)

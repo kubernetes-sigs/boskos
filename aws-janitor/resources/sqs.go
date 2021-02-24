@@ -66,9 +66,9 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 				logger.Warningf("%s: failed listing tags: %v", q.ARN(), err)
 				return false
 			}
-			tags := make([]Tag, len(tagResp.Tags))
+			tags := make(Tags, len(tagResp.Tags))
 			for k, v := range tagResp.Tags {
-				tags = append(tags, NewTag(aws.String(k), v))
+				tags.Add(aws.String(k), v)
 			}
 			if !set.Mark(opts, q, &creationTime, tags) {
 				continue

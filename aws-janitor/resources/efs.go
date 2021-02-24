@@ -52,9 +52,9 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 				id:  aws.StringValue(fs.FileSystemId),
 				arn: aws.StringValue(fs.FileSystemArn),
 			}
-			tags := make([]Tag, len(fs.Tags))
+			tags := make(Tags, len(fs.Tags))
 			for _, t := range fs.Tags {
-				tags = append(tags, NewTag(t.Key, t.Value))
+				tags.Add(t.Key, t.Value)
 			}
 			if !set.Mark(opts, f, fs.CreationTime, tags) {
 				continue
