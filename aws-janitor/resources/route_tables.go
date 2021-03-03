@@ -54,31 +54,33 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		r := &routeTable{Account: opts.Account, Region: opts.Region, ID: *rt.RouteTableId}
-		if set.Mark(r, nil) {
-			logger.Warningf("%s: deleting %T: %s", r.ARN(), rt, r.ID)
-			if opts.DryRun {
-				continue
+		tags := fromEC2Tags(rt.Tags)
+		if !set.Mark(opts, r, nil, tags) {
+			continue
+		}
+		logger.Warningf("%s: deleting %T: %s (%s)", r.ARN(), rt, r.ID, tags[NameTagKey])
+		if opts.DryRun {
+			continue
+		}
+
+		for _, assoc := range rt.Associations {
+			logger.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
+
+			disReq := &ec2.DisassociateRouteTableInput{
+				AssociationId: assoc.RouteTableAssociationId,
 			}
 
-			for _, assoc := range rt.Associations {
-				logger.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
-
-				disReq := &ec2.DisassociateRouteTableInput{
-					AssociationId: assoc.RouteTableAssociationId,
-				}
-
-				if _, err := svc.DisassociateRouteTable(disReq); err != nil {
-					logger.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
-				}
+			if _, err := svc.DisassociateRouteTable(disReq); err != nil {
+				logger.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
 			}
+		}
 
-			deleteReq := &ec2.DeleteRouteTableInput{
-				RouteTableId: rt.RouteTableId,
-			}
+		deleteReq := &ec2.DeleteRouteTableInput{
+			RouteTableId: rt.RouteTableId,
+		}
 
-			if _, err := svc.DeleteRouteTable(deleteReq); err != nil {
-				logger.Warningf("%s: delete failed: %v", r.ARN(), err)
-			}
+		if _, err := svc.DeleteRouteTable(deleteReq); err != nil {
+			logger.Warningf("%s: delete failed: %v", r.ARN(), err)
 		}
 	}
 

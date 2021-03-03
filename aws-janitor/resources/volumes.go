@@ -38,11 +38,19 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 	pageFunc := func(page *ec2.DescribeVolumesOutput, _ bool) bool {
 		for _, vol := range page.Volumes {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
-			if set.Mark(v, vol.CreateTime) {
-				logger.Warningf("%s: deleting %T: %s", v.ARN(), vol, v.ID)
-				if !opts.DryRun {
-					toDelete = append(toDelete, v)
-				}
+			tags := fromEC2Tags(vol.Tags)
+			if !set.Mark(opts, v, vol.CreateTime, tags) {
+				continue
+			}
+			// Since tags and other metadata may not propagate to volumes from their attachments,
+			// we avoid deleting any volume that is currently attached. Once their attached resource is deleted,
+			// we can safely delete volumes in a later clean-up run (using the mark data we saved in this run).
+			if len(vol.Attachments) > 0 {
+				continue
+			}
+			logger.Warningf("%s: deleting %T: %s (%s)", v.ARN(), vol, v.ID, tags[NameTagKey])
+			if !opts.DryRun {
+				toDelete = append(toDelete, v)
 			}
 		}
 		return true

@@ -48,10 +48,11 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 
 	for _, vp := range resp.Vpcs {
 		v := &vpc{Account: opts.Account, Region: opts.Region, ID: *vp.VpcId}
-		if !set.Mark(v, nil) {
+		tags := fromEC2Tags(vp.Tags)
+		if !set.Mark(opts, v, nil, tags) {
 			continue
 		}
-		logger.Warningf("%s: deleting %T: %s", v.ARN(), vp, v.ID)
+		logger.Warningf("%s: deleting %T: %s (%s)", v.ARN(), vp, v.ID, tags[NameTagKey])
 		if opts.DryRun {
 			continue
 		}

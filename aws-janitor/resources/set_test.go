@@ -41,6 +41,13 @@ func absDuration(d time.Duration) time.Duration {
 }
 
 func TestMarkCreationTimes(t *testing.T) {
+	const janitorTTLKey = "janitorTTL"
+	const janitorExcludeKey = "janitorExclude"
+	excludeTM, err := TagMatcherForTags([]string{janitorExcludeKey})
+	if err != nil {
+		t.Errorf("failed initializing tag matcher: %v", err)
+	}
+
 	for _, deleteAll := range []bool{false, true} {
 		ttl := time.Hour
 
@@ -70,6 +77,8 @@ func TestMarkCreationTimes(t *testing.T) {
 			ShouldDelete      bool
 			CreateTime        *time.Time
 			ExpectedFirstSeen time.Time
+			Tags              Tags
+			Unmanaged         bool
 		}{
 			{
 				// New resource, no creation time -> should use time.Now()
@@ -122,9 +131,35 @@ func TestMarkCreationTimes(t *testing.T) {
 				CreateTime:        &tenMinutesAgo,
 				ExpectedFirstSeen: threeHoursAgo,
 			},
+			{
+				Resource:          fakeResource{"ExcludedByTags"},
+				ShouldDelete:      false,
+				CreateTime:        &sixHoursAgo,
+				ExpectedFirstSeen: sixHoursAgo,
+				Tags:              Tags{janitorExcludeKey: "true"},
+				Unmanaged:         true,
+			},
+			{
+				Resource:          fakeResource{"InvalidDurationTag"},
+				ShouldDelete:      true,
+				CreateTime:        &sixHoursAgo,
+				ExpectedFirstSeen: sixHoursAgo,
+				Tags:              Tags{janitorTTLKey: "foo"},
+			},
+			{
+				Resource:          fakeResource{"OverrideDurationTag"},
+				ShouldDelete:      false,
+				CreateTime:        &sixHoursAgo,
+				ExpectedFirstSeen: sixHoursAgo,
+				Tags:              Tags{janitorTTLKey: "12h"},
+			},
 		} {
-			shouldDelete := deleteAll || tc.ShouldDelete
-			delete := s.Mark(tc.Resource, tc.CreateTime)
+			shouldDelete := (deleteAll || tc.ShouldDelete) && !tc.Unmanaged
+			opts := Options{
+				ExcludeTags: excludeTM,
+				TTLTagKey:   janitorTTLKey,
+			}
+			delete := s.Mark(opts, tc.Resource, tc.CreateTime, tc.Tags)
 			if delete != shouldDelete {
 				t.Errorf("%s: delete: expected=%v, got=%v", tc.Resource.Name, shouldDelete, delete)
 			}

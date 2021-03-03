@@ -40,7 +40,8 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 				arn:  aws.StringValue(lc.LaunchConfigurationARN),
 				name: aws.StringValue(lc.LaunchConfigurationName),
 			}
-			if set.Mark(l, lc.CreatedTime) {
+			// No tags?
+			if set.Mark(opts, l, lc.CreatedTime, nil) {
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), lc, l.name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, l)

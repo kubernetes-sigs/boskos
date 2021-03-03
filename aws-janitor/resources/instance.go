@@ -54,12 +54,15 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 					Region:     opts.Region,
 					InstanceID: *inst.InstanceId,
 				}
+				tags := fromEC2Tags(inst.Tags)
 				// Instances don't have a creation date, but launch time is better than nothing.
-				if set.Mark(i, inst.LaunchTime) {
-					logger.Warningf("%s: deleting %T: %s", i.ARN(), inst, i.InstanceID)
-					if !opts.DryRun {
-						toDelete = append(toDelete, inst.InstanceId)
-					}
+				if !set.Mark(opts, i, inst.LaunchTime, tags) {
+					continue
+				}
+
+				logger.Warningf("%s: deleting %T: %s (%s)", i.ARN(), inst, i.InstanceID, tags[NameTagKey])
+				if !opts.DryRun {
+					toDelete = append(toDelete, inst.InstanceId)
 				}
 			}
 		}

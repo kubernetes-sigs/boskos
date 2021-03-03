@@ -44,12 +44,20 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 				a.AttachmentID = *eni.Attachment.AttachmentId
 				attachTime = eni.Attachment.AttachTime
 			}
+			tags := fromEC2Tags(eni.TagSet)
 			// AttachTime isn't exactly the creation time, but it's better than nothing.
-			if set.Mark(a, attachTime) {
-				logger.Warningf("%s: deleting %T", a.ARN(), a)
-				if !opts.DryRun {
-					toDelete = append(toDelete, a)
-				}
+			if !set.Mark(opts, a, attachTime, tags) {
+				continue
+			}
+			// Since tags and other metadata may not propagate to ENIs from their attachments,
+			// we avoid deleting any ENI that is currently attached. Once their attached resource is deleted,
+			// we can safely delete ENIs in a later clean-up run (using the mark data we saved in this run).
+			if eni.Attachment != nil {
+				continue
+			}
+			logger.Warningf("%s: deleting %T (%s)", a.ARN(), a, tags[NameTagKey])
+			if !opts.DryRun {
+				toDelete = append(toDelete, a)
 			}
 		}
 		return true
@@ -60,15 +68,6 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 	}
 
 	for _, eni := range toDelete {
-		if eni.AttachmentID != "" {
-			detachInput := &ec2.DetachNetworkInterfaceInput{
-				AttachmentId: aws.String(eni.AttachmentID),
-			}
-			if _, err := svc.DetachNetworkInterface(detachInput); err != nil {
-				logger.Warningf("%s: detach failed: %v", eni.ARN(), err)
-			}
-		}
-
 		deleteInput := &ec2.DeleteNetworkInterfaceInput{
 			NetworkInterfaceId: aws.String(eni.ID),
 		}

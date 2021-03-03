@@ -17,18 +17,43 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Cloud Formation Stacks
 type CloudFormationStacks struct{}
 
-func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
+func (CloudFormationStacks) fetchTags(svc *cf.CloudFormation, stackID string) (Tags, error) {
+	tags := make(Tags)
+	var errs []error
+
+	describeErr := svc.DescribeStacksPages(&cf.DescribeStacksInput{StackName: aws.String(stackID)},
+		func(page *cf.DescribeStacksOutput, _ bool) bool {
+			for _, stack := range page.Stacks {
+				if aws.StringValue(stack.StackId) != stackID {
+					errs = append(errs, fmt.Errorf("unexpected stack id in DescribeStacks output: %s", aws.StringValue(stack.StackId)))
+					continue
+				}
+				for _, t := range stack.Tags {
+					tags.Add(t.Key, t.Value)
+				}
+			}
+			return true
+		})
+	if describeErr != nil {
+		errs = append(errs, describeErr)
+	}
+	return tags, kerrors.NewAggregate(errs)
+}
+
+func (cfs CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
 	svc := cf.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
@@ -47,11 +72,18 @@ func (CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 				arn:  aws.StringValue(stack.StackId),
 				name: aws.StringValue(stack.StackName),
 			}
-			if set.Mark(o, stack.CreationTime) {
-				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
-				if !opts.DryRun {
-					toDelete = append(toDelete, o)
-				}
+			tags, tagErr := cfs.fetchTags(svc, o.arn)
+			if tagErr != nil {
+				logger.Warningf("%s: failed to fetch tags: %v", o.ARN(), tagErr)
+				continue
+			}
+			if !set.Mark(opts, o, stack.CreationTime, tags) {
+				continue
+			}
+
+			logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, o)
 			}
 		}
 		return true

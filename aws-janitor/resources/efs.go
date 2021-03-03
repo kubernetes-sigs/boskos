@@ -52,11 +52,17 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 				id:  aws.StringValue(fs.FileSystemId),
 				arn: aws.StringValue(fs.FileSystemArn),
 			}
-			if set.Mark(f, fs.CreationTime) {
-				logger.Warningf("%s: deleting %T: %s", f.ARN(), fs, *fs.Name)
-				if !opts.DryRun {
-					fileSystemsToDelete = append(fileSystemsToDelete, f)
-				}
+			tags := make(Tags, len(fs.Tags))
+			for _, t := range fs.Tags {
+				tags.Add(t.Key, t.Value)
+			}
+			if !set.Mark(opts, f, fs.CreationTime, tags) {
+				continue
+			}
+
+			logger.Warningf("%s: deleting %T: %s (%s)", f.ARN(), fs, aws.StringValue(fs.FileSystemId), aws.StringValue(fs.Name))
+			if !opts.DryRun {
+				fileSystemsToDelete = append(fileSystemsToDelete, f)
 			}
 		}
 		return true

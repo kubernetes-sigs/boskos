@@ -30,16 +30,28 @@ import (
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 	"sigs.k8s.io/boskos/aws-janitor/resources"
 	s3path "sigs.k8s.io/boskos/aws-janitor/s3"
+	"sigs.k8s.io/boskos/common"
 )
 
 var (
-	maxTTL   = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
-	region   = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
-	path     = flag.String("path", "", "S3 path for mark data (required when -all=false)")
-	cleanAll = flag.Bool("all", false, "Clean all resources (ignores -path)")
-	logLevel = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
-	dryRun   = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
+	maxTTL    = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
+	region    = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
+	path      = flag.String("path", "", "S3 path for mark data (required when -all=false)")
+	cleanAll  = flag.Bool("all", false, "Clean all resources (ignores -path)")
+	logLevel  = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	dryRun    = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
+	ttlTagKey = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
+
+	excludeTags common.CommaSeparatedStrings
+	includeTags common.CommaSeparatedStrings
 )
+
+func init() {
+	flag.Var(&excludeTags, "exclude-tags",
+		"Resources with any of these tags will not be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
+	flag.Var(&includeTags, "include-tags",
+		"Resources must include all of these tags in order to be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
+}
 
 func main() {
 	logrusutil.ComponentInit()
@@ -56,44 +68,56 @@ func main() {
 	// limiting and fighting against the very resources we're trying
 	// to delete.
 	sess := session.Must(session.NewSessionWithOptions(session.Options{Config: aws.Config{MaxRetries: aws.Int(100)}}))
+	acct, err := account.GetAccount(sess, regions.Default)
+	if err != nil {
+		logrus.Fatalf("Failed retrieving account: %v", err)
+	}
+	logrus.Debugf("account: %s", acct)
+
+	excludeTM, err := resources.TagMatcherForTags(excludeTags)
+	if err != nil {
+		logrus.Fatalf("Error parsing --exclude-tags: %v", err)
+	}
+	includeTM, err := resources.TagMatcherForTags(includeTags)
+	if err != nil {
+		logrus.Fatalf("Error parsing --include-tags: %v", err)
+	}
+
+	opts := resources.Options{
+		Session:     sess,
+		Account:     acct,
+		DryRun:      *dryRun,
+		ExcludeTags: excludeTM,
+		IncludeTags: includeTM,
+		TTLTagKey:   *ttlTagKey,
+	}
 
 	if *cleanAll {
-		if err := resources.CleanAll(sess, *region, *dryRun); err != nil {
+		if err := resources.CleanAll(opts, *region); err != nil {
 			logrus.Fatalf("Error cleaning all resources: %v", err)
 		}
-	} else if err := markAndSweep(sess, *region); err != nil {
+	} else if err := markAndSweep(opts, *region); err != nil {
 		logrus.Fatalf("Error marking and sweeping resources: %v", err)
 	}
 }
 
-func markAndSweep(sess *session.Session, region string) error {
-	s3p, err := s3path.GetPath(sess, *path)
+func markAndSweep(opts resources.Options, region string) error {
+	s3p, err := s3path.GetPath(opts.Session, *path)
 	if err != nil {
 		return errors.Wrapf(err, "-path %q isn't a valid S3 path", *path)
 	}
 
-	acct, err := account.GetAccount(sess, regions.Default)
-	if err != nil {
-		return errors.Wrap(err, "Error getting current user")
-	}
-	logrus.Debugf("account: %s", acct)
-
-	regionList, err := regions.ParseRegion(sess, region)
+	regionList, err := regions.ParseRegion(opts.Session, region)
 	if err != nil {
 		return err
 	}
 	logrus.Infof("Regions: %+v", regionList)
 
-	res, err := resources.LoadSet(sess, s3p, *maxTTL)
+	res, err := resources.LoadSet(opts.Session, s3p, *maxTTL)
 	if err != nil {
 		return errors.Wrapf(err, "Error loading %q", *path)
 	}
 
-	opts := resources.Options{
-		Session: sess,
-		Account: acct,
-		DryRun:  *dryRun,
-	}
 	for _, region := range regionList {
 		opts.Region = region
 		for _, typ := range resources.RegionalTypeList {
@@ -111,7 +135,7 @@ func markAndSweep(sess *session.Session, region string) error {
 	}
 
 	swept := res.MarkComplete()
-	if err := res.Save(sess, s3p); err != nil {
+	if err := res.Save(opts.Session, s3p); err != nil {
 		return errors.Wrapf(err, "Error saving %q", *path)
 	}
 

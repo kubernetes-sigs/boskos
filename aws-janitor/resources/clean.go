@@ -21,24 +21,16 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
-	"sigs.k8s.io/boskos/aws-janitor/account"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 )
 
 // CleanAll cleans all of the resources for all of the regions visible to
 // the provided AWS session.
-func CleanAll(sess *session.Session, region string, dryRun bool) error {
-	acct, err := account.GetAccount(sess, regions.Default)
-	if err != nil {
-		return errors.Wrap(err, "Failed to retrieve account")
-	}
-	logrus.Debugf("Account: %s", acct)
-
-	regionList, err := regions.ParseRegion(sess, region)
+func CleanAll(opts Options, region string) error {
+	regionList, err := regions.ParseRegion(opts.Session, region)
 	if err != nil {
 		return err
 	}
@@ -46,11 +38,6 @@ func CleanAll(sess *session.Session, region string, dryRun bool) error {
 
 	var errs []error
 
-	opts := Options{
-		Session: sess,
-		Account: acct,
-		DryRun:  dryRun,
-	}
 	for _, r := range regionList {
 		opts.Region = r
 		logger := logrus.WithField("options", opts)
