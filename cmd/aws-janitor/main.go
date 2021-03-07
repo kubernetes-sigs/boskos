@@ -52,11 +52,18 @@ var (
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
 
+	sweepCount int
+
 	cleaningTimeHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "aws_janitor_job_duration_time_seconds",
 		ConstLabels: prometheus.Labels{},
 		Buckets:     prometheus.ExponentialBuckets(1, 1.4, 30),
-	}, []string{"type", "status"})
+	}, []string{"type", "status", "region"})
+
+	sweepCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:        "aws_janitor_swept_resources",
+		ConstLabels: prometheus.Labels{},
+	}, []string{"type", "status", "region"})
 )
 
 func init() {
@@ -81,13 +88,12 @@ func main() {
 	exitCode := 2
 	startProcess := time.Now()
 	if *pushGateway != "" {
-		jobName := fmt.Sprintf("aws-janitor-%s", common.GenerateDynamicResourceName())
 		registry := prometheus.NewRegistry()
-		registry.MustRegister(cleaningTimeHistogram)
-		pusher := push.New(*pushGateway, jobName).Gatherer(registry)
+		registry.MustRegister(cleaningTimeHistogram, sweepCounter)
+		pusher := push.New(*pushGateway, "aws-janitor").Gatherer(registry)
 
 		defer func() {
-			pushMetricBeforeExit(pusher, startProcess, *cleanAll, exitCode)
+			pushMetricBeforeExit(pusher, startProcess, exitCode)
 			os.Exit(exitCode)
 		}()
 	} else {
@@ -174,17 +180,17 @@ func markAndSweep(opts resources.Options, region string) error {
 		}
 	}
 
-	swept := res.MarkComplete()
+	sweepCount = res.MarkComplete()
 	if err := res.Save(opts.Session, s3p); err != nil {
 		return errors.Wrapf(err, "Error saving %q", *path)
 	}
 
-	logrus.Infof("swept %d resources", swept)
+	logrus.Infof("swept %d resources", sweepCount)
 
 	return nil
 }
 
-func pushMetricBeforeExit(pusher *push.Pusher, startTime time.Time, jobType bool, exitCode int) {
+func pushMetricBeforeExit(pusher *push.Pusher, startTime time.Time, exitCode int) {
 	// Set the status of the job
 	status := "failed"
 	if exitCode == 0 {
@@ -192,13 +198,21 @@ func pushMetricBeforeExit(pusher *push.Pusher, startTime time.Time, jobType bool
 	}
 
 	// Set the type of the job to report the metric
-	job := "sweep"
-	if jobType {
-		job = "clean"
+	var job string
+	if !*cleanAll {
+		job = "mark_and_sweep"
+
+		sweepCounter.
+			With(prometheus.Labels{"type": job, "status": status, "region": *region}).
+			Add(float64(sweepCount))
+	} else {
+		job = "clean_all"
 	}
 
 	duration := time.Since(startTime).Seconds()
-	cleaningTimeHistogram.WithLabelValues(job, status).Observe(duration)
+	cleaningTimeHistogram.
+		With(prometheus.Labels{"type": job, "status": status, "region": *region}).
+		Observe(duration)
 
 	if err := pusher.Add(); err != nil {
 		logrus.Errorf("Could not push to Pushgateway: %v", err)
