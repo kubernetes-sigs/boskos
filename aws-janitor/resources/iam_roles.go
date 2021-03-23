@@ -25,50 +25,47 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // IAM Roles
 
 type IAMRoles struct{}
 
-func roleTags(svc *iam.IAM, role *iam.Role) (Tags, error) {
-	tags := make(Tags)
-	roleTagsInput := &iam.ListRoleTagsInput{RoleName: role.RoleName}
-	for {
-		tagsResp, err := svc.ListRoleTags(roleTagsInput)
-		if err != nil {
-			return nil, fmt.Errorf("role %s: failed querying for tags: %v", aws.StringValue(role.RoleName), err)
-		}
-		for _, t := range tagsResp.Tags {
-			tags.Add(t.Key, t.Value)
-		}
-		if !aws.BoolValue(tagsResp.IsTruncated) {
-			break
-		}
-		roleTagsInput.SetMarker(aws.StringValue(tagsResp.Marker))
+func fetchRoleAndTags(svc *iam.IAM, roleName *string) (*iam.Role, Tags, error) {
+	getRoleOutput, err := svc.GetRole(&iam.GetRoleInput{RoleName: roleName})
+	if err != nil {
+		return nil, nil, err
 	}
-	return tags, nil
+	if getRoleOutput.Role == nil {
+		return nil, nil, fmt.Errorf("GetRole returned nil Role")
+	}
+	role := getRoleOutput.Role
+	tags := make(Tags, len(role.Tags))
+	for _, t := range role.Tags {
+		tags.Add(t.Key, t.Value)
+	}
+	return role, tags, nil
 }
 
+// Roles defined by AWS documentation that do not live in the /aws-service-role/ path.
+var builtinRoles = sets.NewString(
+	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet-requests.html
+	"aws-ec2-spot-fleet-tagging-role",
+	// https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_accounts_access.html
+	"OrganizationAccountsAccessRole",
+)
+
 // roleIsManaged checks if the role should be managed (and thus deleted) by us.
-// In particular, we want to avoid "system" AWS roles or roles that might support test-infra.
+// In particular, we want to avoid "system" AWS roles.
 // Note that this function does not consider tags.
 func roleIsManaged(role *iam.Role) bool {
-	name := aws.StringValue(role.RoleName)
-	path := aws.StringValue(role.Path)
-
 	// Most AWS system roles are in a directory called `aws-service-role`
-	if strings.HasPrefix(path, "/aws-service-role/") {
+	if strings.HasPrefix(aws.StringValue(role.Path), "/aws-service-role/") {
 		return false
 	}
 
-	// kops roles have names start with `masters.` or `nodes.`
-	if strings.HasPrefix(name, "masters.") || strings.HasPrefix(name, "nodes.") {
-		return true
-	}
-
-	logrus.Infof("Unknown role name=%q, path=%q; assuming not managed", name, path)
-	return false
+	return !builtinRoles.Has(aws.StringValue(role.RoleName))
 }
 
 func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
@@ -82,15 +79,18 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 			if !roleIsManaged(r) {
 				continue
 			}
-			tags, err := roleTags(svc, r)
+			role, tags, err := fetchRoleAndTags(svc, r.RoleName)
 			if err != nil {
-				logger.Warningf("failed fetching role tags: %v", err)
+				logger.Warningf("failed fetching role and tags: %v", err)
 				continue
 			}
-
-			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(r.RoleId), roleName: aws.StringValue(r.RoleName)}
+			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(role.RoleId), roleName: aws.StringValue(role.RoleName)}
 			if set.Mark(opts, l, r.CreateDate, tags) {
-				logger.Warningf("%s: deleting %T: %s", l.ARN(), r, l.roleName)
+				if role.RoleLastUsed != nil && role.RoleLastUsed.LastUsedDate != nil && time.Since(*role.RoleLastUsed.LastUsedDate) < set.ttl {
+					logger.Debugf("%s: used too recently, skipping", l.ARN())
+					continue
+				}
+				logger.Warningf("%s: deleting %T: %s", l.ARN(), role, l.roleName)
 				if !opts.DryRun {
 					toDelete = append(toDelete, l)
 				}
@@ -167,7 +167,7 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 	}
 
 	for _, policyName := range policyNames {
-		logger.Debugf("Deleting IAM role policy %q %q", roleName, policyName)
+		logger.Infof("Deleting IAM role policy %q %q", roleName, policyName)
 
 		deletePolicyReq := &iam.DeleteRolePolicyInput{
 			RoleName:   aws.String(roleName),

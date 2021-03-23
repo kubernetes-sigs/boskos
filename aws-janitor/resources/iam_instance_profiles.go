@@ -43,20 +43,24 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 				managed = false
 			}
 
+			var lastUsed time.Time
 			for _, r := range p.Roles {
 				if !roleIsManaged(r) {
 					managed = false
 					break
 				}
-				tags, err := roleTags(svc, r)
+				role, tags, err := fetchRoleAndTags(svc, r.RoleName)
 				if err != nil {
-					logger.Warningf("failed fetching role tags: %v", err)
+					logger.Warningf("failed fetching role and tags: %v", err)
 					managed = false
 					break
 				}
 				if !opts.ManagedPerTags(tags) {
 					managed = false
 					break
+				}
+				if role.RoleLastUsed != nil && role.RoleLastUsed.LastUsedDate != nil && role.RoleLastUsed.LastUsedDate.After(lastUsed) {
+					lastUsed = *role.RoleLastUsed.LastUsedDate
 				}
 			}
 
@@ -68,7 +72,11 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 			o := &iamInstanceProfile{profile: p}
 			// No tags for instance profiles
 			if set.Mark(opts, o, p.CreateDate, nil) {
-				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, o.ARN())
+				if time.Since(lastUsed) < set.ttl {
+					logger.Debugf("%s: used too recently, skipping", o.ARN())
+					continue
+				}
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), o, aws.StringValue(p.InstanceProfileName))
 				if !opts.DryRun {
 					toDelete = append(toDelete, o)
 				}
