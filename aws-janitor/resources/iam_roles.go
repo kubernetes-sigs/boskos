@@ -53,7 +53,7 @@ var builtinRoles = sets.NewString(
 	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet-requests.html
 	"aws-ec2-spot-fleet-tagging-role",
 	// https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_accounts_access.html
-	"OrganizationAccountsAccessRole",
+	"OrganizationAccountAccessRole",
 )
 
 // roleIsManaged checks if the role should be managed (and thus deleted) by us.
