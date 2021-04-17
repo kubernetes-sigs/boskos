@@ -19,6 +19,7 @@ package resources
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -189,6 +190,9 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 			if !zoneIsManaged(zone) {
 				continue
 			}
+			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
+			zone.Id = aws.String(strings.TrimPrefix(aws.StringValue(zone.Id), "/hostedzone/"))
+
 			inp := &route53.ListResourceRecordSetsInput{HostedZoneId: z.Id}
 			err := svc.ListResourceRecordSetsPages(inp, func(recordSets *route53.ListResourceRecordSetsOutput, _ bool) bool {
 				now := time.Now()
