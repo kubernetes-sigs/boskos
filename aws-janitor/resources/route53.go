@@ -55,6 +55,9 @@ var managedNameRegexes = []*regexp.Regexp{
 
 	// e.g. etcd-events-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
 	regexp.MustCompile(`^etcd-events-[a-z]\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
+
+	// e.g. kops-controller.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
+	regexp.MustCompile(`^kops-controller\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
 }
 
 // resourceRecordSetIsManaged checks if the resource record should be managed (and thus deleted) by us
