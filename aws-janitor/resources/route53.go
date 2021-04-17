@@ -95,6 +95,9 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 				continue
 			}
 			logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, o)
+			}
 		}
 		return true
 	}
