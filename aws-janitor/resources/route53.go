@@ -19,6 +19,7 @@ package resources
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -55,6 +56,9 @@ var managedNameRegexes = []*regexp.Regexp{
 
 	// e.g. etcd-events-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
 	regexp.MustCompile(`^etcd-events-[a-z]\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
+
+	// e.g. kops-controller.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
+	regexp.MustCompile(`^kops-controller\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
 }
 
 // resourceRecordSetIsManaged checks if the resource record should be managed (and thus deleted) by us
@@ -91,6 +95,9 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 				continue
 			}
 			logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+			if !opts.DryRun {
+				toDelete = append(toDelete, o)
+			}
 		}
 		return true
 	}
@@ -186,6 +193,9 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 			if !zoneIsManaged(zone) {
 				continue
 			}
+			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
+			zone.Id = aws.String(strings.TrimPrefix(aws.StringValue(zone.Id), "/hostedzone/"))
+
 			inp := &route53.ListResourceRecordSetsInput{HostedZoneId: z.Id}
 			err := svc.ListResourceRecordSetsPages(inp, func(recordSets *route53.ListResourceRecordSetsOutput, _ bool) bool {
 				now := time.Now()
