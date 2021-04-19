@@ -123,6 +123,9 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 				continue
 			}
 
+			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
+			z.Id = aws.String(strings.TrimPrefix(aws.StringValue(z.Id), "/hostedzone/"))
+
 			zones = append(zones, z)
 			zoneTags[aws.StringValue(z.Id)] = nil
 		}
