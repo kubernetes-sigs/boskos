@@ -37,11 +37,11 @@ func TestManagedNames(t *testing.T) {
 			expected: true,
 		},
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("etcd-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("main.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("etcd-events-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("events.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{

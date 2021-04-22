@@ -51,11 +51,11 @@ var managedNameRegexes = []*regexp.Regexp{
 	// e.g. api.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
 	regexp.MustCompile(`^api\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
 
-	// e.g. etcd-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
-	regexp.MustCompile(`^etcd-[a-z]\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
+	// e.g. main.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
+	regexp.MustCompile(`^main\.etcd\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
 
-	// e.g. etcd-events-b.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
-	regexp.MustCompile(`^etcd-events-[a-z]\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
+	// e.g. events.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
+	regexp.MustCompile(`^events\.etcd\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
 
 	// e.g. kops-controller.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.
 	regexp.MustCompile(`^kops-controller\.internal\.e2e-[0-9a-z]{1,10}-[0-9a-f]{5}\.`),
