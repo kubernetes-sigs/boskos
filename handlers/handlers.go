@@ -415,7 +415,6 @@ func handleMetric(r *ranch.Ranch) http.HandlerFunc {
 }
 
 func returnAndLogError(res http.ResponseWriter, err error, logMsg string) {
-	logMsg = fmt.Sprintf("%s: %v", logMsg, err)
 	log := logrus.WithError(err)
 	httpStatus := errorToStatus(err)
 	if httpStatus > 499 {
@@ -423,5 +422,5 @@ func returnAndLogError(res http.ResponseWriter, err error, logMsg string) {
 	} else {
 		log.Debug(logMsg)
 	}
-	http.Error(res, logMsg, httpStatus)
+	http.Error(res, fmt.Sprintf("%s: %v", logMsg, err), httpStatus)
 }
