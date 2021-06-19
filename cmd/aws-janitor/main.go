@@ -43,7 +43,8 @@ var (
 	maxTTL      = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
 	region      = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
 	path        = flag.String("path", "", "S3 path for mark data (required when -all=false)")
-	cleanAll    = flag.Bool("all", false, "Clean all resources (ignores -path)")
+	cleanAll    = flag.Bool("all", false, "Clean all resources (ignores -path and -ttl)")
+	oneShot     = flag.Bool("oneshot", false, "Run one round of cleaning, honoring TTLs (ignores -path)")
 	logLevel    = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	dryRun      = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
 	ttlTagKey   = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
@@ -138,6 +139,11 @@ func main() {
 		if err := resources.CleanAll(opts, *region); err != nil {
 			logrus.Errorf("Error cleaning all resources: %v", err)
 			runtime.Goexit()
+		}
+	} else if *oneShot {
+		opts.DefaultTTL = *maxTTL
+		if err := resources.CleanAll(opts, *region); err != nil {
+			logrus.Fatalf("Error cleaning resources by TTL: %v", err)
 		}
 	} else if err := markAndSweep(opts, *region); err != nil {
 		logrus.Errorf("Error marking and sweeping resources: %v", err)

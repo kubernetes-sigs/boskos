@@ -66,7 +66,7 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 
 func (Addresses) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &ec2.DescribeAddressesInput{}
 
 	addrs, err := svc.DescribeAddresses(inp)

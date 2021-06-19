@@ -77,7 +77,7 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 
 func (VPCs) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &ec2.DescribeVpcsInput{}
 
 	vpcs, err := svc.DescribeVpcs(inp)

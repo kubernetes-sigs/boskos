@@ -89,7 +89,7 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 
 func (RouteTables) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &ec2.DescribeRouteTablesInput{}
 
 	err := svc.DescribeRouteTablesPages(input, func(tables *ec2.DescribeRouteTablesOutput, _ bool) bool {

@@ -73,7 +73,7 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 
 func (LaunchTemplates) ListAll(opts Options) (*Set, error) {
 	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &ec2.DescribeLaunchTemplatesInput{}
 
 	err := c.DescribeLaunchTemplatesPages(input, func(lts *ec2.DescribeLaunchTemplatesOutput, isLast bool) bool {

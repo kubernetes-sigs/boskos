@@ -17,6 +17,8 @@ limitations under the License.
 package resources
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
@@ -36,6 +38,9 @@ type Options struct {
 	// If set, any resources with a tag matching this key can override the global TTL (unless the global TTL is 0).
 	// The value of the tag must be a valid Go time.Duration string.
 	TTLTagKey string
+
+	// Default TTL for the resource at ListAll phase.
+	DefaultTTL time.Duration
 
 	// Whether to actually delete resources, or just report what would be deleted.
 	DryRun bool

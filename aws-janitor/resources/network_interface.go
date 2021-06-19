@@ -82,7 +82,7 @@ func (NetworkInterfaces) MarkAndSweep(opts Options, set *Set) error {
 
 func (NetworkInterfaces) ListAll(opts Options) (*Set, error) {
 	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &ec2.DescribeNetworkInterfacesInput{}
 
 	err := c.DescribeNetworkInterfacesPages(input, func(enis *ec2.DescribeNetworkInterfacesOutput, isLast bool) bool {
