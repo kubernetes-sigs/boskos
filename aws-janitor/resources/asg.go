@@ -92,7 +92,7 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 
 func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
 	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &autoscaling.DescribeAutoScalingGroupsInput{}
 
 	err := c.DescribeAutoScalingGroupsPages(input, func(asgs *autoscaling.DescribeAutoScalingGroupsOutput, isLast bool) bool {

@@ -103,7 +103,7 @@ func (cfs CloudFormationStacks) MarkAndSweep(opts Options, set *Set) error {
 
 func (CloudFormationStacks) ListAll(opts Options) (*Set, error) {
 	svc := cf.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &cf.ListStacksInput{}
 
 	err := svc.ListStacksPages(inp, func(stacks *cf.ListStacksOutput, _ bool) bool {

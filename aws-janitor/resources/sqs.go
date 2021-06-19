@@ -147,7 +147,7 @@ func deleteEventBridgeRule(rule *string, svcRules *eventbridge.EventBridge, logg
 
 func (SQSQueues) ListAll(opts Options) (*Set, error) {
 	svc := sqs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &sqs.ListQueuesInput{}
 
 	err := svc.ListQueuesPages(input, func(queues *sqs.ListQueuesOutput, _ bool) bool {

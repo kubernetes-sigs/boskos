@@ -97,7 +97,7 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 
 func (DHCPOptions) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &ec2.DescribeDhcpOptionsInput{}
 
 	optsList, err := svc.DescribeDhcpOptions(inp)

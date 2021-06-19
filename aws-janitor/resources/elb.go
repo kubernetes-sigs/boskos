@@ -108,7 +108,7 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 
 func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
 	c := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &elb.DescribeLoadBalancersInput{}
 
 	err := c.DescribeLoadBalancersPages(input, func(lbs *elb.DescribeLoadBalancersOutput, isLast bool) bool {

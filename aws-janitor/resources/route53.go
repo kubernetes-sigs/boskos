@@ -187,7 +187,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 
 func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 
 	var rrsErr error
 	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {

@@ -114,7 +114,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 
 func (IAMRoles) ListAll(opts Options) (*Set, error) {
 	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &iam.ListRolesInput{}
 
 	err := svc.ListRolesPages(inp, func(roles *iam.ListRolesOutput, _ bool) bool {

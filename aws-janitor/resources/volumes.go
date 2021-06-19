@@ -75,7 +75,7 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 
 func (Volumes) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &ec2.DescribeVolumesInput{}
 
 	err := svc.DescribeVolumesPages(inp, func(vols *ec2.DescribeVolumesOutput, _ bool) bool {

@@ -70,7 +70,7 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 
 func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
 	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &autoscaling.DescribeLaunchConfigurationsInput{}
 
 	err := c.DescribeLaunchConfigurationsPages(input, func(lcs *autoscaling.DescribeLaunchConfigurationsOutput, isLast bool) bool {

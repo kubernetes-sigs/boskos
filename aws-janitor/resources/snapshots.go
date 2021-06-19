@@ -80,7 +80,7 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 
 func (Snapshots) ListAll(opts Options) (*Set, error) {
 	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &ec2.DescribeSnapshotsInput{
 		// Exclude publicly-available snapshots from other owners.
 		OwnerIds: aws.StringSlice([]string{"self"}),

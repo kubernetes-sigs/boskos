@@ -59,7 +59,7 @@ func (e EKS) MarkAndSweep(opts Options, set *Set) error {
 
 func (e EKS) ListAll(opts Options) (*Set, error) {
 	svc := eks.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	err := e.describeClusters(opts, set, svc, func(_ *eksCluster) {})
 	return set, err
 }

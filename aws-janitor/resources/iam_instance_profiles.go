@@ -99,7 +99,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 
 func (IAMInstanceProfiles) ListAll(opts Options) (*Set, error) {
 	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	inp := &iam.ListInstanceProfilesInput{}
 
 	err := svc.ListInstanceProfilesPages(inp, func(profiles *iam.ListInstanceProfilesOutput, _ bool) bool {

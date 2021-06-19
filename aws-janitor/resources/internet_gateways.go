@@ -106,7 +106,7 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 func (InternetGateways) ListAll(opts Options) (*Set, error) {
 	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &ec2.DescribeInternetGatewaysInput{}
 
 	gateways, err := svc.DescribeInternetGateways(input)

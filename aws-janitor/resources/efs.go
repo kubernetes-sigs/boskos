@@ -112,7 +112,7 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 
 func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
 	svc := efs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
+	set := NewSet(opts.DefaultTTL)
 	input := &efs.DescribeFileSystemsInput{}
 
 	err := svc.DescribeFileSystemsPages(input, func(page *efs.DescribeFileSystemsOutput, _ bool) bool {
