@@ -256,14 +256,17 @@ def collect(project, age, resource, filt, clear_all):
     if resource.name == 'sinks' and not clear_all:
         return col
 
+    if resource.condition == 'zone' and resource.name not in ['sole-tenancy', 'network-endpoint-groups']:
+        if len(filt) > 0:
+            filt.append(' AND ')
+        filt.append('zone=(%s)' % ','.join(ZONES))
+
     cmd = base_command(resource)
     cmd.extend([
         'list',
         '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
-        '--filter=%s' % filt,
+        '--filter="%s"' % filt,
         '--project=%s' % project])
-    if resource.condition == 'zone' and resource.name != 'sole-tenancy' and resource.name != 'network-endpoint-groups':
-        cmd.append('--zones=%s' % ','.join(ZONES))
     log('%r' % cmd)
 
     # TODO(krzyzacy): work around for alpha API list calls
