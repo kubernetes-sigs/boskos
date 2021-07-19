@@ -32,6 +32,8 @@ COPY . .
 ARG DOCKER_TAG
 ENV DOCKER_TAG=${DOCKER_TAG}
 
+RUN apk add gcc musl-dev
+
 ARG cmd
 RUN make "${cmd}"
 
