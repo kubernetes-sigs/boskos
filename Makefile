@@ -31,6 +31,10 @@ GOLANGCI_LINT_VER := v1.35.2
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER)
 
+CONTROLLER_GEN_VER := v0.6.1
+CONTROLLER_GEN_BIN := controller-gen
+CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
+
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 
 export GO_VERSION=1.15.8
@@ -88,6 +92,16 @@ verify-boilerplate:
 verify-lint: $(GOLANGCI_LINT)
 	./hack/tools/bin/golangci-lint run -v --new-from-rev HEAD~
 
+.PHONY: verify-codegen
+verify-codegen: $(CONTROLLER_GEN)
+	@make codegen
+	@[[ -z $$(git status --porcelain) ]]
+
+.PHONY: codegen
+codegen: $(CONTROLLER_GEN)
+	./hack/tools/bin/controller-gen object paths=./crds
+
+
 .PHONY: verify-modules
 verify-modules:
 	./hack/verify/verify_modules.sh
@@ -101,3 +115,6 @@ $(GOTESTSUM):
 
 $(GOLANGCI_LINT):
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/golangci/golangci-lint/cmd/golangci-lint $(GOLANGCI_LINT_BIN) $(GOLANGCI_LINT_VER)
+
+$(CONTROLLER_GEN):
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
