@@ -53,10 +53,10 @@ func init() {
 }
 
 // json does not serialized time with nanosecond precision
-func now() time.Time {
+func now() metav1.Time {
 	format := "2006-01-02 15:04:05.000"
 	now, _ := time.Parse(format, format)
-	return now
+	return metav1.Time{Time: now}
 }
 
 var (
@@ -70,7 +70,7 @@ func MakeTestRanch(resources []runtime.Object) *ranch.Ranch {
 		obj.(metav1.Object).SetNamespace(ns)
 	}
 	client := &onceConflictingClient{Client: fakectrlruntimeclient.NewFakeClient(resources...)}
-	s := ranch.NewTestingStorage(client, ns, func() time.Time { return fakeNow })
+	s := ranch.NewTestingStorage(client, ns, func() metav1.Time { return fakeNow })
 	r, _ := ranch.NewRanch("", s, testTTL)
 	return r
 }
@@ -445,7 +445,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "s",
-					LastUpdate: time.Now().Add(-time.Minute * 20),
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -463,7 +463,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "s",
-					LastUpdate: time.Now(),
+					LastUpdate: metav1.Now(),
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -481,7 +481,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "s",
-					LastUpdate: time.Now().Add(-time.Minute * 20),
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -499,7 +499,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "wrong",
-					LastUpdate: time.Now().Add(-time.Minute * 20),
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -518,7 +518,7 @@ func TestReset(t *testing.T) {
 				Status: crds.ResourceStatus{
 					State:      "s",
 					Owner:      "user",
-					LastUpdate: time.Now().Add(-time.Minute * 20),
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:       "?type=t&state=s&expire=10m&dest=d",
@@ -569,7 +569,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	FakeNow := time.Now()
+	FakeNow := metav1.Now()
 
 	var testcases = []struct {
 		name      string

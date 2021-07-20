@@ -25,9 +25,9 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -80,7 +80,7 @@ func TestAcquireUpdate(t *testing.T) {
 	}{
 		{
 			name:     "noInfo",
-			resource: newResource("test", "type", common.Dirty, "", time.Time{}),
+			resource: newResource("test", "type", common.Dirty, "", metav1.Time{}),
 		},
 		{
 			name: "existingInfo",
@@ -93,7 +93,7 @@ func TestAcquireUpdate(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:    common.Dirty,
-					UserData: common.UserDataFromMap(common.UserDataMap{"test": "old"}),
+					UserData: map[string]string{"test": "old"},
 				},
 			},
 		},
@@ -127,8 +127,8 @@ func TestAcquireUpdate(t *testing.T) {
 			if err != nil {
 				t.Error("unable to list resources")
 			}
-			if !reflect.DeepEqual(updatedResource.Status.UserData.ToMap(), userData.ToMap()) {
-				t.Errorf("info should match. Expected \n%v, received \n%v", userData.ToMap(), updatedResource.Status.UserData.ToMap())
+			if diff := cmp.Diff(updatedResource.Status.UserData, map[string]string(userData.ToMap())); diff != "" {
+				t.Errorf("info should match but differs: %s", diff)
 			}
 		})
 	}
@@ -148,7 +148,7 @@ func TestAcquireByState(t *testing.T) {
 			name:  "noNames",
 			state: "state1",
 			resources: []runtime.Object{
-				newResource("test", "type", common.Dirty, "", time.Time{}),
+				newResource("test", "type", common.Dirty, "", metav1.Time{}),
 			},
 			err: fmt.Errorf("status 400 Bad Request, status code 400"),
 		},
@@ -157,7 +157,7 @@ func TestAcquireByState(t *testing.T) {
 			names: []string{"test"},
 			state: "state1",
 			resources: []runtime.Object{
-				newResource("test", "type", common.Dirty, "", time.Time{}),
+				newResource("test", "type", common.Dirty, "", metav1.Time{}),
 			},
 			err: fmt.Errorf("resources not found"),
 		},
@@ -166,14 +166,14 @@ func TestAcquireByState(t *testing.T) {
 			names: []string{"test2", "test3"},
 			state: "state1",
 			resources: []runtime.Object{
-				newResource("test1", "type1", common.Dirty, "", time.Time{}),
-				newResource("test2", "type2", "state1", "", time.Time{}),
-				newResource("test3", "type3", "state1", "", time.Time{}),
-				newResource("test4", "type4", common.Dirty, "", time.Time{}),
+				newResource("test1", "type1", common.Dirty, "", metav1.Time{}),
+				newResource("test2", "type2", "state1", "", metav1.Time{}),
+				newResource("test3", "type3", "state1", "", metav1.Time{}),
+				newResource("test4", "type4", common.Dirty, "", metav1.Time{}),
 			},
 			expected: []common.Resource{
-				common.NewResource("test2", "type2", newState, owner, fakeNow),
-				common.NewResource("test3", "type3", newState, owner, fakeNow),
+				common.NewResource("test2", "type2", newState, owner, fakeNow.Time),
+				common.NewResource("test3", "type3", newState, owner, fakeNow.Time),
 			},
 		},
 		{
@@ -181,15 +181,16 @@ func TestAcquireByState(t *testing.T) {
 			names: []string{"test2", "test3"},
 			state: "state1",
 			resources: []runtime.Object{
-				newResource("test1", "type1", common.Dirty, "", time.Time{}),
-				newResource("test2", "type2", "state1", "foo", time.Time{}),
-				newResource("test3", "type3", "state1", "foo", time.Time{}),
-				newResource("test4", "type4", common.Dirty, "", time.Time{}),
+				newResource("test1", "type1", common.Dirty, "", metav1.Time{}),
+				newResource("test2", "type2", "state1", "foo", metav1.Time{}),
+				newResource("test3", "type3", "state1", "foo", metav1.Time{}),
+				newResource("test4", "type4", common.Dirty, "", metav1.Time{}),
 			},
 			err: fmt.Errorf("resources not found"),
 		},
 	}
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r := MakeTestRanch(tc.resources)
 			boskos := makeTestBoskos(t, r)
@@ -210,8 +211,8 @@ func TestAcquireByState(t *testing.T) {
 					tc.expected[idx].UserData = &common.UserData{}
 				}
 			}
-			if diff := deep.Equal(receivedRes, tc.expected); diff != nil {
-				t.Errorf("receivedRes differ from expected, diff: %v", diff)
+			if diff := cmp.Diff(receivedRes, tc.expected, cmp.Exporter(func(_ reflect.Type) bool { return true })); diff != "" {
+				t.Errorf("receivedRes differ from expected, diff: %s", diff)
 			}
 		})
 	}
@@ -220,9 +221,9 @@ func TestAcquireByState(t *testing.T) {
 func TestClientServerUpdate(t *testing.T) {
 	owner := "owner"
 
-	newResourceWithUD := func(name, rtype, state, owner string, t time.Time, ud common.UserDataMap) *crds.ResourceObject {
+	newResourceWithUD := func(name, rtype, state, owner string, t metav1.Time, ud common.UserDataMap) *crds.ResourceObject {
 		res := newResource(name, rtype, state, owner, t)
-		res.Status.UserData = common.UserDataFromMap(ud)
+		res.Status.UserData = ud
 		return res
 	}
 
@@ -241,12 +242,12 @@ func TestClientServerUpdate(t *testing.T) {
 	}{
 		{
 			name:     "noUserData",
-			resource: newResource(resourceName, rType, initialState, "", time.Time{}),
+			resource: newResource(resourceName, rType, initialState, "", metav1.Time{}),
 			expected: newResource(resourceName, rType, finalState, owner, fakeNow),
 		},
 		{
 			name:     "userData",
-			resource: newResource(resourceName, rType, initialState, "", time.Time{}),
+			resource: newResource(resourceName, rType, initialState, "", metav1.Time{}),
 			expected: newResourceWithUD(resourceName, rType, finalState, owner, fakeNow, common.UserDataMap{"custom": "custom"}),
 			ud:       common.UserDataMap{"custom": "custom"},
 		},
@@ -288,8 +289,8 @@ func TestClientServerUpdate(t *testing.T) {
 				t.Fatalf("tc: %s - errors don't match, expected %v, received\n %v", tc.name, tc.err, err)
 			}
 			receivedRes, _ := r.Storage.GetResource(tc.resource.Name)
-			if !reflect.DeepEqual(receivedRes.Status.UserData.ToMap(), tc.expected.Status.UserData.ToMap()) {
-				t.Errorf("tc: %s - resources user data should match. Expected \n%v, received \n%v", tc.name, tc.expected.Status.UserData.ToMap(), receivedRes.Status.UserData.ToMap())
+			if diff := cmp.Diff(receivedRes.Status.UserData, tc.expected.Status.UserData); diff != "" {
+				t.Errorf("userdata differs from expected: %s", diff)
 			}
 			tc.expected.Namespace = "test"
 			if diff := diffResourceObjects(receivedRes, tc.expected); diff != nil {
@@ -307,7 +308,7 @@ func diffResourceObjects(a, b *crds.ResourceObject) []string {
 	return deep.Equal(a, b)
 }
 
-func newResource(name, rtype, state, owner string, t time.Time) *crds.ResourceObject {
+func newResource(name, rtype, state, owner string, t metav1.Time) *crds.ResourceObject {
 	if state == "" {
 		state = common.Free
 	}
@@ -323,7 +324,7 @@ func newResource(name, rtype, state, owner string, t time.Time) *crds.ResourceOb
 			State:      state,
 			Owner:      owner,
 			LastUpdate: t,
-			UserData:   &common.UserData{},
+			UserData:   map[string]string{},
 		},
 	}
 }

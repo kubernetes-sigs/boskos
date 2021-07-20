@@ -24,6 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,7 +39,7 @@ type Ranch struct {
 	Storage    *Storage
 	requestMgr *RequestManager
 	//
-	now func() time.Time
+	now func() metav1.Time
 }
 
 // Public errors:
@@ -89,7 +90,7 @@ func NewRanch(config string, s *Storage, ttl time.Duration) (*Ranch, error) {
 	newRanch := &Ranch{
 		Storage:    s,
 		requestMgr: NewRequestManager(ttl),
-		now:        time.Now,
+		now:        metav1.Now,
 	}
 	return newRanch, nil
 }
@@ -108,7 +109,7 @@ type acquireRequestPriorityKey struct {
 //     requestID - request ID to get a priority in the queue
 // Out: A valid Resource object and the time when the resource was originally requested on success, or
 //      ResourceNotFound error if target type resource does not exist in target state.
-func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.ResourceObject, time.Time, error) {
+func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.ResourceObject, metav1.Time, error) {
 	logger := logrus.WithFields(logrus.Fields{
 		"type":       rType,
 		"state":      state,
@@ -299,7 +300,7 @@ func (r *Ranch) Release(name, dest, owner string) error {
 			// all resources and find the right one which is more costly.
 			if lf.Spec.LifeSpan != nil {
 				expirationTime := r.now().Add(*lf.Spec.LifeSpan)
-				res.Status.ExpirationDate = &expirationTime
+				res.Status.ExpirationDate = &metav1.Time{Time: expirationTime}
 			}
 		} else {
 			res.Status.ExpirationDate = nil
@@ -340,9 +341,9 @@ func (r *Ranch) Update(name, owner, state string, ud *common.UserData) error {
 			return &StateNotMatch{res.Status.State, state}
 		}
 		if res.Status.UserData == nil {
-			res.Status.UserData = &common.UserData{}
+			res.Status.UserData = map[string]string{}
 		}
-		res.Status.UserData.Update(ud)
+		res.Status.UserData = common.UserDataFromMap(res.Status.UserData).Update(ud).ToMap()
 		if _, err := r.Storage.UpdateResource(res); err != nil {
 			return err
 		}
@@ -372,7 +373,7 @@ func (r *Ranch) Reset(rtype, state string, expire time.Duration, dest string) (m
 
 		for idx := range resources.Items {
 			res := resources.Items[idx]
-			if rtype != res.Spec.Type || state != res.Status.State || res.Status.Owner == "" || r.now().Sub(res.Status.LastUpdate) < expire {
+			if rtype != res.Spec.Type || state != res.Status.State || res.Status.Owner == "" || r.now().Sub(res.Status.LastUpdate.Time) < expire {
 				continue
 			}
 
@@ -468,7 +469,7 @@ func (r *Ranch) AllMetrics() ([]common.Metric, error) {
 
 // newResourceFromNewDynamicResourceLifeCycle creates a resource from DynamicResourceLifeCycle given a name and a time.
 // Using this method helps make sure all the resources are created the same way.
-func newResourceFromNewDynamicResourceLifeCycle(name string, dlrc *crds.DRLCObject, now time.Time) *crds.ResourceObject {
+func newResourceFromNewDynamicResourceLifeCycle(name string, dlrc *crds.DRLCObject, now metav1.Time) *crds.ResourceObject {
 	return crds.NewResource(name, dlrc.Name, dlrc.Spec.InitialState, "", now)
 }
 

@@ -170,6 +170,8 @@ func (o *KubernetesClientOptions) Cfg() (*rest.Config, error) {
 	return cfg, nil
 }
 
+// +k8s:deepcopy-gen=false
+
 // Type defines a Custom Resource Definition (CRD) Type.
 type Type struct {
 	Kind, ListKind   string
