@@ -105,7 +105,7 @@ func FromResource(r common.Resource) *ResourceObject {
 		Status: ResourceStatus{
 			Owner:          r.Owner,
 			State:          r.State,
-			LastUpdate:     v1.Time{r.LastUpdate.UTC()},
+			LastUpdate:     v1.Time{Time: r.LastUpdate.UTC()},
 			UserData:       map[string]string(r.UserData.ToMap()),
 			ExpirationDate: timeToMetaTime(r.ExpirationDate),
 		},

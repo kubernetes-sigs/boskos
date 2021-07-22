@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+SHELL := /bin/bash
+
 WHAT ?= ./...
 DOCKER_REPO ?= gcr.io/k8s-staging-boskos
 DOCKER_TAG ?= v$(shell date -u '+%Y%m%d')-$(shell git describe --tags --always --dirty)
@@ -90,7 +93,7 @@ verify-boilerplate:
 .PHONY: verify-lint
 # TODO(ixdy): fix legacy errors and remove --new-from-rev
 verify-lint: $(GOLANGCI_LINT)
-	./hack/tools/bin/golangci-lint run -v --new-from-rev HEAD~
+	./hack/tools/bin/golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 -v --new-from-rev HEAD~
 
 .PHONY: verify-codegen
 verify-codegen: $(CONTROLLER_GEN)

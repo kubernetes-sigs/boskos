@@ -498,7 +498,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "wrong",
-					LastUpdate: metav1.Time{time.Now().Add(-time.Minute * 20)},
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -517,7 +517,7 @@ func TestReset(t *testing.T) {
 				Status: crds.ResourceStatus{
 					State:      "s",
 					Owner:      "user",
-					LastUpdate: metav1.Time{time.Now().Add(-time.Minute * 20)},
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:       "?type=t&state=s&expire=10m&dest=d",

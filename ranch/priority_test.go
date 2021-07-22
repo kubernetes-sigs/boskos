@@ -91,7 +91,7 @@ func TestRequestManager(t *testing.T) {
 	expectedRankEmpty := 2
 	expectedRankAfterDelete := 1
 	now := metav1.Now()
-	expiredFuture := metav1.Time{now.Add(2 * testTTL)}
+	expiredFuture := metav1.Time{Time: now.Add(2 * testTTL)}
 	mgr := NewRequestManager(testTTL)
 	mgr.now = func() metav1.Time { return now }
 

@@ -67,7 +67,7 @@ func (g *nameGenerator) name() string {
 func fakeTime(t time.Time) metav1.Time {
 	format := "2006-01-02 15:04:05.000"
 	now, _ := time.Parse(format, t.Format(format))
-	return metav1.Time{now}
+	return metav1.Time{Time: now}
 }
 
 const testNS = "test"
@@ -238,7 +238,7 @@ func TestAcquire(t *testing.T) {
 
 func TestAcquirePriority(t *testing.T) {
 	now := metav1.Now()
-	expiredFuture := metav1.Time{now.Add(2 * testTTL)}
+	expiredFuture := metav1.Time{Time: now.Add(2 * testTTL)}
 	owner := "tester"
 	res := crds.NewResource("res", "type", common.Free, "", now)
 	r := makeTestRanch(nil)
@@ -511,7 +511,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - has no owner",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
+				newResource("res", "t", "s", "", metav1.Time{Time: startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -531,7 +531,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - no match type",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "wrong", "s", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
+				newResource("res", "wrong", "s", "", metav1.Time{Time: startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -541,7 +541,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - no match state",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "wrong", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
+				newResource("res", "t", "wrong", "", metav1.Time{Time: startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -551,7 +551,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "ok",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "user", metav1.Time{startTime.Add(-time.Minute * 20)}),
+				newResource("res", "t", "s", "user", metav1.Time{Time: startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:      "t",
 			state:      "s",
@@ -1557,7 +1557,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", common.Free, "", startTime),
-					metav1.Time{fakeNow.Add(time.Hour)}),
+					metav1.Time{Time: fakeNow.Add(time.Hour)}),
 				setExpiration(
 					newResource("dt_2", "dt", common.Free, "", startTime),
 					startTime),
@@ -1579,7 +1579,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 				// Unchanged because expiration is in the future
 				*setExpiration(
 					newResource("dt_1", "dt", common.Free, "", startTime),
-					metav1.Time{fakeNow.Add(time.Hour)}),
+					metav1.Time{Time: fakeNow.Add(time.Hour)}),
 				// Newly deleted
 				*setExpiration(
 					newResource("dt_2", "dt", common.ToBeDeleted, "", fakeNow),

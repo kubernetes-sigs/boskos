@@ -300,7 +300,7 @@ func (r *Ranch) Release(name, dest, owner string) error {
 			// all resources and find the right one which is more costly.
 			if lf.Spec.LifeSpan != nil {
 				expirationTime := r.now().Add(*lf.Spec.LifeSpan)
-				res.Status.ExpirationDate = &metav1.Time{expirationTime}
+				res.Status.ExpirationDate = &metav1.Time{Time: expirationTime}
 			}
 		} else {
 			res.Status.ExpirationDate = nil
