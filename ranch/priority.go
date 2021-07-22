@@ -23,14 +23,15 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // request stores request information with expiration
 type request struct {
 	id         string
-	expiration time.Time
+	expiration metav1.Time
 	// Used to calculate since when this resource has been acquired
-	createdAt time.Time
+	createdAt metav1.Time
 }
 
 type requestNode struct {
@@ -94,7 +95,7 @@ func newRequestQueue() *requestQueue {
 
 // update updates expiration time is updated if already present,
 // add a new requestID at the end otherwise (FIFO)
-func (rq *requestQueue) update(requestID string, newExpiration, now time.Time) bool {
+func (rq *requestQueue) update(requestID string, newExpiration, now metav1.Time) bool {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
 	req, exists := rq.requestMap[requestID]
@@ -119,7 +120,7 @@ func (rq *requestQueue) delete(requestID string) {
 }
 
 // cleanup checks for all expired  or marked for deletion items and delete them.
-func (rq *requestQueue) cleanup(now time.Time) {
+func (rq *requestQueue) cleanup(now metav1.Time) {
 	rq.lock.Lock()
 	defer rq.lock.Unlock()
 	newRequestList := &requestLinkedList{}
@@ -127,7 +128,7 @@ func (rq *requestQueue) cleanup(now time.Time) {
 	rq.requestList.Range(func(requestID string) bool {
 		req := rq.requestMap[requestID]
 		// Checking expiration
-		if now.After(req.expiration) {
+		if now.After(req.expiration.Time) {
 			logrus.Infof("request id %s expired", req.id)
 			return true
 		}
@@ -142,18 +143,18 @@ func (rq *requestQueue) cleanup(now time.Time) {
 
 // getRank provides the rank of a given requestID following the order it was added (FIFO).
 // If requestID is an empty string, getRank assumes it is added last (lowest rank + 1).
-func (rq *requestQueue) getRank(requestID string, ttl time.Duration, now time.Time) (int, bool) {
+func (rq *requestQueue) getRank(requestID string, ttl time.Duration, now metav1.Time) (int, bool) {
 	// not considering empty requestID as new
 	var new bool
 	if requestID != "" {
-		new = rq.update(requestID, now.Add(ttl), now)
+		new = rq.update(requestID, metav1.Time{Time: now.Add(ttl)}, now)
 	}
 	rank := 1
 	rq.lock.RLock()
 	defer rq.lock.RUnlock()
 	rq.requestList.Range(func(existingID string) bool {
 		req := rq.requestMap[existingID]
-		if now.After(req.expiration) {
+		if now.After(req.expiration.Time) {
 			logrus.Infof("request id %s expired", req.id)
 			return true
 		}
@@ -180,7 +181,7 @@ type RequestManager struct {
 	stopGC   context.CancelFunc
 	wg       sync.WaitGroup
 	// For testing only
-	now func() time.Time
+	now func() metav1.Time
 }
 
 // NewRequestManager creates a new RequestManager
@@ -188,11 +189,11 @@ func NewRequestManager(ttl time.Duration) *RequestManager {
 	return &RequestManager{
 		requests: map[interface{}]*requestQueue{},
 		ttl:      ttl,
-		now:      time.Now,
+		now:      metav1.Now,
 	}
 }
 
-func (rp *RequestManager) cleanup(now time.Time) {
+func (rp *RequestManager) cleanup(now metav1.Time) {
 	rp.lock.Lock()
 	defer rp.lock.Unlock()
 	for key, rq := range rp.requests {
@@ -247,10 +248,10 @@ func (rp *RequestManager) GetRank(key interface{}, id string) (int, bool) {
 }
 
 // GetCreatedAt returns when the request was created
-func (rp *RequestManager) GetCreatedAt(key interface{}, id string) (time.Time, error) {
+func (rp *RequestManager) GetCreatedAt(key interface{}, id string) (metav1.Time, error) {
 	rp.lock.Lock()
 	defer rp.lock.Unlock()
-	var createdTime time.Time
+	var createdTime metav1.Time
 	rq := rp.requests[key]
 	if rq == nil {
 		//This should never happen

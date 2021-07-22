@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -28,7 +30,7 @@ const (
 )
 
 func TestRequestQueue(t *testing.T) {
-	now := time.Now()
+	now := metav1.Now()
 	rq := newRequestQueue()
 	count := 10
 	for i := 0; i < count; i++ {
@@ -88,10 +90,10 @@ func TestRequestManager(t *testing.T) {
 	expectedRank := 1
 	expectedRankEmpty := 2
 	expectedRankAfterDelete := 1
-	now := time.Now()
-	expiredFuture := now.Add(2 * testTTL)
+	now := metav1.Now()
+	expiredFuture := metav1.Time{Time: now.Add(2 * testTTL)}
 	mgr := NewRequestManager(testTTL)
-	mgr.now = func() time.Time { return now }
+	mgr.now = func() metav1.Time { return now }
 
 	// Getting Rank
 	rank, _ := mgr.GetRank(key, id)

@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+SHELL := /bin/bash
+
 WHAT ?= ./...
 DOCKER_REPO ?= gcr.io/k8s-staging-boskos
 DOCKER_TAG ?= v$(shell date -u '+%Y%m%d')-$(shell git describe --tags --always --dirty)
@@ -30,6 +33,10 @@ GOTESTSUM := $(TOOLS_BIN_DIR)/$(GOTESTSUM_BIN)-$(GOTESTSUM_VER)
 GOLANGCI_LINT_VER := v1.35.2
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER)
+
+CONTROLLER_GEN_VER := v0.6.1
+CONTROLLER_GEN_BIN := controller-gen
+CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
 
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 
@@ -86,14 +93,24 @@ verify-boilerplate:
 .PHONY: verify-lint
 # TODO(ixdy): fix legacy errors and remove --new-from-rev
 verify-lint: $(GOLANGCI_LINT)
-	./hack/tools/bin/golangci-lint run -v --new-from-rev HEAD~
+	./hack/tools/bin/golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 -v --new-from-rev HEAD~
+
+.PHONY: verify-codegen
+verify-codegen: $(CONTROLLER_GEN)
+	@make codegen
+	@[[ -z $$(git status --porcelain) ]]
+
+.PHONY: codegen
+codegen: $(CONTROLLER_GEN)
+	./hack/tools/bin/controller-gen object:headerFile=hack/verify/boilerplate/boilerplate.go.txt,year=2021 paths=./crds
+
 
 .PHONY: verify-modules
 verify-modules:
 	./hack/verify/verify_modules.sh
 
 .PHONY: verify
-verify: verify-boilerplate verify-lint verify-modules
+verify: verify-boilerplate verify-lint verify-modules verify-codegen
 
 # Tools
 $(GOTESTSUM):
@@ -101,3 +118,6 @@ $(GOTESTSUM):
 
 $(GOLANGCI_LINT):
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/golangci/golangci-lint/cmd/golangci-lint $(GOLANGCI_LINT_BIN) $(GOLANGCI_LINT_VER)
+
+$(CONTROLLER_GEN):
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
