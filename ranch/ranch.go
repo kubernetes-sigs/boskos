@@ -343,7 +343,7 @@ func (r *Ranch) Update(name, owner, state string, ud *common.UserData) error {
 		if res.Status.UserData == nil {
 			res.Status.UserData = map[string]string{}
 		}
-		res.Status.UserData = ud.ToMap()
+		res.Status.UserData = common.UserDataFromMap(res.Status.UserData).Update(ud).ToMap()
 		if _, err := r.Storage.UpdateResource(res); err != nil {
 			return err
 		}

@@ -221,14 +221,14 @@ func TestAcquire(t *testing.T) {
 			if res.Status.State != tc.dest {
 				t.Errorf("%s - Wrong final state. Got %v, expected %v", tc.name, res.Status.State, tc.dest)
 			}
-			if !reflect.DeepEqual(*res, resources.Items[0]) {
-				t.Errorf("%s - Wrong resource. Got %v, expected %v", tc.name, res, resources.Items[0])
+			if diff := cmp.Diff(resources.Items[0], *res); diff != "" {
+				t.Errorf("resources differ: %s", diff)
 			} else if !res.Status.LastUpdate.After(startTime.Time) {
 				t.Errorf("%s - LastUpdate did not update.", tc.name)
 			}
 		} else {
 			for _, res := range resources.Items {
-				if res.Status.LastUpdate != startTime {
+				if !res.Status.LastUpdate.Equal(&startTime) {
 					t.Errorf("%s - LastUpdate should not update. Got %v, expected %v", tc.name, resources.Items[0].Status.LastUpdate, startTime)
 				}
 			}
@@ -668,7 +668,7 @@ func TestUpdate(t *testing.T) {
 				}
 			} else {
 				for _, res := range resources.Items {
-					if res.Status.LastUpdate != startTime {
+					if !res.Status.LastUpdate.Equal(&startTime) {
 						t.Errorf("%s - LastUpdate should not update. Got %v, expected %v", tc.name, resources.Items[0].Status.LastUpdate, startTime)
 					}
 				}
@@ -1887,7 +1887,6 @@ func newResource(name, rtype, state, owner string, t metav1.Time) *crds.Resource
 		state = common.Free
 	}
 
-	fmt.Printf("new resource %s: %d\n", name, t.Second())
 	return &crds.ResourceObject{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
