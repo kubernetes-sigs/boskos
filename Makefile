@@ -99,7 +99,7 @@ verify-codegen: $(CONTROLLER_GEN)
 
 .PHONY: codegen
 codegen: $(CONTROLLER_GEN)
-	./hack/tools/bin/controller-gen object paths=./crds
+	./hack/tools/bin/controller-gen object:headerFile=hack/verify/boilerplate/boilerplate.go.txt,year=2021 paths=./crds
 
 
 .PHONY: verify-modules
@@ -107,7 +107,7 @@ verify-modules:
 	./hack/verify/verify_modules.sh
 
 .PHONY: verify
-verify: verify-boilerplate verify-lint verify-modules
+verify: verify-boilerplate verify-lint verify-modules verify-codegen
 
 # Tools
 $(GOTESTSUM):
