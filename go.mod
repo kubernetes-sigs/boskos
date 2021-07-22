@@ -17,6 +17,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-test/deep v1.0.7
 	github.com/google/go-cmp v0.5.4
+	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/pkg/errors v0.9.1

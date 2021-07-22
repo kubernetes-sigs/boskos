@@ -277,6 +277,9 @@ func (ud *UserData) Update(new *UserData) {
 
 // ToMap converts a UserData to UserDataMap
 func (ud *UserData) ToMap() UserDataMap {
+	if ud == nil {
+		return nil
+	}
 	m := UserDataMap{}
 	ud.Range(func(key, value interface{}) bool {
 		m[key.(string)] = value.(string)

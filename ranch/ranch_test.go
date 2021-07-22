@@ -47,8 +47,8 @@ func init() {
 }
 
 var (
-	startTime = fakeTime(time.Now())
-	fakeNow   = fakeTime(startTime.Add(time.Second))
+	startTime = fakeTime(time.Now().Truncate(time.Second))
+	fakeNow   = fakeTime(startTime.Add(time.Second).Truncate(time.Second))
 )
 
 type nameGenerator struct {
@@ -64,10 +64,10 @@ func (g *nameGenerator) name() string {
 }
 
 // json does not serialized time with nanosecond precision
-func fakeTime(t time.Time) time.Time {
+func fakeTime(t time.Time) metav1.Time {
 	format := "2006-01-02 15:04:05.000"
 	now, _ := time.Parse(format, t.Format(format))
-	return now
+	return metav1.Time{now}
 }
 
 const testNS = "test"
@@ -78,13 +78,13 @@ func makeTestRanch(objects []ctrlruntimeclient.Object) *Ranch {
 	}
 	client := &onceConflictingClient{Client: fakectrlruntimeclient.NewFakeClient(objects...)}
 	s := NewStorage(context.Background(), client, testNS)
-	s.now = func() time.Time {
+	s.now = func() metav1.Time {
 		return fakeNow
 	}
 	nameGen := &nameGenerator{}
 	s.generateName = nameGen.name
 	r, _ := NewRanch("", s, testTTL)
-	r.now = func() time.Time {
+	r.now = func() metav1.Time {
 		return fakeNow
 	}
 	return r
@@ -199,8 +199,8 @@ func TestAcquire(t *testing.T) {
 
 	for _, tc := range testcases {
 		c := makeTestRanch(tc.resources)
-		now := time.Now()
-		c.now = func() time.Time {
+		now := metav1.Now()
+		c.now = func() metav1.Time {
 			return now
 		}
 		res, createdTime, err := c.Acquire(tc.rtype, tc.state, tc.dest, tc.owner, "")
@@ -214,7 +214,7 @@ func TestAcquire(t *testing.T) {
 			t.Errorf("failed to get resources")
 			continue
 		}
-		if !now.Equal(createdTime) {
+		if !now.Equal(&createdTime) {
 			t.Errorf("expected createdAt %s, got %s", now, createdTime)
 		}
 		if err == nil {
@@ -223,7 +223,7 @@ func TestAcquire(t *testing.T) {
 			}
 			if !reflect.DeepEqual(*res, resources.Items[0]) {
 				t.Errorf("%s - Wrong resource. Got %v, expected %v", tc.name, res, resources.Items[0])
-			} else if !res.Status.LastUpdate.After(startTime) {
+			} else if !res.Status.LastUpdate.After(startTime.Time) {
 				t.Errorf("%s - LastUpdate did not update.", tc.name)
 			}
 		} else {
@@ -237,12 +237,12 @@ func TestAcquire(t *testing.T) {
 }
 
 func TestAcquirePriority(t *testing.T) {
-	now := time.Now()
-	expiredFuture := now.Add(2 * testTTL)
+	now := metav1.Now()
+	expiredFuture := metav1.Time{now.Add(2 * testTTL)}
 	owner := "tester"
 	res := crds.NewResource("res", "type", common.Free, "", now)
 	r := makeTestRanch(nil)
-	r.requestMgr.now = func() time.Time { return now }
+	r.requestMgr.now = func() metav1.Time { return now }
 
 	// Setting Priority, this request will fail
 	if _, _, err := r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "request_id_1"); err == nil {
@@ -264,7 +264,7 @@ func TestAcquirePriority(t *testing.T) {
 	if err != nil {
 		t.Fatalf("should succeed since the request priority should match its rank in the queue. got %v", err)
 	}
-	if !now.Equal(createdTime) {
+	if !now.Equal(&createdTime) {
 		t.Errorf("expected createdAt %s, got %s", now, createdTime)
 	}
 	r.Release(res.Name, common.Free, "tester")
@@ -277,14 +277,14 @@ func TestAcquirePriority(t *testing.T) {
 		t.Errorf("should fail as request_id_2 has rank 1 now")
 	}
 	r.requestMgr.cleanup(expiredFuture)
-	now2 := time.Now()
-	r.now = func() time.Time { return now2 }
+	now2 := metav1.Now()
+	r.now = func() metav1.Time { return now2 }
 	// Attempting to acquire this resource without priority
 	_, createdTime, err = r.Acquire(res.Spec.Type, res.Status.State, common.Dirty, owner, "")
 	if err != nil {
 		t.Errorf("request_id_2 expired, this should work now, got %v", err)
 	}
-	if !now2.Equal(createdTime) {
+	if !now2.Equal(&createdTime) {
 		t.Errorf("expected createdAt %s, got %s", now, createdTime)
 	}
 }
@@ -317,7 +317,7 @@ func TestAcquireOnDemand(t *testing.T) {
 	requestID1 := "req1234"
 	requestID2 := "req12345"
 	requestID3 := "req123456"
-	now := time.Now()
+	now := metav1.Now()
 	dRLCs := []ctrlruntimeclient.Object{
 		&crds.DRLCObject{
 			ObjectMeta: metav1.ObjectMeta{
@@ -332,7 +332,7 @@ func TestAcquireOnDemand(t *testing.T) {
 	}
 	// Not adding any resources to start with
 	c := makeTestRanch(dRLCs)
-	c.now = func() time.Time { return now }
+	c.now = func() metav1.Time { return now }
 	// First acquire should trigger a creation
 	if _, _, err := c.Acquire(rType, common.Free, common.Busy, owner, requestID1); err == nil {
 		t.Errorf("should fail since there is not resource yet")
@@ -487,10 +487,12 @@ func diffResourceObjects(a, b *crds.ResourceObject) []string {
 	if a != nil {
 		a.TypeMeta = metav1.TypeMeta{}
 		a.ResourceVersion = "0"
+		a.Status.LastUpdate.Time = a.Status.LastUpdate.UTC()
 	}
 	if b != nil {
 		b.TypeMeta = metav1.TypeMeta{}
 		b.ResourceVersion = "0"
+		b.Status.LastUpdate.Time = b.Status.LastUpdate.UTC()
 	}
 	return deep.Equal(a, b)
 }
@@ -509,7 +511,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - has no owner",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "", startTime.Add(-time.Minute*20)),
+				newResource("res", "t", "s", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -529,7 +531,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - no match type",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "wrong", "s", "", startTime.Add(-time.Minute*20)),
+				newResource("res", "wrong", "s", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -539,7 +541,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "empty - no match state",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "wrong", "", startTime.Add(-time.Minute*20)),
+				newResource("res", "t", "wrong", "", metav1.Time{startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:  "t",
 			state:  "s",
@@ -549,7 +551,7 @@ func TestReset(t *testing.T) {
 		{
 			name: "ok",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "user", startTime.Add(-time.Minute*20)),
+				newResource("res", "t", "s", "user", metav1.Time{startTime.Add(-time.Minute * 20)}),
 			},
 			rtype:      "t",
 			state:      "s",
@@ -579,7 +581,7 @@ func TestReset(t *testing.T) {
 				t.Errorf("failed to get resources")
 				continue
 			}
-			if !resources.Items[0].Status.LastUpdate.After(startTime) {
+			if !resources.Items[0].Status.LastUpdate.After(startTime.Time) {
 				t.Errorf("%s - LastUpdate did not update.", tc.name)
 			}
 		}
@@ -661,7 +663,7 @@ func TestUpdate(t *testing.T) {
 					t.Errorf("%s - Wrong owner after release. Got %v, expected %v", tc.name, resources.Items[0].Status.Owner, tc.owner)
 				} else if resources.Items[0].Status.State != tc.state {
 					t.Errorf("%s - Wrong state after release. Got %v, expected %v", tc.name, resources.Items[0].Status.State, tc.state)
-				} else if !resources.Items[0].Status.LastUpdate.After(startTime) {
+				} else if !resources.Items[0].Status.LastUpdate.After(startTime.Time) {
 					t.Errorf("%s - LastUpdate did not update.", tc.name)
 				}
 			} else {
@@ -691,7 +693,7 @@ func TestMetric(t *testing.T) {
 		{
 			name: "no matching resource",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "merlin", time.Now()),
+				newResource("res", "t", "s", "merlin", metav1.Now()),
 			},
 			metricType: "foo",
 			expectErr:  &ResourceNotFound{"foo"},
@@ -699,7 +701,7 @@ func TestMetric(t *testing.T) {
 		{
 			name: "one resource",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "merlin", time.Now()),
+				newResource("res", "t", "s", "merlin", metav1.Now()),
 			},
 			metricType: "t",
 			expectMetric: common.Metric{
@@ -715,11 +717,11 @@ func TestMetric(t *testing.T) {
 		{
 			name: "multiple resources",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res-1", "t", "s", "merlin", time.Now()),
-				newResource("res-2", "t", "p", "pony", time.Now()),
-				newResource("res-3", "t", "s", "pony", time.Now()),
-				newResource("res-4", "foo", "s", "pony", time.Now()),
-				newResource("res-5", "t", "d", "merlin", time.Now()),
+				newResource("res-1", "t", "s", "merlin", metav1.Now()),
+				newResource("res-2", "t", "p", "pony", metav1.Now()),
+				newResource("res-3", "t", "s", "pony", metav1.Now()),
+				newResource("res-4", "foo", "s", "pony", metav1.Now()),
+				newResource("res-5", "t", "d", "merlin", metav1.Now()),
 			},
 			metricType: "t",
 			expectMetric: common.Metric{
@@ -766,7 +768,7 @@ func TestAllMetrics(t *testing.T) {
 		{
 			name: "one resource",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res", "t", "s", "merlin", time.Now()),
+				newResource("res", "t", "s", "merlin", metav1.Now()),
 			},
 			expectMetrics: []common.Metric{
 				{
@@ -783,13 +785,13 @@ func TestAllMetrics(t *testing.T) {
 		{
 			name: "multiple resources",
 			resources: []ctrlruntimeclient.Object{
-				newResource("res-1", "t", "s", "merlin", time.Now()),
-				newResource("res-2", "t", "p", "pony", time.Now()),
-				newResource("res-3", "t", "s", "pony", time.Now()),
-				newResource("res-4", "foo", "s", "pony", time.Now()),
-				newResource("res-5", "t", "d", "merlin", time.Now()),
-				newResource("res-6", "foo", "x", "mars", time.Now()),
-				newResource("res-7", "bar", "d", "merlin", time.Now()),
+				newResource("res-1", "t", "s", "merlin", metav1.Now()),
+				newResource("res-2", "t", "p", "pony", metav1.Now()),
+				newResource("res-3", "t", "s", "pony", metav1.Now()),
+				newResource("res-4", "foo", "s", "pony", metav1.Now()),
+				newResource("res-5", "t", "d", "merlin", metav1.Now()),
+				newResource("res-6", "foo", "x", "mars", metav1.Now()),
+				newResource("res-7", "bar", "d", "merlin", metav1.Now()),
 			},
 			expectMetrics: []common.Metric{
 				{
@@ -841,7 +843,7 @@ func TestAllMetrics(t *testing.T) {
 	}
 }
 
-func setExpiration(res *crds.ResourceObject, exp time.Time) *crds.ResourceObject {
+func setExpiration(res *crds.ResourceObject, exp metav1.Time) *crds.ResourceObject {
 	res.Status.ExpirationDate = &exp
 	return res
 }
@@ -1491,7 +1493,7 @@ func TestSyncResources(t *testing.T) {
 			for idx := range tc.expectedRes.Items {
 				tc.expectedRes.Items[idx].Namespace = testNS
 				if tc.expectedRes.Items[idx].Status.UserData == nil {
-					tc.expectedRes.Items[idx].Status.UserData = &common.UserData{}
+					tc.expectedRes.Items[idx].Status.UserData = map[string]string{}
 				}
 			}
 			if diff := compareResourceObjectsLists(resources, tc.expectedRes); diff != "" {
@@ -1555,7 +1557,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 			currentRes: []ctrlruntimeclient.Object{
 				setExpiration(
 					newResource("dt_1", "dt", common.Free, "", startTime),
-					fakeNow.Add(time.Hour)),
+					metav1.Time{fakeNow.Add(time.Hour)}),
 				setExpiration(
 					newResource("dt_2", "dt", common.Free, "", startTime),
 					startTime),
@@ -1577,7 +1579,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 				// Unchanged because expiration is in the future
 				*setExpiration(
 					newResource("dt_1", "dt", common.Free, "", startTime),
-					fakeNow.Add(time.Hour)),
+					metav1.Time{fakeNow.Add(time.Hour)}),
 				// Newly deleted
 				*setExpiration(
 					newResource("dt_2", "dt", common.ToBeDeleted, "", fakeNow),
@@ -1817,7 +1819,7 @@ func TestUpdateAllDynamicResources(t *testing.T) {
 			for idx := range tc.expectedRes.Items {
 				// needed to prevent test failures due to nil != empty
 				if tc.expectedRes.Items[idx].Status.UserData == nil {
-					tc.expectedRes.Items[idx].Status.UserData = &common.UserData{}
+					tc.expectedRes.Items[idx].Status.UserData = map[string]string{}
 				}
 			}
 
@@ -1845,13 +1847,23 @@ func compareResourceObjectsLists(a, b *crds.ResourceObjectList) string {
 	for idx := range a.Items {
 		a.Items[idx].TypeMeta = metav1.TypeMeta{}
 		a.Items[idx].ResourceVersion = ""
+		if a.Items[idx].Status.UserData == nil {
+			a.Items[idx].Status.UserData = map[string]string{}
+		}
 	}
 	for idx := range b.Items {
 		b.Items[idx].TypeMeta = metav1.TypeMeta{}
 		b.Items[idx].ResourceVersion = ""
+		if b.Items[idx].Status.UserData == nil {
+			b.Items[idx].Status.UserData = map[string]string{}
+		}
 	}
-	return cmp.Diff(a, b, cmp.AllowUnexported(sync.Map{}, sync.Mutex{}, atomic.Value{}))
+	return cmp.Diff(a, b, timeComparer, cmp.AllowUnexported(sync.Map{}, sync.Mutex{}, atomic.Value{}))
 }
+
+var timeComparer = cmp.Comparer(func(a, b time.Time) (r bool) {
+	return a.Equal(b)
+})
 
 func compareDRLCLists(a, b *crds.DRLCObjectList) string {
 	sortDRLCList(a, b)
@@ -1867,14 +1879,15 @@ func compareDRLCLists(a, b *crds.DRLCObjectList) string {
 		b.Items[idx].TypeMeta = metav1.TypeMeta{}
 		b.Items[idx].ResourceVersion = ""
 	}
-	return cmp.Diff(a, b)
+	return cmp.Diff(a, b, timeComparer)
 }
 
-func newResource(name, rtype, state, owner string, t time.Time) *crds.ResourceObject {
+func newResource(name, rtype, state, owner string, t metav1.Time) *crds.ResourceObject {
 	if state == "" {
 		state = common.Free
 	}
 
+	fmt.Printf("new resource %s: %d\n", name, t.Second())
 	return &crds.ResourceObject{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -1886,7 +1899,7 @@ func newResource(name, rtype, state, owner string, t time.Time) *crds.ResourceOb
 			State:      state,
 			Owner:      owner,
 			LastUpdate: t,
-			UserData:   &common.UserData{},
+			UserData:   map[string]string{},
 		},
 	}
 }

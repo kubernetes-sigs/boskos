@@ -46,12 +46,12 @@ type Storage struct {
 	resourcesLock sync.RWMutex
 
 	// For testing
-	now          func() time.Time
+	now          func() metav1.Time
 	generateName func() string
 }
 
 // NewTestingStorage is used only for testing.
-func NewTestingStorage(client ctrlruntimeclient.Client, namespace string, updateTime func() time.Time) *Storage {
+func NewTestingStorage(client ctrlruntimeclient.Client, namespace string, updateTime func() metav1.Time) *Storage {
 	return &Storage{
 		ctx:       context.Background(),
 		client:    client,
@@ -66,7 +66,7 @@ func NewStorage(ctx context.Context, client ctrlruntimeclient.Client, namespace 
 		ctx:          ctx,
 		client:       client,
 		namespace:    namespace,
-		now:          func() time.Time { return time.Now() },
+		now:          metav1.Now,
 		generateName: common.GenerateDynamicResourceName,
 	}
 }
@@ -108,7 +108,7 @@ func (s *Storage) GetResource(name string) (*crds.ResourceObject, error) {
 		return nil, fmt.Errorf("failed to get resource %s: %v", name, err)
 	}
 	if o.Status.UserData == nil {
-		o.Status.UserData = &common.UserData{}
+		o.Status.UserData = map[string]string{}
 	}
 
 	return o, nil
@@ -122,7 +122,7 @@ func (s *Storage) GetResources() (*crds.ResourceObjectList, error) {
 	}
 
 	sort.SliceStable(resourceList.Items, func(i, j int) bool {
-		return resourceList.Items[i].Status.LastUpdate.Before(resourceList.Items[j].Status.LastUpdate)
+		return resourceList.Items[i].Status.LastUpdate.Time.Before(resourceList.Items[j].Status.LastUpdate.Time)
 	})
 
 	return resourceList, nil
@@ -311,7 +311,7 @@ func (s *Storage) updateDynamicResources(lifecycle *crds.DRLCObject, resources [
 			// resources.
 			toBeDeleted++
 		} else {
-			if r.Status.ExpirationDate != nil && s.now().After(*r.Status.ExpirationDate) {
+			if r.Status.ExpirationDate != nil && s.now().After(r.Status.ExpirationDate.Time) {
 				// Expired. Don't decrement the active count until it's tombstoned,
 				// however, as it might be depending on other resources that need
 				// to be released first.

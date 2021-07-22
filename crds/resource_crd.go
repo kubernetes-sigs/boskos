@@ -105,7 +105,7 @@ func FromResource(r common.Resource) *ResourceObject {
 		Status: ResourceStatus{
 			Owner:          r.Owner,
 			State:          r.State,
-			LastUpdate:     v1.Time{r.LastUpdate},
+			LastUpdate:     v1.Time{r.LastUpdate.UTC()},
 			UserData:       map[string]string(r.UserData.ToMap()),
 			ExpirationDate: timeToMetaTime(r.ExpirationDate),
 		},
@@ -120,7 +120,7 @@ func timeToMetaTime(in *time.Time) *v1.Time {
 }
 
 // NewResource creates a new Boskos Resource.
-func NewResource(name, rtype, state, owner string, t time.Time) *ResourceObject {
+func NewResource(name, rtype, state, owner string, t v1.Time) *ResourceObject {
 	// If no state defined, mark as Free
 	if state == "" {
 		state = common.Free
@@ -136,7 +136,7 @@ func NewResource(name, rtype, state, owner string, t time.Time) *ResourceObject 
 		Status: ResourceStatus{
 			State:      state,
 			Owner:      owner,
-			LastUpdate: v1.Time{t},
+			LastUpdate: t,
 			UserData:   map[string]string{},
 		},
 	}
