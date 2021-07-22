@@ -55,7 +55,7 @@ func init() {
 func now() metav1.Time {
 	format := "2006-01-02 15:04:05.000"
 	now, _ := time.Parse(format, format)
-	return metav1.Time{now}
+	return metav1.Time{Time: now}
 }
 
 var (
@@ -444,7 +444,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "s",
-					LastUpdate: metav1.Time{time.Now().Add(-time.Minute * 20)},
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
@@ -480,7 +480,7 @@ func TestReset(t *testing.T) {
 				},
 				Status: crds.ResourceStatus{
 					State:      "s",
-					LastUpdate: metav1.Time{time.Now().Add(-time.Minute * 20)},
+					LastUpdate: metav1.Time{Time: time.Now().Add(-time.Minute * 20)},
 				},
 			}},
 			path:   "?type=t&state=s&expire=10m&dest=d",
