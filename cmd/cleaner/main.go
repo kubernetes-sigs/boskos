@@ -35,7 +35,7 @@ import (
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
-	"k8s.io/test-infra/prow/pjutil"
+	"k8s.io/test-infra/prow/pjutil/pprof"
 	"sigs.k8s.io/boskos/cleaner"
 	cleanerv2 "sigs.k8s.io/boskos/cleaner/v2"
 	"sigs.k8s.io/boskos/client"
@@ -97,7 +97,7 @@ func main() {
 
 	defer interrupts.WaitForGracefulShutdown()
 	prowmetrics.ExposeMetrics("boskos", config.PushGateway{}, instrumentationOptions.MetricsPort)
-	pjutil.ServePProf(instrumentationOptions.PProfPort)
+	pprof.Instrument(instrumentationOptions)
 
 	if useV2Implementation {
 		v2Main(client)
