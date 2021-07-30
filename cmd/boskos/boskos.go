@@ -45,6 +45,7 @@ import (
 	"k8s.io/test-infra/prow/logrusutil"
 	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
+	"k8s.io/test-infra/prow/pjutil/pprof"
 
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/crds"
@@ -104,7 +105,7 @@ func main() {
 	runtime.SetMutexProfileFraction(1)
 
 	defer interrupts.WaitForGracefulShutdown()
-	pjutil.ServePProf(instrumentationOptions.PProfPort)
+	pprof.Instrument(instrumentationOptions)
 	prowmetrics.ExposeMetrics("boskos", config.PushGateway{}, instrumentationOptions.MetricsPort)
 	// signal to the world that we are healthy
 	// this needs to be in a separate port as we don't start the

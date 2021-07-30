@@ -22,7 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"sigs.k8s.io/boskos/common"
@@ -50,7 +50,7 @@ type fakeBoskos struct {
 }
 
 // Create a fake client
-func createFakeBoskos(objects ...ctrlruntimeclient.Object) (*ranch.Storage, boskosClient, chan releasedResource) {
+func createFakeBoskos(objects ...runtime.Object) (*ranch.Storage, boskosClient, chan releasedResource) {
 	for _, obj := range objects {
 		obj.(metav1.Object).SetNamespace(testNS)
 	}
@@ -113,12 +113,12 @@ func testDRLC(rType string) common.DynamicResourceLifeCycle {
 func TestRecycleResources(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
-		resources      []ctrlruntimeclient.Object
+		resources      []runtime.Object
 		expectedStates map[string]string
 	}{
 		{
 			name: "nothingToDo",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				testResource("static_3", "static", common.Free, "", nil),
 			},
 			expectedStates: map[string]string{
@@ -127,7 +127,7 @@ func TestRecycleResources(t *testing.T) {
 		},
 		{
 			name: "noLeasedResources",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				testResource("static_1", "static", "dynamic_1", "", nil),
 				testResource("static_2", "static", "dynamic_1", "", nil),
 				testResource("static_3", "static", common.Free, "", nil),
@@ -151,7 +151,7 @@ func TestRecycleResources(t *testing.T) {
 		},
 		{
 			name: "leasedResources",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				testResource("static_1", "static", "dynamic_1", "", nil),
 				testResource("static_2", "static", "dynamic_1", "", nil),
 				testResource("static_3", "static", "dynamic_2", "", nil),
@@ -175,7 +175,7 @@ func TestRecycleResources(t *testing.T) {
 		},
 		{
 			name: "missingLeasedResource",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				testResource("static_1", "static", "dynamic_1", "", nil),
 				testResource("static_2", "static", common.Free, "", nil),
 				testResource("static_3", "static", common.Free, "", nil),

@@ -93,11 +93,10 @@ func NewClient(owner string, urlString, username, passwordFile string) (*Client,
 			fmt.Printf("[WARNING] should NOT use password without enabling TLS: '%s'\n", urlString)
 		}
 
-		sa := &secret.Agent{}
-		if err := sa.Start([]string{passwordFile}); err != nil {
+		if err := secret.Add(passwordFile); err != nil {
 			logrus.WithError(err).Fatal("Failed to start secrets agent")
 		}
-		getPassword = sa.GetTokenGenerator(passwordFile)
+		getPassword = secret.GetTokenGenerator(passwordFile)
 	}
 
 	return NewClientWithPasswordGetter(owner, urlString, username, getPassword)

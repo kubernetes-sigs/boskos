@@ -91,12 +91,13 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...ctr
 			NewCache: func(_ *rest.Config, _ cache.Options) (cache.Cache, error) {
 				return &informertest.FakeInformers{}, nil
 			},
-			NewClient: func(_ cache.Cache, _ *rest.Config, _ ctrlruntimeclient.Options) (ctrlruntimeclient.Client, error) {
+			NewClient: func(_ cache.Cache, _ *rest.Config, _ ctrlruntimeclient.Options, _ ...ctrlruntimeclient.Object) (ctrlruntimeclient.Client, error) {
 				return fakectrlruntimeclient.NewFakeClient(), nil
 			},
 			EventBroadcaster: record.NewBroadcasterForTests(time.Hour),
 		})
 	}
+	// func(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error)
 
 	cfg, err := o.Cfg()
 	if err != nil {

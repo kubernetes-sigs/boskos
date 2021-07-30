@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-test/deep"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -101,7 +101,7 @@ func TestAcquireUpdate(t *testing.T) {
 	for _, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			r := MakeTestRanch([]ctrlruntimeclient.Object{tc.resource})
+			r := MakeTestRanch([]runtime.Object{tc.resource})
 			boskos := makeTestBoskos(t, r)
 			owner := "owner"
 			client, err := client.NewClient(owner, boskos.URL, "", "")
@@ -139,7 +139,7 @@ func TestAcquireByState(t *testing.T) {
 	owner := "owner"
 	var testcases = []struct {
 		name, state string
-		resources   []ctrlruntimeclient.Object
+		resources   []runtime.Object
 		expected    []common.Resource
 		err         error
 		names       []string
@@ -147,7 +147,7 @@ func TestAcquireByState(t *testing.T) {
 		{
 			name:  "noNames",
 			state: "state1",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				newResource("test", "type", common.Dirty, "", time.Time{}),
 			},
 			err: fmt.Errorf("status 400 Bad Request, status code 400"),
@@ -156,7 +156,7 @@ func TestAcquireByState(t *testing.T) {
 			name:  "noState",
 			names: []string{"test"},
 			state: "state1",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				newResource("test", "type", common.Dirty, "", time.Time{}),
 			},
 			err: fmt.Errorf("resources not found"),
@@ -165,7 +165,7 @@ func TestAcquireByState(t *testing.T) {
 			name:  "existing",
 			names: []string{"test2", "test3"},
 			state: "state1",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				newResource("test1", "type1", common.Dirty, "", time.Time{}),
 				newResource("test2", "type2", "state1", "", time.Time{}),
 				newResource("test3", "type3", "state1", "", time.Time{}),
@@ -180,7 +180,7 @@ func TestAcquireByState(t *testing.T) {
 			name:  "alreadyOwned",
 			names: []string{"test2", "test3"},
 			state: "state1",
-			resources: []ctrlruntimeclient.Object{
+			resources: []runtime.Object{
 				newResource("test1", "type1", common.Dirty, "", time.Time{}),
 				newResource("test2", "type2", "state1", "foo", time.Time{}),
 				newResource("test3", "type3", "state1", "foo", time.Time{}),
@@ -272,7 +272,7 @@ func TestClientServerUpdate(t *testing.T) {
 	for _, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			r := MakeTestRanch([]ctrlruntimeclient.Object{tc.resource})
+			r := MakeTestRanch([]runtime.Object{tc.resource})
 			boskos := makeTestBoskos(t, r)
 			client, err := client.NewClient(owner, boskos.URL, "", "")
 			if err != nil {
