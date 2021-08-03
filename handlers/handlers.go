@@ -161,7 +161,7 @@ func handleAcquire(r *ranch.Ranch) http.HandlerFunc {
 		logrus.Infof("Resource leased: %v", string(resJSON))
 		fmt.Fprint(res, string(resJSON))
 
-		latency := time.Since(createdTime)
+		latency := time.Since(createdTime.Time)
 		labels := prometheus.Labels{"type": rtype, "state": state, "dest": dest, "has_request_id": strconv.FormatBool(requestID != "")}
 		acquireDurationSeconds.With(labels).Observe(latency.Seconds())
 	}

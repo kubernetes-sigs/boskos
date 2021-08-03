@@ -22,8 +22,7 @@ import (
 
 	"sigs.k8s.io/boskos/common"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -37,6 +36,8 @@ var (
 		Collection: &DRLCObjectList{},
 	}
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DRLCObject holds generalized configuration information about how the
 // resource needs to be created.
@@ -57,6 +58,8 @@ type DRLCSpec struct {
 	Needs        common.ResourceNeeds `json:"needs"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DRLCObjectList implements the Collections interface
 type DRLCObjectList struct {
 	v1.TypeMeta `json:",inline"`
@@ -67,30 +70,6 @@ type DRLCObjectList struct {
 // GetName implements the Object interface
 func (in *DRLCObject) GetName() string {
 	return in.Name
-}
-
-func (in *DRLCObject) deepCopyInto(out *DRLCObject) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
-}
-
-func (in *DRLCObject) deepCopy() *DRLCObject {
-	if in == nil {
-		return nil
-	}
-	out := new(DRLCObject)
-	in.deepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements the runtime.Object interface
-func (in *DRLCObject) DeepCopyObject() runtime.Object {
-	if c := in.deepCopy(); c != nil {
-		return c
-	}
-	return nil
 }
 
 func (in *DRLCObject) ToDynamicResourceLifeCycle() common.DynamicResourceLifeCycle {
@@ -120,28 +99,4 @@ func FromDynamicResourceLifecycle(r common.DynamicResourceLifeCycle) *DRLCObject
 			Needs:        r.Needs,
 		},
 	}
-}
-
-func (in *DRLCObjectList) deepCopyInto(out *DRLCObjectList) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ListMeta.DeepCopyInto(&out.ListMeta)
-	out.Items = in.Items
-}
-
-func (in *DRLCObjectList) deepCopy() *DRLCObjectList {
-	if in == nil {
-		return nil
-	}
-	out := new(DRLCObjectList)
-	in.deepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements the runtime.Object interface
-func (in *DRLCObjectList) DeepCopyObject() runtime.Object {
-	if c := in.deepCopy(); c != nil {
-		return c
-	}
-	return nil
 }

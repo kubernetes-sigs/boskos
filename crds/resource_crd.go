@@ -20,10 +20,8 @@ import (
 	"reflect"
 	"time"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/boskos/common"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -38,6 +36,8 @@ var (
 	}
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ResourceObject represents common.ResourceObject. It implements the Object interface.
 type ResourceObject struct {
 	v1.TypeMeta   `json:",inline"`
@@ -45,6 +45,8 @@ type ResourceObject struct {
 	Spec          ResourceSpec   `json:"spec,omitempty"`
 	Status        ResourceStatus `json:"status,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceObjectList is the Collection implementation
 type ResourceObjectList struct {
@@ -60,36 +62,11 @@ type ResourceSpec struct {
 
 // ResourceStatus holds information that are likely to change
 type ResourceStatus struct {
-	State          string           `json:"state,omitempty"`
-	Owner          string           `json:"owner"`
-	LastUpdate     time.Time        `json:"lastUpdate,omitempty"`
-	UserData       *common.UserData `json:"userData,omitempty"`
-	ExpirationDate *time.Time       `json:"expirationDate,omitempty"`
-}
-
-func (in *ResourceObject) deepCopyInto(out *ResourceObject) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
-	out.Status = in.Status
-}
-
-func (in *ResourceObject) deepCopy() *ResourceObject {
-	if in == nil {
-		return nil
-	}
-	out := new(ResourceObject)
-	in.deepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements runtime.Object interface
-func (in *ResourceObject) DeepCopyObject() runtime.Object {
-	if c := in.deepCopy(); c != nil {
-		return c
-	}
-	return nil
+	State          string            `json:"state,omitempty"`
+	Owner          string            `json:"owner"`
+	LastUpdate     v1.Time           `json:"lastUpdate,omitempty"`
+	UserData       map[string]string `json:"userData,omitempty"`
+	ExpirationDate *v1.Time          `json:"expirationDate,omitempty"`
 }
 
 // ToResource returns the common.Resource representation for
@@ -100,10 +77,17 @@ func (in *ResourceObject) ToResource() common.Resource {
 		Type:           in.Spec.Type,
 		Owner:          in.Status.Owner,
 		State:          in.Status.State,
-		LastUpdate:     in.Status.LastUpdate,
-		UserData:       in.Status.UserData,
-		ExpirationDate: in.Status.ExpirationDate,
+		LastUpdate:     in.Status.LastUpdate.Time,
+		UserData:       common.UserDataFromMap(in.Status.UserData),
+		ExpirationDate: metaTimeToTime(in.Status.ExpirationDate),
 	}
+}
+
+func metaTimeToTime(in *v1.Time) *time.Time {
+	if in == nil {
+		return nil
+	}
+	return &in.Time
 }
 
 // FromResource converts a common.Resource to a *ResourceObject
@@ -121,39 +105,22 @@ func FromResource(r common.Resource) *ResourceObject {
 		Status: ResourceStatus{
 			Owner:          r.Owner,
 			State:          r.State,
-			LastUpdate:     r.LastUpdate,
-			UserData:       r.UserData,
-			ExpirationDate: r.ExpirationDate,
+			LastUpdate:     v1.Time{Time: r.LastUpdate},
+			UserData:       map[string]string(r.UserData.ToMap()),
+			ExpirationDate: timeToMetaTime(r.ExpirationDate),
 		},
 	}
 }
 
-func (in *ResourceObjectList) deepCopyInto(out *ResourceObjectList) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	in.ListMeta.DeepCopyInto(&out.ListMeta)
-	out.Items = in.Items
-}
-
-func (in *ResourceObjectList) deepCopy() *ResourceObjectList {
+func timeToMetaTime(in *time.Time) *v1.Time {
 	if in == nil {
 		return nil
 	}
-	out := new(ResourceObjectList)
-	in.deepCopyInto(out)
-	return out
-}
-
-// DeepCopyObject implements Collection interface
-func (in *ResourceObjectList) DeepCopyObject() runtime.Object {
-	if c := in.deepCopy(); c != nil {
-		return c
-	}
-	return nil
+	return &v1.Time{Time: *in}
 }
 
 // NewResource creates a new Boskos Resource.
-func NewResource(name, rtype, state, owner string, t time.Time) *ResourceObject {
+func NewResource(name, rtype, state, owner string, t v1.Time) *ResourceObject {
 	// If no state defined, mark as Free
 	if state == "" {
 		state = common.Free
@@ -170,7 +137,7 @@ func NewResource(name, rtype, state, owner string, t time.Time) *ResourceObject 
 			State:      state,
 			Owner:      owner,
 			LastUpdate: t,
-			UserData:   &common.UserData{},
+			UserData:   map[string]string{},
 		},
 	}
 }
