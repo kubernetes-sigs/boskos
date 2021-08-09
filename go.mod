@@ -11,6 +11,7 @@ replace (
 
 require (
 	github.com/aws/aws-sdk-go v1.37.22
+	github.com/bombsimon/logrusr v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-test/deep v1.0.7
 	github.com/google/go-cmp v0.5.5

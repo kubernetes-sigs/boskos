@@ -51,7 +51,16 @@ type KubernetesClientOptions struct {
 // AddFlags adds kube client flags to existing FlagSet.
 func (o *KubernetesClientOptions) AddFlags(fs *flag.FlagSet) {
 	fs.StringVar(&o.projectedTokenFile, "projected-token-file", "", "A projected serviceaccount token file. If set, this will be configured as token file in the in-cluster config.")
-	fs.StringVar(&o.kubeConfig, "kubeconfig", "", "absolute path to the kubeConfig file")
+	kubeconfigFlagDescription := "absolute path to the kubeconfig file"
+	if f := flag.Lookup("kubeconfig"); f != nil {
+		logrus.Infof("HAMZY: kubeconfig1 %v ", f)
+		f.Usage = kubeconfigFlagDescription
+		// https://i.kym-cdn.com/entries/icons/original/000/018/012/this_is_fine.jpeg
+		defer func() { o.kubeConfig = f.Value.String() }()
+		} else {
+		logrus.Infof("HAMZY: kubeconfig2 %v ", f)
+		fs.StringVar(&o.kubeConfig, "kubeconfig", "", "absolute path to the kubeConfig file")
+	}
 	fs.BoolVar(&o.inMemory, "in_memory", false, "Use in memory client instead of CRD")
 }
 
