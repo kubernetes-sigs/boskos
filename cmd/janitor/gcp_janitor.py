@@ -110,6 +110,9 @@ ZONES = [
     'asia-south1-a',
     'asia-south1-b',
     'asia-south1-c',
+    'asia-south2-a',
+    'asia-south2-b',
+    'asia-south2-c',
     'asia-southeast1-a',
     'asia-southeast1-b',
     'asia-southeast1-c',
@@ -119,6 +122,12 @@ ZONES = [
     'australia-southeast1-a',
     'australia-southeast1-b',
     'australia-southeast1-c',
+    'australia-southeast2-a',
+    'australia-southeast2-b',
+    'australia-southeast2-c',
+    'europe-central2-a',
+    'europe-central2-b',
+    'europe-central2-c',
     'europe-north1-a',
     'europe-north1-b',
     'europe-north1-c',
@@ -140,6 +149,9 @@ ZONES = [
     'northamerica-northeast1-a',
     'northamerica-northeast1-b',
     'northamerica-northeast1-c',
+    'northamerica-northeast2-a',
+    'northamerica-northeast2-b',
+    'northamerica-northeast2-c',
     'southamerica-east1-a',
     'southamerica-east1-b',
     'southamerica-east1-c',
@@ -147,6 +159,10 @@ ZONES = [
     'us-central1-b',
     'us-central1-c',
     'us-central1-f',
+    'us-central2-a',
+    'us-central2-b',
+    'us-central2-c',
+    'us-central2-d',
     'us-east1-b',
     'us-east1-c',
     'us-east1-d',
@@ -260,10 +276,11 @@ def collect(project, age, resource, filt, clear_all):
     cmd.extend([
         'list',
         '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
-        '--filter=%s' % filt,
         '--project=%s' % project])
     if resource.condition == 'zone' and resource.name != 'sole-tenancy' and resource.name != 'network-endpoint-groups':
-        cmd.append('--zones=%s' % ','.join(ZONES))
+        cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(ZONES)))
+    else:
+        cmd.append('--filter=%s' % filt)
     log('%r' % cmd)
 
     # TODO(krzyzacy): work around for alpha API list calls
