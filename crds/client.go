@@ -97,7 +97,6 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...ctr
 			EventBroadcaster: record.NewBroadcasterForTests(time.Hour),
 		})
 	}
-	// func(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error)
 
 	cfg, err := o.Cfg()
 	if err != nil {
