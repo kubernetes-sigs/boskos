@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -245,7 +245,7 @@ def nonconforming_lines(files):
 def main():
     regexs = get_regexs()
     refs = get_refs()
-    filenames = get_files(refs.keys())
+    filenames = get_files(list(refs.keys()))
     nonconforming_files = []
     for filename in sorted(filenames):
         if not file_passes(filename, refs, regexs):
