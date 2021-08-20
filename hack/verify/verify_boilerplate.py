@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -20,7 +20,6 @@
 import argparse
 import datetime
 import glob
-import io
 import os
 import re
 import sys
@@ -66,7 +65,7 @@ def get_refs():
 
         # Pass the encoding parameter to avoid ascii decode error for some
         # platform.
-        ref_file = io.open(path, 'r', encoding='utf-8')
+        ref_file = open(path, 'r', encoding='utf-8')
         ref = ref_file.read().splitlines()
         ref_file.close()
         refs[extension] = ref
@@ -97,7 +96,7 @@ def file_passes(filename, refs, regexs):  # pylint: disable=too-many-locals
     try:
         # Pass the encoding parameter to avoid ascii decode error for some
         # platform.
-        with io.open(filename, 'r', encoding='utf-8') as fp:
+        with open(filename, 'r', encoding='utf-8') as fp:
             data = fp.read()
     except IOError:
         return False
@@ -168,7 +167,7 @@ IGNORE_HEADERS = [
 def has_ignored_header(pathname):
     # Pass the encoding parameter to avoid ascii decode error for some
     # platform.
-    with io.open(pathname, 'r', encoding='utf-8') as myfile:
+    with open(pathname, 'r', encoding='utf-8') as myfile:
         data = myfile.read()
         for header in IGNORE_HEADERS:
             if data.startswith(header):
@@ -245,7 +244,7 @@ def nonconforming_lines(files):
 def main():
     regexs = get_regexs()
     refs = get_refs()
-    filenames = get_files(refs.keys())
+    filenames = get_files(list(refs.keys()))
     nonconforming_files = []
     for filename in sorted(filenames):
         if not file_passes(filename, refs, regexs):
