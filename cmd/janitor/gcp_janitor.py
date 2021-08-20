@@ -91,7 +91,7 @@ RESOURCES_BY_API = {
 }
 
 # gcloud compute zones list --format="value(name)" | sort | awk '{print "    \x27"$1"\x27," }'
-ZONES = [
+BASE_ZONES = [
     'asia-east1-a',
     'asia-east1-b',
     'asia-east1-c',
@@ -249,11 +249,12 @@ def validate_item(item, age, resource, clear_all):
     return False
 
 
-def collect(project, age, resource, filt, clear_all):
+def collect(project, zones, age, resource, filt, clear_all):
     """ Collect a list of resources for each condition (zone or region).
 
     Args:
         project: The name of a gcp project.
+        zones: a list of gcp zones to clean up the resources.
         age: Time cutoff from the creation of a resource.
         resource: Definition of a type of gcloud resource.
         filt: Filter clause for gcloud list command.
@@ -278,7 +279,7 @@ def collect(project, age, resource, filt, clear_all):
         '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
         '--project=%s' % project])
     if resource.condition == 'zone' and resource.name != 'sole-tenancy' and resource.name != 'network-endpoint-groups':
-        cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(ZONES)))
+        cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(zones)))
     else:
         cmd.append('--filter=%s' % filt)
     log('%r' % cmd)
@@ -505,7 +506,7 @@ def api_enabled(project, api):
     return False
 
 
-def main(project, days, hours, filt, rate_limit, service_account):
+def main(project, days, hours, filt, rate_limit, service_account, additional_zones):
     """ Clean up resources from a gcp project based on it's creation time
 
     Args:
@@ -536,6 +537,7 @@ def main(project, days, hours, filt, rate_limit, service_account):
         err |= 1  # keep clean the other resource
         print('Fail to clean up cluster from project %r' % project, file=sys.stderr)
 
+    zones = BASE_ZONES + additional_zones
     for api, resources in RESOURCES_BY_API.items():
         if not api_enabled(project, api):
             continue
@@ -543,7 +545,7 @@ def main(project, days, hours, filt, rate_limit, service_account):
             log('Try to search for %r with condition %r, managed %r' % (
                 res.name, res.condition, res.managed))
             try:
-                col = collect(project, age, res, filt, clear_all)
+                col = collect(project, zones, age, res, filt, clear_all)
                 if col:
                     err |= clear_resources(project, col, res, rate_limit)
             except (subprocess.CalledProcessError, ValueError) as exc:
@@ -584,6 +586,11 @@ if __name__ == '__main__':
         '--service_account',
         help='GCP service account',
         default=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", None))
+    PARSER.add_argument(
+        '--additional_zones', 
+        nargs="*",
+        help='Addtional GCP zones to clean up the GCP resources',
+        default=[])
     ARGS = PARSER.parse_args()
 
     # We want to allow --days=0 and --hours=0, so check against None instead.
@@ -592,4 +599,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     main(ARGS.project, ARGS.days or 0, ARGS.hours or 0, ARGS.filter,
-         ARGS.ratelimit, ARGS.service_account)
+         ARGS.ratelimit, ARGS.service_account, ARGS.additional_zones)
