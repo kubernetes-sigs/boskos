@@ -21,17 +21,32 @@ metadata:
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: boskos-crd-admin
+  name: boskos-server
   namespace: boskos
 rules:
   - apiGroups: ["boskos.k8s.io"]
     resources: ["*"]
     verbs: ["*"]
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    resourceNames:
+    - boskos-server
+    verbs:
+    - get
+    - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: boskos-crd-admin
+  name: boskos-server
   namespace: boskos
 subjects:
   - kind: ServiceAccount
