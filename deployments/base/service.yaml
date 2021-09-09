@@ -20,7 +20,7 @@ metadata:
   namespace: boskos
 spec:
   selector:
-    app: boskos
+    boskos-leader: "true"
   ports:
     - name: default
       protocol: TCP

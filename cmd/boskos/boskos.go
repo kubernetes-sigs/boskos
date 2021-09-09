@@ -29,14 +29,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
-	toolsleaderelection "k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/apimachinery/pkg/labels"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/leaderelection"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -54,6 +51,7 @@ import (
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/crds"
 	"sigs.k8s.io/boskos/handlers"
+	"sigs.k8s.io/boskos/leaderlabelreconciler"
 	"sigs.k8s.io/boskos/metrics"
 	"sigs.k8s.io/boskos/ranch"
 )
@@ -68,12 +66,14 @@ var (
 	configPath = flag.String("config", "config.yaml", "Path to init resource file")
 	_          = flag.Duration("dynamic-resource-update-period", defaultDynamicResourceUpdatePeriod,
 		"Legacy flag that does nothing but is kept for compatibility reasons")
-	requestTTL              = flag.Duration("request-ttl", defaultRequestTTL, "request TTL before losing priority in the queue")
-	logLevel                = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
-	namespace               = flag.String("namespace", corev1.NamespaceDefault, "namespace to install on")
-	port                    = flag.Int("port", 8080, "Port to serve on")
-	enableLeaderElection    = flag.Bool("enable-leader-election", false, "If leader election should be enabled. If enabled, it is possible to run Boskos with multiple replicas and only the one that is leader will receive traffic.")
-	leaderElectionNamespace = flag.String("leader-election-namespace", "", "Namespace to use for leader election. If running in-cluster, this defaults to the pods namespace")
+	requestTTL           = flag.Duration("request-ttl", defaultRequestTTL, "request TTL before losing priority in the queue")
+	logLevel             = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	namespace            = flag.String("namespace", corev1.NamespaceDefault, "namespace to install on")
+	port                 = flag.Int("port", 8080, "Port to serve on")
+	enableLeaderElection = flag.Bool("enable-leader-election", false, "If leader election should be enabled. If enabled, it is possible to run Boskos with multiple replicas and only the one that is leader will receive traffic. This works through boskos managing a label so it is only set on the leader pod. The boskos service must select on this label and not one that matches all replicas.")
+	boskosLabelSelector  = flag.String("boskos-label-selector", "", "Must be set when leader election is used. The label selector to identify boskos pods")
+	podName              = flag.String("pod-name", "", "The name of the current pod. Required when --enable-leadere-election is set.")
+	leaderLabelKey       = flag.String("leader-label-key", "boskos-leader", "The key of the label that will be used to denote the replica that is leader. The value of the label is always `true`")
 
 	httpRequestDuration = prowmetrics.HttpRequestDuration("boskos", 0.005, 1200)
 	httpResponseSize    = prowmetrics.HttpResponseSize("boskos", 128, 65536)
@@ -118,49 +118,28 @@ func main() {
 	// main server with the main mux until we're ready
 	health := pjutil.NewHealthOnPort(instrumentationOptions.HealthPort)
 
-	mgr, err := kubeClientOptions.Manager(*namespace, &crds.ResourceObject{}, &crds.DRLCObject{})
+	mgr, err := kubeClientOptions.Manager(*namespace, *enableLeaderElection, &crds.ResourceObject{}, &crds.DRLCObject{})
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to get mgr")
 	}
 
 	if *enableLeaderElection {
-		cfg, err := kubeClientOptions.Cfg()
-		if err != nil {
-			logrus.WithError(err).Fatal("Failed to get kubeconfig")
+		if *podName == "" {
+			logrus.Fatal("--pod-name must be set when --enable-leader-election is set")
 		}
-		lock, err := leaderelection.NewResourceLock(cfg, loggingFakeEventRecorderProvider(), leaderelection.Options{
-			LeaderElection:             true,
-			LeaderElectionResourceLock: resourcelock.LeasesResourceLock,
-			LeaderElectionNamespace:    *leaderElectionNamespace,
-			LeaderElectionID:           "boskos-server"},
-		)
-		if err != nil {
-			logrus.WithError(err).Fatal("Failed to construct leader election lock")
+		if *boskosLabelSelector == "" {
+			logrus.Fatal("--boskos-label-selector must be set when --enable-leader-election is set")
 		}
-
-		elected := make(chan struct{})
-		elector, err := toolsleaderelection.NewLeaderElector(toolsleaderelection.LeaderElectionConfig{
-			Lock:          lock,
-			LeaseDuration: 15 * time.Second,
-			RenewDeadline: 10 * time.Second,
-			RetryPeriod:   2 * time.Second,
-			Callbacks: toolsleaderelection.LeaderCallbacks{
-				OnStartedLeading: func(_ context.Context) { close(elected) },
-				OnStoppedLeading: func() { logrus.Fatal("Lost leaderelection") },
-			},
-			ReleaseOnCancel: true,
-		})
-		if err != nil {
-			logrus.WithError(err).Fatal("failed to construct leader elector")
+		if *leaderLabelKey == "" {
+			logrus.Fatal("--leader-label-key must be non-empty when --enable-leader-election is set")
 		}
-
-		go func() {
-			elector.Run(interrupts.Context())
-		}()
-
-		logrus.Info("Waiting to be elected leader")
-		<-elected
-		logrus.Info("Got elected to leader, starting")
+		selector, err := labels.Parse(*boskosLabelSelector)
+		if err != nil {
+			logrus.WithError(err).Fatalf("failed to parse %s as label selector", *boskosLabelSelector)
+		}
+		if err := leaderlabelreconciler.AddToManager(mgr, selector, *leaderLabelKey, *podName); err != nil {
+			logrus.WithError(err).Fatal("Failed to construct leader label reconciler")
+		}
 	}
 
 	storage := ranch.NewStorage(interrupts.Context(), mgr.GetClient(), *namespace)
@@ -277,23 +256,4 @@ func resourceUpdatePredicate() predicate.Predicate {
 		},
 		GenericFunc: func(_ event.GenericEvent) bool { return true },
 	}
-}
-
-type recorderProvider struct {
-	recorder record.EventRecorder
-}
-
-func (rp *recorderProvider) GetEventRecorderFor(_ string) record.EventRecorder {
-	return rp.recorder
-}
-
-func loggingFakeEventRecorderProvider() *recorderProvider {
-	events := make(chan string)
-	go func() {
-		for event := range events {
-			logrus.WithField("event", event).Info("Received event for leader election recorder")
-		}
-	}()
-
-	return &recorderProvider{recorder: &record.FakeRecorder{Events: events}}
 }
