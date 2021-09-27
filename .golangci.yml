@@ -24,3 +24,9 @@ linters:
     - varcheck
     - whitespace
   fast: false
+
+issues:
+  exclude-rules:
+  - linters:
+    - staticcheck
+    text: "SA1019: fakectrlruntimeclient.NewFakeClient is deprecated:"

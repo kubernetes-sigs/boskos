@@ -82,7 +82,7 @@ func (o *KubernetesClientOptions) Client() (ctrlruntimeclient.Client, error) {
 // Manager returns a Manager. It contains a client whose Reader is cache backed. Namespace can be empty
 // in which case the client will use all namespaces.
 // It blocks until the cache was synced for all types passed in startCacheFor.
-func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...ctrlruntimeclient.Object) (manager.Manager, error) {
+func (o *KubernetesClientOptions) Manager(namespace string, enableLeaderElection bool, startCacheFor ...ctrlruntimeclient.Object) (manager.Manager, error) {
 	if o.inMemory {
 		return manager.New(&rest.Config{}, manager.Options{
 			LeaderElection:     false,
@@ -106,9 +106,12 @@ func (o *KubernetesClientOptions) Manager(namespace string, startCacheFor ...ctr
 	cfg.Burst = 200
 
 	mgr, err := manager.New(cfg, manager.Options{
-		LeaderElection:     false,
-		Namespace:          namespace,
-		MetricsBindAddress: "0",
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionReleaseOnCancel: true,
+		LeaderElectionResourceLock:    "leases",
+		LeaderElectionID:              "boskos-server",
+		Namespace:                     namespace,
+		MetricsBindAddress:            "0",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct manager: %v", err)

@@ -28,6 +28,15 @@ rules:
     resources: ["*"]
     verbs: ["*"]
   - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+  - apiGroups:
     - coordination.k8s.io
     resources:
     - leases
@@ -54,7 +63,7 @@ subjects:
     namespace: boskos
 roleRef:
   kind: Role
-  name: boskos-crd-admin
+  name: boskos-server
   apiGroup: rbac.authorization.k8s.io
 ---
 kind: Role
