@@ -72,7 +72,7 @@ var (
 	port                 = flag.Int("port", 8080, "Port to serve on")
 	enableLeaderElection = flag.Bool("enable-leader-election", false, "If leader election should be enabled. If enabled, it is possible to run Boskos with multiple replicas and only the one that is leader will receive traffic. This works through boskos managing a label so it is only set on the leader pod. The boskos service must select on this label and not one that matches all replicas.")
 	boskosLabelSelector  = flag.String("boskos-label-selector", "", "Must be set when leader election is used. The label selector to identify boskos pods")
-	podName              = flag.String("pod-name", "", "The name of the current pod. Required when --enable-leadere-election is set.")
+	podName              = flag.String("pod-name", "", "The name of the current pod. Required when --enable-leader-election is set.")
 	leaderLabelKey       = flag.String("leader-label-key", "boskos-leader", "The key of the label that will be used to denote the replica that is leader. The value of the label is always `true`")
 
 	httpRequestDuration = prowmetrics.HttpRequestDuration("boskos", 0.005, 1200)
