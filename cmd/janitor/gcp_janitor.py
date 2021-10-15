@@ -88,6 +88,11 @@ RESOURCES_BY_API = {
     'gkehub.googleapis.com': [
         Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
     ],
+
+    # staging GKE hub memberships
+    'staging-gkehub.sandbox.googleapis.com': [
+        Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
+    ]
 }
 
 # gcloud compute zones list --format="value(name)" | sort | awk '{print "    \x27"$1"\x27," }'
@@ -541,6 +546,13 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
     for api, resources in RESOURCES_BY_API.items():
         if not api_enabled(project, api):
             continue
+        if api == 'staging-gkehub.sandbox.googleapis.com' || api == 'gkehub.googleapis.com':
+            cmd = "gcloud config set api_endpoint_overrides/gkehub https://" + api
+            try:
+                subprocess.run(cmd, shell=True, text=True, check=True)
+            except (subprocess.CalledProcessError, ValueError) as exc:
+                log('Cannot set GKE HUB endpoint %s with %r, continue' % (api, exc))
+                continue
         for res in resources:
             log('Try to search for %r with condition %r, managed %r' % (
                 res.name, res.condition, res.managed))
@@ -552,7 +564,6 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
                 err |= 1  # keep clean the other resource
                 print('Fail to list resource %r from project %r: %r' % (res.name, project, exc),
                       file=sys.stderr)
-
     print('[=== Finish Janitor on project %r with status %r ===]' % (project, err))
     sys.exit(err)
 
