@@ -547,7 +547,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
         if not api_enabled(project, api):
             continue
         if api == 'staging-gkehub.sandbox.googleapis.com' or api == 'gkehub.googleapis.com':
-            cmd = "gcloud config set api_endpoint_overrides/gkehub https://" + api
+            cmd = "gcloud config set api_endpoint_overrides/gkehub https://{}/".format(api)
             try:
                 subprocess.run(cmd, shell=True, text=True, check=True)
             except (subprocess.CalledProcessError, ValueError) as exc:
