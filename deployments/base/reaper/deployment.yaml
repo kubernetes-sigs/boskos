@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: boskos-reaper
-          image: gcr.io/k8s-staging-boskos/reaper:v20200617-f289ba6
+          image: gcr.io/k8s-staging-boskos/reaper:v20211015-2401f5c
           args:
             - --boskos-url=http://boskos
             - --resource-type=$(REAPER_RESOURCE_TYPES)
