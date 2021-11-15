@@ -33,6 +33,11 @@ RESOURCES_BY_API = {
     # [WARNING FROM KRZYZACY] : TOUCH THIS WITH CARE!
     # ORDER (INSIDE EACH API BLOCK) REALLY MATTERS HERE!
 
+    # filestore resources
+    'file.googleapis.com': [
+        Resource('', 'filestore', 'instances', None, 'zone', None, False, False, None),
+    ],
+
     # compute resources
     'compute.googleapis.com': [
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
@@ -283,7 +288,10 @@ def collect(project, zones, age, resource, filt, clear_all):
         'list',
         '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
         '--project=%s' % project])
-    if resource.condition == 'zone' and resource.name != 'sole-tenancy' and resource.name != 'network-endpoint-groups':
+    if (resource.condition == 'zone'
+            and resource.name != 'sole-tenancy'
+            and resource.name != 'network-endpoint-groups'
+            and resource.group != 'filestore'):
         cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(zones)))
     else:
         cmd.append('--filter=%s' % filt)
@@ -318,6 +326,10 @@ def collect(project, zones, age, resource, filt, clear_all):
                 # subcommands want just the name, not the full URL, so strip it.
                 colname = item[resource.condition].rsplit('/', 1)[-1]
                 log('looking for items in %s=%s' % (resource.condition, colname))
+            elif resource.group == 'filestore':
+                # Filestore instances don't have 'zone' field, but require
+                # --zone flag for deletion.
+                colname = item['name'].split('/')[3]
             else:
                 # This item doesn't match the condition, so don't include it.
                 continue
@@ -597,7 +609,7 @@ if __name__ == '__main__':
         help='GCP service account',
         default=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", None))
     PARSER.add_argument(
-        '--additional_zones', 
+        '--additional_zones',
         nargs="*",
         help='Addtional GCP zones to clean up the GCP resources',
         default=[])
