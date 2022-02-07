@@ -97,6 +97,11 @@ RESOURCES_BY_API = {
     # staging GKE hub memberships
     'staging-gkehub.sandbox.googleapis.com': [
         Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
+    ],
+
+    # staging GKE hub memberships
+    'autopush-gkehub.sandbox.googleapis.com': [
+        Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
     ]
 }
 
@@ -558,7 +563,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
     for api, resources in RESOURCES_BY_API.items():
         if not api_enabled(project, api):
             continue
-        if api == 'staging-gkehub.sandbox.googleapis.com' or api == 'gkehub.googleapis.com':
+        if api == 'staging-gkehub.sandbox.googleapis.com' or api == 'gkehub.googleapis.com' or api == 'autopush-gkehub.sandbox.googleapis.com':
             cmd = "gcloud config set api_endpoint_overrides/gkehub https://{}/".format(api)
             try:
                 subprocess.run(cmd, shell=True, text=True, check=True)
