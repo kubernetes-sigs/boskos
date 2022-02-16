@@ -6,3 +6,16 @@ aliases:
 
   aws-janitor-emeritus-contributors:
   - detiber
+
+  # business hours oncall for prow etc (https://go.k8s.io/oncall)
+  test-infra-oncall:
+  - chaodaiG
+  # TODO(chases2): uncomment below once joined k8s-sig
+  # - chases2
+  - cjwagner
+  - fejta
+  - listx
+  # TODO(michelle192837): uncomment below once joined k8s-sig
+  # - michelle192837
+  # TODO(mpherman2): uncomment below once joined k8s-sig
+  # - mpherman2

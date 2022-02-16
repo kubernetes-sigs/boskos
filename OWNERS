@@ -1,9 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- ixdy
 - alvaroaleman
 - stevekuznetsov
+- test-infra-oncall
 
 labels:
 - sig/testing
+
+emeritus_approvers:
+- ixdy
