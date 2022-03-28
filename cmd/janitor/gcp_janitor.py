@@ -542,7 +542,7 @@ def api_enabled(project, api):
     return False
 
 
-def main(project, days, hours, filt, rate_limit, service_account, additional_zones, set_quota_project):
+def main(project, days, hours, filt, rate_limit, service_account, additional_zones, set_as_quota_project):
     """ Clean up resources from a gcp project based on it's creation time
 
     Args:
@@ -565,7 +565,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
             print('Failed to activate service account %r' % service_account, file=sys.stderr)
             sys.exit(err)
 
-    if set_quota_project:
+    if set_as_quota_project:
         err |= set_quota_project(project)
         if err:
             print('Failed to set quota project %r' % project, file=sys.stderr)
@@ -640,7 +640,7 @@ if __name__ == '__main__':
         help='Addtional GCP zones to clean up the GCP resources',
         default=[])
     PARSER.add_argument(
-        '--set_quota_project',
+        '--set_as_quota_project',
         default=False,
         action='store_true',
         help='Set the to-be-cleaned project as the quota project')
@@ -652,4 +652,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     main(ARGS.project, ARGS.days or 0, ARGS.hours or 0, ARGS.filter,
-         ARGS.ratelimit, ARGS.service_account, ARGS.additional_zones, ARGS.set_quota_project)
+         ARGS.ratelimit, ARGS.service_account, ARGS.additional_zones, ARGS.set_as_quota_project)
