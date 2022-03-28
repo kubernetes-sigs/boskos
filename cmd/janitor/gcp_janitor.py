@@ -506,6 +506,20 @@ def activate_service_account(service_account):
         return 1
     return 0
 
+def set_quota_project(project):
+    print('[=== Setting quota_project %s ===]' % project)
+    cmd = [
+        'gcloud', 'config', 'set', 'billing/quota_project',
+        '%s' % project,
+    ]
+    log('running %s' % cmd)
+
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError:
+        print('Error try to set quota_project: %s' % project, file=sys.stderr)
+        return 1
+    return 0
 
 # Returns whether the specified GCP API is enabled on the provided project.
 def api_enabled(project, api):
@@ -528,7 +542,7 @@ def api_enabled(project, api):
     return False
 
 
-def main(project, days, hours, filt, rate_limit, service_account, additional_zones):
+def main(project, days, hours, filt, rate_limit, service_account, additional_zones, set_quota_project):
     """ Clean up resources from a gcp project based on it's creation time
 
     Args:
@@ -549,6 +563,12 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
         err |= activate_service_account(service_account)
         if err:
             print('Failed to activate service account %r' % service_account, file=sys.stderr)
+            sys.exit(err)
+
+    if set_quota_project:
+        err |= set_quota_project(project)
+        if err:
+            print('Failed to set quota project %r' % project, file=sys.stderr)
             sys.exit(err)
 
     # try to clean a leaked GKE cluster first, rather than attempting to delete
@@ -619,6 +639,11 @@ if __name__ == '__main__':
         nargs="*",
         help='Addtional GCP zones to clean up the GCP resources',
         default=[])
+    PARSER.add_argument(
+        '--set_quota_project',
+        default=False,
+        action='store_true',
+        help='Set the to-be-cleaned project as the quota project')
     ARGS = PARSER.parse_args()
 
     # We want to allow --days=0 and --hours=0, so check against None instead.
@@ -627,4 +652,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     main(ARGS.project, ARGS.days or 0, ARGS.hours or 0, ARGS.filter,
-         ARGS.ratelimit, ARGS.service_account, ARGS.additional_zones)
+         ARGS.ratelimit, ARGS.service_account, ARGS.additional_zones, ARGS.set_quota_project)
