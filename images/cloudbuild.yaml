@@ -54,6 +54,8 @@ images:
   - "gcr.io/$PROJECT_ID/cleaner:latest"
   - "gcr.io/$PROJECT_ID/fake-mason:$_GIT_TAG"
   - "gcr.io/$PROJECT_ID/fake-mason:latest"
+  - "gcr.io/$PROJECT_ID/ibmcloud-janitor-boskos:$_GIT_TAG"
+  - "gcr.io/$PROJECT_ID/ibmcloud-janitor-boskos:latest"
   - "gcr.io/$PROJECT_ID/janitor:$_GIT_TAG"
   - "gcr.io/$PROJECT_ID/janitor:latest"
   - "gcr.io/$PROJECT_ID/metrics:$_GIT_TAG"
