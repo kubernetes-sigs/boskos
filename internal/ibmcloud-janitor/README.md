@@ -76,7 +76,7 @@ spec:
       terminationGracePeriodSeconds: 300
       containers:
       - name: boskos-janitor-ibmcloud
-        image: ibmcloud-janitor-boskos:latest
+        image: gcr.io/k8s-staging-boskos/ibmcloud-janitor-boskos:latest
         args:
         - --boskos-url=http://boskos.test-pods.svc.cluster.local.
         env: 
@@ -91,7 +91,6 @@ spec:
             secretName: ibmcloud-janitor-secret
 ```
 `IBMCLOUD_ENV_FILE` environment variable stores tha path of the file containing the API key. To see how the `janitor-secret` is made available in the cluster, refer [secret management](#secret-management-for-ibmcloud-janitor).
-> Note: The official image for ibmcloud-janitor is not yet available in any container image respository.
 
 
 ## How to run it locally
