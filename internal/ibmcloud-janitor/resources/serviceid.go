@@ -29,7 +29,6 @@ import (
 
 type APIKey struct {
 	serviceIDName string
-	value         *string
 }
 
 func getAPIkeyName() string {
