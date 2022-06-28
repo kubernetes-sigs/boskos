@@ -19,3 +19,11 @@ aliases:
   # - michelle192837
   # TODO(mpherman2): uncomment below once joined k8s-sig
   # - mpherman2
+
+  ibmcloud-janitor-reviewers:
+  - Amulyam24
+  - mkumatag
+
+  ibmcloud-janitor-approvers:
+  - Amulyam24
+  - mkumatag
