@@ -30,18 +30,25 @@ const (
 
 // Returns an authenticator for IBM Cloud
 func GetAuthenticator() (core.Authenticator, error) {
+	key, err := GetAPIkeyValue()
+	if err != nil {
+		return nil, errors.New("could not get the value of API key")
+	}
+	auth := &core.IamAuthenticator{
+		ApiKey: key,
+	}
+	return auth, nil
+}
+
+func GetAPIkeyValue() (string, error) {
 	fileName := os.Getenv(APIKeyEnv)
 	if fileName == "" {
-		return nil, errors.New("please set IBMCLOUD_ENV_FILE, it cannot be empty")
+		return "", errors.New("please set IBMCLOUD_ENV_FILE, it cannot be empty")
 	}
 
 	key, err := os.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	auth := &core.IamAuthenticator{
-		ApiKey: string(key),
-	}
-	return auth, nil
+	return string(key), nil
 }

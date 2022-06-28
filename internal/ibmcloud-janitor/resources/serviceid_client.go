@@ -20,6 +20,8 @@ import (
 	"github.com/IBM/go-sdk-core/v5/core"
 	identityv1 "github.com/IBM/platform-services-go-sdk/iamidentityv1"
 	"github.com/pkg/errors"
+
+	"sigs.k8s.io/boskos/internal/ibmcloud-janitor/account"
 )
 
 type ServiceID struct {
@@ -69,8 +71,13 @@ func NewServiceIDClient(auth core.Authenticator, key *APIKey) (*ServiceID, error
 
 // Returns the account ID
 func (s *ServiceID) GetAccount() (*string, error) {
+	key, err := account.GetAPIkeyValue()
+	if err != nil {
+		return nil, errors.New("could not get the API key value")
+	}
+
 	apikeyDetailsOptions := &identityv1.GetAPIKeysDetailsOptions{
-		IamAPIKey: s.key.value,
+		IamAPIKey: &key,
 	}
 
 	apiKeyDetails, _, err := s.GetAPIKeysDetails(apikeyDetailsOptions)

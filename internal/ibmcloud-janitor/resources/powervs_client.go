@@ -76,7 +76,6 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 
 	pclient.key = &APIKey{
 		serviceIDName: options.Resource.Name,
-		value:         &powervsData.APIKey,
 	}
 
 	auth, err := account.GetAuthenticator()

@@ -33,7 +33,6 @@ const (
 
 type ResourceData struct {
 	ServiceInstanceID string
-	APIKey            string
 	Region            string
 	Zone              string
 }
@@ -49,11 +48,6 @@ func GetResourceData(r *common.Resource) (*ResourceData, error) {
 		return nil, errors.New("no Service Instance ID in UserData")
 	}
 
-	key, ok := r.UserData.Map.Load(APIKey)
-	if !ok {
-		return nil, errors.New("no API key in UserData")
-	}
-
 	region, ok := r.UserData.Map.Load(Region)
 	if !ok {
 		return nil, errors.New("no region in UserData")
@@ -66,7 +60,6 @@ func GetResourceData(r *common.Resource) (*ResourceData, error) {
 
 	return &ResourceData{
 		ServiceInstanceID: sid.(string),
-		APIKey:            key.(string),
 		Region:            region.(string),
 		Zone:              zone.(string),
 	}, nil
