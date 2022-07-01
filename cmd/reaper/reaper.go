@@ -27,16 +27,22 @@ import (
 )
 
 var (
-	rTypes         common.CommaSeparatedStrings
-	boskosURL      = flag.String("boskos-url", "http://boskos", "Boskos URL")
-	username       = flag.String("username", "", "Username used to access the Boskos server")
-	passwordFile   = flag.String("password-file", "", "The path to password file used to access the Boskos server")
-	expiryDuration = flag.Duration("expire", 30*time.Minute, "The expiry time (in minutes) after which reaper will reset resources.")
-	targetState    = flag.String("target-state", common.Dirty, "The state to move resources to when reaped.")
+	rTypes            common.CommaSeparatedStrings
+	extraSourceStates common.CommaSeparatedStrings
+	boskosURL         = flag.String("boskos-url", "http://boskos", "Boskos URL")
+	username          = flag.String("username", "", "Username used to access the Boskos server")
+	passwordFile      = flag.String("password-file", "", "The path to password file used to access the Boskos server")
+	expiryDuration    = flag.Duration("expire", 30*time.Minute, "The expiry time (in minutes) after which reaper will reset resources.")
+	targetState       = flag.String("target-state", common.Dirty, "The state to move resources to when reaped.")
 )
+
+type resetClient interface {
+	Reset(string, string, time.Duration, string) (map[string]string, error)
+}
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be reset")
+	flag.Var(&extraSourceStates, "extra-source-states", "comma-separated list of extra source states need to be reset")
 }
 
 func main() {
@@ -57,19 +63,27 @@ func main() {
 		logrus.Fatal("--target-state must not be empty!")
 	}
 
+	reap := &reaper{extraSourceStates, *expiryDuration, *targetState}
+
 	for range time.Tick(time.Minute) {
 		for _, r := range rTypes {
-			sync(boskos, r)
+			reap.sync(boskos, r)
 		}
 	}
 }
 
-func sync(c *client.Client, res string) {
-	log := logrus.WithField("resource_type", res).WithField("target_state", *targetState)
+type reaper struct {
+	extraSourceStates common.CommaSeparatedStrings
+	expiryDuration    time.Duration
+	targetState       string
+}
+
+func (r *reaper) sync(c resetClient, res string) {
+	log := logrus.WithField("resource_type", res).WithField("target_state", r.targetState)
 
 	// kubetest busted
 	log = log.WithField("source_state", common.Busy)
-	if owners, err := c.Reset(res, common.Busy, *expiryDuration, *targetState); err != nil {
+	if owners, err := c.Reset(res, common.Busy, r.expiryDuration, r.targetState); err != nil {
 		log.WithError(err).Error("Reset failed")
 	} else {
 		logResponses(log, owners)
@@ -77,7 +91,7 @@ func sync(c *client.Client, res string) {
 
 	// janitor, mason busted
 	log = log.WithField("source_state", common.Cleaning)
-	if owners, err := c.Reset(res, common.Cleaning, *expiryDuration, *targetState); err != nil {
+	if owners, err := c.Reset(res, common.Cleaning, r.expiryDuration, r.targetState); err != nil {
 		log.WithError(err).Error("Reset failed")
 	} else {
 		logResponses(log, owners)
@@ -85,10 +99,20 @@ func sync(c *client.Client, res string) {
 
 	// mason busted
 	log = log.WithField("source_state", common.Leased)
-	if owners, err := c.Reset(res, common.Leased, *expiryDuration, *targetState); err != nil {
+	if owners, err := c.Reset(res, common.Leased, r.expiryDuration, r.targetState); err != nil {
 		log.WithError(err).Error("Reset failed")
 	} else {
 		logResponses(log, owners)
+	}
+
+	// extra source states
+	for _, s := range r.extraSourceStates {
+		log = log.WithField("source_state", s)
+		if owners, err := c.Reset(res, s, r.expiryDuration, r.targetState); err != nil {
+			log.WithError(err).Error("Reset failed")
+		} else {
+			logResponses(log, owners)
+		}
 	}
 }
 
