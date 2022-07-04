@@ -4,7 +4,6 @@ go 1.18
 
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	k8s.io/client-go => k8s.io/client-go v0.24.2
 )
 
