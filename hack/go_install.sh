@@ -54,6 +54,6 @@ cd "${tmp_dir}"
 go mod init fake/mod
 
 # install the golang module specified as the first argument
-go get -tags tools "${module}@${version}"
+go install -tags tools "${module}@${version}"
 mv "${GOBIN}/${binary_name}" "${GOBIN}/${binary_name}-${version}"
 ln -sf "${GOBIN}/${binary_name}-${version}" "${GOBIN}/${binary_name}"

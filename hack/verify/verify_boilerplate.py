@@ -117,7 +117,9 @@ def file_passes(filename, refs, regexs):  # pylint: disable=too-many-locals
 
     # remove build tags from the top of Go files
     if extension == "go":
-        con = regexs["go_build_constraints"]
+        con = regexs["go_build_constraints_1"]
+        (data, found) = con.subn("", data, 1)
+        con = regexs["go_build_constraints_2"]
         (data, found) = con.subn("", data, 1)
 
     # remove shebang from the top of shell files
@@ -228,8 +230,11 @@ def get_regexs():
     # dates can be 2014, 2015, 2016 or 2017, company holder names can be anything
     regexs["date"] = re.compile(get_dates())
     # strip // +build \n\n build constraints
-    regexs["go_build_constraints"] = re.compile(
+    regexs["go_build_constraints_1"] = re.compile(
         r"^(// \+build.*\n)+\n", re.MULTILINE)
+    # strip //go:build build constraints
+    regexs["go_build_constraints_2"] = re.compile(
+        r"^(//go:build.*\n)", re.MULTILINE)
     # strip #!.* from shell/python scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
     return regexs
