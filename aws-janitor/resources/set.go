@@ -116,19 +116,22 @@ func (s *Set) Mark(opts Options, r Interface, created *time.Time, tags Tags) boo
 	key := r.ResourceKey()
 	s.marked[key] = true
 
-	// Calculate the most likely creation time based on whichever is first:
-	// - the current time
-	// - the creation time passed to this function
-	// - any previous record of this resource's creation time
+	// Calculate the most likely creation time.  If a creation time is explicitly passed to us, use that.
+	// Otherwise, we either use a previously recorded timestamp or record and use the current time.
 	now := time.Now()
-	firstSeen := now
+
+	// Use the created time if it is valid
+	var firstSeen time.Time
 	if created != nil && created.Before(now) && !created.IsZero() && !created.Equal(time.Unix(0, 0)) {
 		firstSeen = *created
+	} else {
+		if t, ok := s.firstSeen[key]; ok {
+			firstSeen = t
+		} else {
+			firstSeen = now
+		}
 	}
 
-	if t, ok := s.firstSeen[key]; ok && t.Before(firstSeen) {
-		firstSeen = t
-	}
 	s.firstSeen[key] = firstSeen
 
 	if !opts.ManagedPerTags(tags) {
