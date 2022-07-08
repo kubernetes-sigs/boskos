@@ -43,11 +43,6 @@ import (
 	"sigs.k8s.io/boskos/storage"
 )
 
-const (
-	// resourceTypeErrorSnippet is present in the HTTP response if user requests a resource type that does not exist.
-	resourceTypeErrorSnippet = "resource type"
-)
-
 var (
 	// ErrNotFound is returned by Acquire() when no resources are available.
 	ErrNotFound = errors.New("resources not found")
@@ -432,7 +427,9 @@ func (c *Client) acquire(rtype, state, dest, requestID string) (*common.Resource
 			// resource type is to check the text of the accompanying error message.
 			if c.DistinguishNotFoundVsTypeNotFound {
 				if bytes, err := io.ReadAll(resp.Body); err == nil {
-					if strings.Contains(string(bytes), resourceTypeErrorSnippet) {
+					cutset := " \n\t"
+					str := strings.Trim(string(bytes), cutset)
+					if str == strings.Trim(common.ResourceTypeNotFoundMessage(rtype), cutset) {
 						return false, ErrTypeNotFound
 					}
 				}
