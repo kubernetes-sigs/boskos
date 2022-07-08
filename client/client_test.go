@@ -53,14 +53,27 @@ func TestAcquire(t *testing.T) {
 	defer func() { SleepFunc = oldSleepFunc }()
 
 	var testcases = []struct {
-		name      string
-		serverErr bool
-		expectErr error
+		name        string
+		serverErr   string
+		distinguish bool
+		expectErr   error
 	}{
 		{
 			name:      "request error",
-			serverErr: true,
-			expectErr: fmt.Errorf("status %d %s, status code %d", http.StatusBadRequest, http.StatusText(http.StatusBadRequest), http.StatusBadRequest),
+			serverErr: "Acquire failed: no available resource my-resource-type, try again later",
+			expectErr: ErrNotFound,
+		},
+		{
+			name:        "request error - distinguish - not found",
+			serverErr:   "Acquire failed: no available resource my-resource-type, try again later",
+			distinguish: true,
+			expectErr:   ErrNotFound,
+		},
+		{
+			name:        "request error - distinguish - type not found",
+			serverErr:   "Acquire failed: resource type \"my-resource-type\" does not exist",
+			distinguish: true,
+			expectErr:   ErrTypeNotFound,
 		},
 		{
 			name:      "request successful",
@@ -70,10 +83,10 @@ func TestAcquire(t *testing.T) {
 
 	for _, tc := range testcases {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if tc.serverErr {
-				http.Error(w, "", http.StatusBadRequest)
-			} else {
+			if tc.serverErr == "" {
 				fmt.Fprint(w, FakeRes)
+			} else {
+				http.Error(w, tc.serverErr, http.StatusNotFound)
 			}
 		}))
 		defer ts.Close()
@@ -81,6 +94,9 @@ func TestAcquire(t *testing.T) {
 		c, err := NewClient("user", ts.URL, "", "")
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
+		}
+		if tc.distinguish {
+			c.DistinguishNotFoundVsTypeNotFound = true
 		}
 		res, err := c.Acquire("t", "s", "d")
 
