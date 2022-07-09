@@ -427,9 +427,8 @@ func (c *Client) acquire(rtype, state, dest, requestID string) (*common.Resource
 			// resource type is to check the text of the accompanying error message.
 			if c.DistinguishNotFoundVsTypeNotFound {
 				if bytes, err := io.ReadAll(resp.Body); err == nil {
-					cutset := " \n\t"
-					str := strings.Trim(string(bytes), cutset)
-					if str == strings.Trim(common.ResourceTypeNotFoundMessage(rtype), cutset) {
+					errorMsg := string(bytes)
+					if strings.Contains(errorMsg, common.ResourceTypeNotFoundMessage(rtype)) {
 						return false, ErrTypeNotFound
 					}
 				}

@@ -60,18 +60,18 @@ func TestAcquire(t *testing.T) {
 	}{
 		{
 			name:      "request error",
-			serverErr: "no available resource my-resource-type, try again later",
+			serverErr: "Acquire failed: no available resource my-resource-type, try again later",
 			expectErr: ErrNotFound,
 		},
 		{
 			name:        "request error - distinguish - not found",
-			serverErr:   "no available resource my-resource-type, try again later",
+			serverErr:   "Acquire failed: no available resource my-resource-type, try again later",
 			distinguish: true,
 			expectErr:   ErrNotFound,
 		},
 		{
 			name:        "request error - distinguish - type not found",
-			serverErr:   common.ResourceTypeNotFoundMessage("t"),
+			serverErr:   "Acquire failed: " + common.ResourceTypeNotFoundMessage("t"),
 			distinguish: true,
 			expectErr:   ErrTypeNotFound,
 		},
