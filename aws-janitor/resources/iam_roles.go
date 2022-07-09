@@ -86,6 +86,10 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 			}
 			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(role.RoleId), roleName: aws.StringValue(role.RoleName)}
 			if set.Mark(opts, l, r.CreateDate, tags) {
+				if r.CreateDate != nil && time.Since(*r.CreateDate) < set.ttl {
+					logger.Debugf("%s: created too recently, skipping", l.ARN())
+					continue
+				}
 				if role.RoleLastUsed != nil && role.RoleLastUsed.LastUsedDate != nil && time.Since(*role.RoleLastUsed.LastUsedDate) < set.ttl {
 					logger.Debugf("%s: used too recently, skipping", l.ARN())
 					continue
