@@ -125,11 +125,14 @@ func TestMarkCreationTimes(t *testing.T) {
 				ExpectedFirstSeen: threeHoursAgo,
 			},
 			{
-				// Some resources only have times that can potentially reset to newer times (e.g. startup date)
+				// Some resources might be created again with the same name, and we don't want to delete those.
+				// Note that some resources don't record a creation timestamp,
+				// and only have times that can potentially reset to newer times (e.g. startup date),
+				// potentially we will leak those, but if the data keeps increasing that is taken as a usage signal.
 				Resource:          prevSeenNewYoungerCreateTime,
-				ShouldDelete:      true,
+				ShouldDelete:      false,
 				CreateTime:        &tenMinutesAgo,
-				ExpectedFirstSeen: threeHoursAgo,
+				ExpectedFirstSeen: tenMinutesAgo,
 			},
 			{
 				Resource:          fakeResource{"ExcludedByTags"},
