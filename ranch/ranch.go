@@ -59,7 +59,7 @@ type ResourceTypeNotFound struct {
 }
 
 func (r ResourceTypeNotFound) Error() string {
-	return fmt.Sprintf("resource type %q does not exist", r.rType)
+	return common.ResourceTypeNotFoundMessage(r.rType)
 }
 
 // OwnerNotMatch will be returned if request owner does not match current owner for target resource.
@@ -84,7 +84,9 @@ func (s StateNotMatch) Error() string {
 
 // NewRanch creates a new Ranch object.
 // In: config - path to resource file
-//     storage - path to where to save/restore the state data
+//
+//	storage - path to where to save/restore the state data
+//
 // Out: A Ranch object, loaded from config/storage, or error
 func NewRanch(config string, s *Storage, ttl time.Duration) (*Ranch, error) {
 	newRanch := &Ranch{
@@ -103,12 +105,15 @@ type acquireRequestPriorityKey struct {
 // Acquire checks out a type of resource in certain state without an owner,
 // and move the checked out resource to the end of the resource list.
 // In: rtype - name of the target resource
-//     state - current state of the requested resource
-//     dest - destination state of the requested resource
-//     owner - requester of the resource
-//     requestID - request ID to get a priority in the queue
+//
+//	state - current state of the requested resource
+//	dest - destination state of the requested resource
+//	owner - requester of the resource
+//	requestID - request ID to get a priority in the queue
+//
 // Out: A valid Resource object and the time when the resource was originally requested on success, or
-//      ResourceNotFound error if target type resource does not exist in target state.
+//
+//	ResourceNotFound error if target type resource does not exist in target state.
 func (r *Ranch) Acquire(rType, state, dest, owner, requestID string) (*crds.ResourceObject, metav1.Time, error) {
 	logger := logrus.WithFields(logrus.Fields{
 		"type":       rType,
@@ -218,11 +223,14 @@ func addResource(new bool, logger *logrus.Entry, r *Ranch, rType string, typeCou
 // AcquireByState checks out resources of a given type without an owner,
 // that matches a list of resources names.
 // In: state - current state of the requested resource
-//     dest - destination state of the requested resource
-//     owner - requester of the resource
-//     names - names of resource to acquire
+//
+//	dest - destination state of the requested resource
+//	owner - requester of the resource
+//	names - names of resource to acquire
+//
 // Out: A valid list of Resource object on success, or
-//      ResourceNotFound error if target type resource does not exist in target state.
+//
+//	ResourceNotFound error if target type resource does not exist in target state.
 func (r *Ranch) AcquireByState(state, dest, owner string, names []string) ([]*crds.ResourceObject, error) {
 	if names == nil {
 		return nil, fmt.Errorf("must provide names of expected resources")
@@ -276,11 +284,14 @@ func (r *Ranch) AcquireByState(state, dest, owner string, names []string) ([]*cr
 
 // Release unsets owner for target resource and move it to a new state.
 // In: name - name of the target resource
-//     dest - destination state of the resource
-//     owner - owner of the resource
+//
+//	dest - destination state of the resource
+//	owner - owner of the resource
+//
 // Out: nil on success, or
-//      OwnerNotMatch error if owner does not match current owner of the resource, or
-//      ResourceNotFound error if target named resource does not exist.
+//
+//	OwnerNotMatch error if owner does not match current owner of the resource, or
+//	ResourceNotFound error if target named resource does not exist.
 func (r *Ranch) Release(name, dest, owner string) error {
 	if err := retryOnConflict(retry.DefaultBackoff, func() error {
 		res, err := r.Storage.GetResource(name)
@@ -320,13 +331,16 @@ func (r *Ranch) Release(name, dest, owner string) error {
 
 // Update updates the timestamp of a target resource.
 // In: name  - name of the target resource
-//     state - current state of the resource
-//     owner - current owner of the resource
-// 	   info  - information on how to use the resource
+//
+//	    state - current state of the resource
+//	    owner - current owner of the resource
+//		   info  - information on how to use the resource
+//
 // Out: nil on success, or
-//      OwnerNotMatch error if owner does not match current owner of the resource, or
-//      ResourceNotFound error if target named resource does not exist, or
-//      StateNotMatch error if state does not match current state of the resource.
+//
+//	OwnerNotMatch error if owner does not match current owner of the resource, or
+//	ResourceNotFound error if target named resource does not exist, or
+//	StateNotMatch error if state does not match current state of the resource.
 func (r *Ranch) Update(name, owner, state string, ud *common.UserData) error {
 	if err := retryOnConflict(retry.DefaultBackoff, func() error {
 		res, err := r.Storage.GetResource(name)
@@ -358,9 +372,11 @@ func (r *Ranch) Update(name, owner, state string, ud *common.UserData) error {
 
 // Reset unstucks a type of stale resource to a new state.
 // In: rtype - type of the resource
-//     state - current state of the resource
-//     expire - duration before resource's last update
-//     dest - destination state of expired resources
+//
+//	state - current state of the resource
+//	expire - duration before resource's last update
+//	dest - destination state of expired resources
+//
 // Out: map of resource name - resource owner.
 func (r *Ranch) Reset(rtype, state string, expire time.Duration, dest string) (map[string]string, error) {
 	var ret map[string]string

@@ -295,3 +295,7 @@ func (ud *UserData) FromMap(m UserDataMap) {
 		ud.Store(key, value)
 	}
 }
+
+func ResourceTypeNotFoundMessage(rType string) string {
+	return fmt.Sprintf("resource type %q does not exist", rType)
+}
