@@ -82,11 +82,12 @@ func TestAcquire(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tcCopy := tc
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if tc.serverErr == "" {
+			if tcCopy.serverErr == "" {
 				fmt.Fprint(w, FakeRes)
 			} else {
-				http.Error(w, tc.serverErr, http.StatusNotFound)
+				http.Error(w, tcCopy.serverErr, http.StatusNotFound)
 			}
 		}))
 		defer ts.Close()
