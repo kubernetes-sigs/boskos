@@ -28,13 +28,14 @@ import (
 )
 
 var (
-	region = flag.String("region", "", "Region to list (defaults to all)")
+	region                 = flag.String("region", "", "Region to list (defaults to all)")
+	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
 )
 
 func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
 	fmt.Printf("==%T==\n", res)
 	for _, region := range regions {
-		set, err := res.ListAll(resources.Options{Session: sess, Account: acct, Region: region, DryRun: true})
+		set, err := res.ListAll(resources.Options{Session: sess, Account: acct, Region: region, DryRun: true, EnableTargetGroupClean: *enableTargetGroupClean})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
 			continue
