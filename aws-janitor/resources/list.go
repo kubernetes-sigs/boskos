@@ -39,6 +39,9 @@ type Options struct {
 
 	// Whether to actually delete resources, or just report what would be deleted.
 	DryRun bool
+
+	// If true, clean target groups.
+	EnableTargetGroupClean bool
 }
 
 type Type interface {
@@ -78,6 +81,8 @@ var RegionalTypeList = []Type{
 	Addresses{},
 	ElasticFileSystems{},
 	SQSQueues{},
+	// ELBV2 target groups,
+	TargetGroups{},
 }
 
 // Non-regional AWS resource types, in dependency order

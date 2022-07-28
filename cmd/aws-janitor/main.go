@@ -40,14 +40,15 @@ import (
 )
 
 var (
-	maxTTL      = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
-	region      = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
-	path        = flag.String("path", "", "S3 path for mark data (required when -all=false)")
-	cleanAll    = flag.Bool("all", false, "Clean all resources (ignores -path)")
-	logLevel    = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
-	dryRun      = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
-	ttlTagKey   = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
-	pushGateway = flag.String("push-gateway", "", "If specified, push prometheus metrics to this endpoint.")
+	maxTTL                 = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
+	region                 = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
+	path                   = flag.String("path", "", "S3 path for mark data (required when -all=false)")
+	cleanAll               = flag.Bool("all", false, "Clean all resources (ignores -path)")
+	logLevel               = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	dryRun                 = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
+	ttlTagKey              = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
+	pushGateway            = flag.String("push-gateway", "", "If specified, push prometheus metrics to this endpoint.")
+	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
 
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
@@ -126,12 +127,13 @@ func main() {
 	}
 
 	opts := resources.Options{
-		Session:     sess,
-		Account:     acct,
-		DryRun:      *dryRun,
-		ExcludeTags: excludeTM,
-		IncludeTags: includeTM,
-		TTLTagKey:   *ttlTagKey,
+		Session:                sess,
+		Account:                acct,
+		DryRun:                 *dryRun,
+		ExcludeTags:            excludeTM,
+		IncludeTags:            includeTM,
+		TTLTagKey:              *ttlTagKey,
+		EnableTargetGroupClean: *enableTargetGroupClean,
 	}
 
 	if *cleanAll {
