@@ -15,7 +15,7 @@
 # Installs a few extra tools folks might want to use when running boskosctl.
 
 ARG go_version
-ARG alpine_version=3.14
+ARG alpine_version=3.16
 
 FROM golang:${go_version}-alpine${alpine_version} as build
 WORKDIR /go/src/app
