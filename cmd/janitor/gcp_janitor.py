@@ -508,17 +508,7 @@ def activate_service_account(service_account):
 
 def set_quota_project(project):
     print('[=== Setting quota_project %s ===]' % project)
-    cmd = [
-        'gcloud', 'config', 'set', 'billing/quota_project',
-        '%s' % project,
-    ]
-    log('running %s' % cmd)
-
-    try:
-        subprocess.check_call(cmd)
-    except subprocess.CalledProcessError:
-        print('Error try to set quota_project: %s' % project, file=sys.stderr)
-        return 1
+    os.environ['CLOUDSDK_BILLING_QUOTA_PROJECT'] = '%s' % project
     return 0
 
 # Returns whether the specified GCP API is enabled on the provided project.
@@ -585,11 +575,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
         if not api_enabled(project, api):
             continue
         if api in gkehub_apis:
-            cmd = "gcloud config set api_endpoint_overrides/gkehub https://{}/".format(api)
-            try:
-                subprocess.run(cmd, shell=True, text=True, check=True)
-            except (subprocess.CalledProcessError, ValueError) as exc:
-                log('Cannot set GKE HUB endpoint %s with %r, continue' % (api, exc))
+            os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_GKEHUB'] = 'https://{}/'.format(api)
         for res in resources:
             log('Try to search for %r with condition %r, managed %r' % (
                 res.name, res.condition, res.managed))
