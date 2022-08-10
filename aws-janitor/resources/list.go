@@ -42,6 +42,9 @@ type Options struct {
 
 	// If true, clean target groups.
 	EnableTargetGroupClean bool
+
+	// If true, clean key pairs.
+	EnableKeyPairsClean bool
 }
 
 type Type interface {
@@ -83,6 +86,7 @@ var RegionalTypeList = []Type{
 	SQSQueues{},
 	// ELBV2 target groups,
 	TargetGroups{},
+	KeyPairs{},
 }
 
 // Non-regional AWS resource types, in dependency order

@@ -30,12 +30,13 @@ import (
 var (
 	region                 = flag.String("region", "", "Region to list (defaults to all)")
 	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
+	enableKeyPairsClean    = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
 )
 
 func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
 	fmt.Printf("==%T==\n", res)
 	for _, region := range regions {
-		set, err := res.ListAll(resources.Options{Session: sess, Account: acct, Region: region, DryRun: true, EnableTargetGroupClean: *enableTargetGroupClean})
+		set, err := res.ListAll(resources.Options{Session: sess, Account: acct, Region: region, DryRun: true, EnableTargetGroupClean: *enableTargetGroupClean, EnableKeyPairsClean: *enableKeyPairsClean})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
 			continue

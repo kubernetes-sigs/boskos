@@ -55,6 +55,7 @@ var (
 	dryRun                 = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
 	ttlTagKey              = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
 	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
+	enableKeyPairsClean    = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
 
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
@@ -188,6 +189,7 @@ func cleanResource(res *common.Resource) error {
 		IncludeTags:            includeTM,
 		TTLTagKey:              *ttlTagKey,
 		EnableTargetGroupClean: *enableTargetGroupClean,
+		EnableKeyPairsClean:    *enableKeyPairsClean,
 	}
 
 	logrus.WithField("name", res.Name).Info("beginning cleaning")
