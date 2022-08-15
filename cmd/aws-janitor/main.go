@@ -49,6 +49,7 @@ var (
 	ttlTagKey              = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
 	pushGateway            = flag.String("push-gateway", "", "If specified, push prometheus metrics to this endpoint.")
 	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
+	enableKeyPairsClean    = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
 
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
@@ -134,6 +135,7 @@ func main() {
 		IncludeTags:            includeTM,
 		TTLTagKey:              *ttlTagKey,
 		EnableTargetGroupClean: *enableTargetGroupClean,
+		EnableKeyPairsClean:    *enableKeyPairsClean,
 	}
 
 	if *cleanAll {
