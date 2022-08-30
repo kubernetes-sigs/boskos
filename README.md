@@ -240,7 +240,7 @@ resource definition.
 [`crds`] General client library to store data on k8s custom resource definition.
 In theory those could be use outside of Boskos.
 
-For the boskos server that handles k8s e2e jobs, the status is available from the [`Velodrome dashboard`]
+For the boskos server that handles k8s e2e jobs, the status is available from the [`Prow monitoring dashboard`]
 
 ## Adding UserData to a resource
 
@@ -295,7 +295,7 @@ If you don't see a command prompt, try pressing enter.
 [`Mason`]: ./mason
 [`Storage`]: ./storage
 [`crds`]: ./crds
-[`Velodrome dashboard`]: http://velodrome.k8s.io/dashboard/db/boskos-dashboard
+[`Prow monitoring dashboard`]: https://monitoring.prow.k8s.io/d/wSrfvNxWz/boskos-resource-usage
 
 ## Community, discussion, contribution, and support
 
