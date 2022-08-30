@@ -45,6 +45,9 @@ type Options struct {
 
 	// If true, clean key pairs.
 	EnableKeyPairsClean bool
+
+	// If true, clean VPC endpoints.
+	EnableVPCEndpointsClean bool
 }
 
 type Type interface {
@@ -78,6 +81,7 @@ var RegionalTypeList = []Type{
 	RouteTables{},
 	NATGateway{},
 	VPCs{},
+	VPCEndpoints{},
 	DHCPOptions{},
 	Snapshots{},
 	Volumes{},
