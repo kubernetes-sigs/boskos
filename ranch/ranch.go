@@ -299,7 +299,7 @@ func (r *Ranch) Release(name, dest, owner string) error {
 			logrus.WithError(err).Errorf("unable to release resource %s", name)
 			return &ResourceNotFound{name}
 		}
-		if owner != res.Status.Owner {
+		if owner != "" && owner != res.Status.Owner {
 			return &OwnerNotMatch{request: owner, owner: res.Status.Owner}
 		}
 
