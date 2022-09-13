@@ -2,11 +2,6 @@ module sigs.k8s.io/boskos
 
 go 1.18
 
-replace (
-	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-	k8s.io/client-go => k8s.io/client-go v0.24.2
-)
-
 require (
 	github.com/IBM-Cloud/power-go-client v1.1.11
 	github.com/IBM/go-sdk-core/v5 v5.10.2
@@ -25,8 +20,8 @@ require (
 	github.com/spf13/viper v1.8.1
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.3
-	k8s.io/client-go v11.0.1-0.20190805182717-6502b5e7b1b5+incompatible
-	k8s.io/test-infra v0.0.0-20220810003029-a8a8778c45fd
+	k8s.io/client-go v0.24.2
+	k8s.io/test-infra v0.0.0-20220913174101-46ac1a6cf806
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
 )
