@@ -43,19 +43,20 @@ import (
 )
 
 var (
-	boskosURL              = flag.String("boskos-url", "http://boskos", "Boskos URL")
-	rTypes                 common.CommaSeparatedStrings
-	username               = flag.String("username", "", "Username used to access the Boskos server")
-	passwordFile           = flag.String("password-file", "", "The path to password file used to access the Boskos server")
-	region                 = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
-	sweepCount             = flag.Int("sweep-count", 5, "Number of times to sweep the resources")
-	sweepSleep             = flag.String("sweep-sleep", "30s", "The duration to pause between sweeps")
-	sweepSleepDuration     time.Duration
-	logLevel               = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
-	dryRun                 = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
-	ttlTagKey              = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
-	enableTargetGroupClean = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
-	enableKeyPairsClean    = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
+	boskosURL               = flag.String("boskos-url", "http://boskos", "Boskos URL")
+	rTypes                  common.CommaSeparatedStrings
+	username                = flag.String("username", "", "Username used to access the Boskos server")
+	passwordFile            = flag.String("password-file", "", "The path to password file used to access the Boskos server")
+	region                  = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
+	sweepCount              = flag.Int("sweep-count", 5, "Number of times to sweep the resources")
+	sweepSleep              = flag.String("sweep-sleep", "30s", "The duration to pause between sweeps")
+	sweepSleepDuration      time.Duration
+	logLevel                = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
+	dryRun                  = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
+	ttlTagKey               = flag.String("ttl-tag-key", "", "If set, allow resources to use a tag with this key to override TTL")
+	enableTargetGroupClean  = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
+	enableKeyPairsClean     = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
+	enableVPCEndpointsClean = flag.Bool("enable-vpc-endpoints-clean", false, "If true, clean vpc endpoints.")
 
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
@@ -182,14 +183,15 @@ func cleanResource(res *common.Resource) error {
 		return errors.Wrap(err, "Failed retrieving account")
 	}
 	opts := resources.Options{
-		Session:                s,
-		Account:                acct,
-		DryRun:                 *dryRun,
-		ExcludeTags:            excludeTM,
-		IncludeTags:            includeTM,
-		TTLTagKey:              *ttlTagKey,
-		EnableTargetGroupClean: *enableTargetGroupClean,
-		EnableKeyPairsClean:    *enableKeyPairsClean,
+		Session:                 s,
+		Account:                 acct,
+		DryRun:                  *dryRun,
+		ExcludeTags:             excludeTM,
+		IncludeTags:             includeTM,
+		TTLTagKey:               *ttlTagKey,
+		EnableTargetGroupClean:  *enableTargetGroupClean,
+		EnableKeyPairsClean:     *enableKeyPairsClean,
+		EnableVPCEndpointsClean: *enableVPCEndpointsClean,
 	}
 
 	logrus.WithField("name", res.Name).Info("beginning cleaning")
