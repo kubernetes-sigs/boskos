@@ -85,7 +85,7 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 
 	recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
 		for _, rrs := range records.ResourceRecordSets {
-			if !resourceRecordSetIsManaged(rrs) {
+			if !opts.SkipRoute53ManagementCheck && !resourceRecordSetIsManaged(rrs) {
 				continue
 			}
 
@@ -119,7 +119,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 	pageFunc := func(zs *route53.ListHostedZonesOutput, _ bool) bool {
 		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
 		for _, z := range zs.HostedZones {
-			if !zoneIsManaged(z) {
+			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(z) {
 				continue
 			}
 
@@ -193,7 +193,7 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {
 		for _, z := range zones.HostedZones {
 			zone := z
-			if !zoneIsManaged(zone) {
+			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(zone) {
 				continue
 			}
 			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"

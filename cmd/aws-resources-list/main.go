@@ -28,23 +28,25 @@ import (
 )
 
 var (
-	region                  = flag.String("region", "", "Region to list (defaults to all)")
-	enableTargetGroupClean  = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
-	enableKeyPairsClean     = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
-	enableVPCEndpointsClean = flag.Bool("enable-vpc-endpoints-clean", false, "If true, clean vpc endpoints.")
+	region                     = flag.String("region", "", "Region to list (defaults to all)")
+	enableTargetGroupClean     = flag.Bool("enable-target-group-clean", false, "If true, clean target groups.")
+	enableKeyPairsClean        = flag.Bool("enable-key-pairs-clean", false, "If true, clean key pairs.")
+	enableVPCEndpointsClean    = flag.Bool("enable-vpc-endpoints-clean", false, "If true, clean vpc endpoints.")
+	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 )
 
 func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
 	fmt.Printf("==%T==\n", res)
 	for _, region := range regions {
 		set, err := res.ListAll(resources.Options{
-			Session:                 sess,
-			Account:                 acct,
-			Region:                  region,
-			DryRun:                  true,
-			EnableTargetGroupClean:  *enableTargetGroupClean,
-			EnableKeyPairsClean:     *enableKeyPairsClean,
-			EnableVPCEndpointsClean: *enableVPCEndpointsClean,
+			Session:                    sess,
+			Account:                    acct,
+			Region:                     region,
+			DryRun:                     true,
+			EnableTargetGroupClean:     *enableTargetGroupClean,
+			EnableKeyPairsClean:        *enableKeyPairsClean,
+			EnableVPCEndpointsClean:    *enableVPCEndpointsClean,
+			SkipRoute53ManagementCheck: *skipRoute53ManagementCheck,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)

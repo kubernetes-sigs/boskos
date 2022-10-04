@@ -48,6 +48,9 @@ type Options struct {
 
 	// If true, clean VPC endpoints.
 	EnableVPCEndpointsClean bool
+
+	// If true, skip managed zone check and managed resource name check.
+	SkipRoute53ManagementCheck bool
 }
 
 type Type interface {
