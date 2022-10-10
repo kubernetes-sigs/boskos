@@ -22,7 +22,10 @@ import (
 	"github.com/IBM-Cloud/power-go-client/power/models"
 	"github.com/IBM/go-sdk-core/v5/core"
 	identityv1 "github.com/IBM/platform-services-go-sdk/iamidentityv1"
+	"github.com/IBM/vpc-go-sdk/vpcv1"
+
 	"github.com/pkg/errors"
+
 	"sigs.k8s.io/boskos/common"
 )
 
@@ -36,8 +39,14 @@ type CleanupOptions struct {
 }
 
 var PowervsResources = []Resource{
-	PowervsInstance{},
-	PowervsNetwork{},
+	PowerVSInstance{},
+	PowerVSNetwork{},
+}
+
+var VpcResources = []Resource{
+	VPCInstance{},
+	VPCNetwork{},
+	VPCs{},
 }
 
 var CommonResources = []Resource{
@@ -53,6 +62,20 @@ type PowerVS interface {
 	DeletePort(networkID, portID string) error
 }
 
+type VPC interface {
+	DeleteInstance(options *vpcv1.DeleteInstanceOptions) (*core.DetailedResponse, error)
+	ListInstances(options *vpcv1.ListInstancesOptions) (*vpcv1.InstanceCollection, *core.DetailedResponse, error)
+	DeleteVPC(options *vpcv1.DeleteVPCOptions) (*core.DetailedResponse, error)
+	ListVpcs(options *vpcv1.ListVpcsOptions) (*vpcv1.VPCCollection, *core.DetailedResponse, error)
+	DeleteFloatingIP(options *vpcv1.DeleteFloatingIPOptions) (*core.DetailedResponse, error)
+	ListFloatingIps(options *vpcv1.ListFloatingIpsOptions) (*vpcv1.FloatingIPCollection, *core.DetailedResponse, error)
+	DeleteSubnet(options *vpcv1.DeleteSubnetOptions) (*core.DetailedResponse, error)
+	ListSubnets(options *vpcv1.ListSubnetsOptions) (*vpcv1.SubnetCollection, *core.DetailedResponse, error)
+	GetSubnetPublicGateway(options *vpcv1.GetSubnetPublicGatewayOptions) (*vpcv1.PublicGateway, *core.DetailedResponse, error)
+	DeletePublicGateway(options *vpcv1.DeletePublicGatewayOptions) (*core.DetailedResponse, error)
+	UnsetSubnetPublicGateway(options *vpcv1.UnsetSubnetPublicGatewayOptions) (*core.DetailedResponse, error)
+}
+
 type ServiceIDClient interface {
 	CreateAPIKey(options *identityv1.CreateAPIKeyOptions) (*identityv1.APIKey, *core.DetailedResponse, error)
 	DeleteAPIKey(options *identityv1.DeleteAPIKeyOptions) (*core.DetailedResponse, error)
@@ -64,6 +87,8 @@ type ServiceIDClient interface {
 func listResources(rtype string) ([]Resource, error) {
 	if strings.HasPrefix(rtype, "powervs") {
 		return PowervsResources, nil
+	} else if strings.HasPrefix(rtype, "vpc") {
+		return VpcResources, nil
 	}
-	return nil, errors.New("Not a valid resource type. Only supported type is powervs-service")
+	return nil, errors.New("Not a valid resource type. The supported types are powervs-service and vpc-service")
 }

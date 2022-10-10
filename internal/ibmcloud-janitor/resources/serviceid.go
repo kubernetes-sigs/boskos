@@ -20,9 +20,12 @@ import (
 	"fmt"
 
 	identityv1 "github.com/IBM/platform-services-go-sdk/iamidentityv1"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/util/rand"
+
 	"sigs.k8s.io/boskos/common/ibmcloud"
 	"sigs.k8s.io/boskos/internal/ibmcloud-janitor/account"
 )
@@ -95,17 +98,13 @@ func (s *ServiceID) resetKeys(serviceID *identityv1.ServiceID) (*identityv1.APIK
 func (k APIKey) cleanup(options *CleanupOptions) error {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the API key of resource")
-	pclient, err := NewPowerVSClient(options)
-	if err != nil {
-		return errors.Wrap(err, "couldn't create powervs client")
-	}
 
 	auth, err := account.GetAuthenticator()
 	if err != nil {
 		return errors.Wrap(err, "failed to get authenticator")
 	}
 
-	sclient, err := NewServiceIDClient(auth, pclient.key)
+	sclient, err := NewServiceIDClient(auth, &APIKey{serviceIDName: options.Resource.Name})
 	if err != nil {
 		return errors.Wrap(err, "failed to create serviceID client")
 	}
@@ -127,6 +126,6 @@ func (k APIKey) cleanup(options *CleanupOptions) error {
 	}
 	resourceLogger.WithField("API key:", apikey.Name).Info("Successfully reset the API key of the resource")
 
-	ibmcloud.UpdateResource(pclient.resource, *apikey.Apikey)
+	ibmcloud.UpdateResource(options.Resource, *apikey.Apikey)
 	return nil
 }

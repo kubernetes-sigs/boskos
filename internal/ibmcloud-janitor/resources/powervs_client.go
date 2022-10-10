@@ -19,8 +19,10 @@ package resources
 import (
 	"github.com/IBM-Cloud/power-go-client/ibmpisession"
 	"github.com/IBM-Cloud/power-go-client/power/models"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/common/ibmcloud"
 	"sigs.k8s.io/boskos/internal/ibmcloud-janitor/account"
@@ -29,9 +31,8 @@ import (
 type IBMPowerVSClient struct {
 	session *ibmpisession.IBMPISession
 
-	instance *PowervsInstance
-	network  *PowervsNetwork
-	key      *APIKey
+	instance *PowerVSInstance
+	network  *PowerVSNetwork
 	resource *common.Resource
 }
 
@@ -69,13 +70,9 @@ func (p *IBMPowerVSClient) DeletePort(networkID, portID string) error {
 func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	pclient := &IBMPowerVSClient{}
-	powervsData, err := ibmcloud.GetResourceData(options.Resource)
+	powervsData, err := ibmcloud.GetPowerVSResourceData(options.Resource)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the resource data")
-	}
-
-	pclient.key = &APIKey{
-		serviceIDName: options.Resource.Name,
 	}
 
 	auth, err := account.GetAuthenticator()
@@ -83,7 +80,7 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 		return nil, errors.Wrap(err, "failed to get the authenticator")
 	}
 
-	sclient, err := NewServiceIDClient(auth, pclient.key)
+	sclient, err := NewServiceIDClient(auth, &APIKey{serviceIDName: options.Resource.Name})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create serviceID client")
 	}
@@ -96,7 +93,6 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 	clientOptions := &ibmpisession.IBMPIOptions{
 		Debug:         options.Debug,
 		Authenticator: auth,
-		Region:        powervsData.Region,
 		Zone:          powervsData.Zone,
 		UserAccount:   *account,
 	}

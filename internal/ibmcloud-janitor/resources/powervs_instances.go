@@ -21,18 +21,19 @@ import (
 
 	"github.com/IBM-Cloud/power-go-client/clients/instance"
 	"github.com/IBM-Cloud/power-go-client/ibmpisession"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type PowervsInstance struct {
+type PowerVSInstance struct {
 	instanceClient    *instance.IBMPIInstanceClient
 	serviceInstanceID string
 }
 
 // Creates a new PowerVS Instance client
-func NewInstanceClient(sess *ibmpisession.IBMPISession, instanceID string) *PowervsInstance {
-	c := &PowervsInstance{
+func NewInstanceClient(sess *ibmpisession.IBMPISession, instanceID string) *PowerVSInstance {
+	c := &PowerVSInstance{
 		serviceInstanceID: instanceID,
 	}
 	c.instanceClient = instance.NewIBMPIInstanceClient(context.Background(), sess, instanceID)
@@ -40,7 +41,7 @@ func NewInstanceClient(sess *ibmpisession.IBMPISession, instanceID string) *Powe
 }
 
 // Cleans up the virtual server instances in the PowerVS service instance
-func (i PowervsInstance) cleanup(options *CleanupOptions) error {
+func (i PowerVSInstance) cleanup(options *CleanupOptions) error {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the virtual server instances")
 	pclient, err := NewPowerVSClient(options)

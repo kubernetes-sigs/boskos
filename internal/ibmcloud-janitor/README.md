@@ -2,8 +2,9 @@
 
 ## Introduction
 
-IBM Cloud janitor supports resources of type `powervs-service` by default.
-Each resource of type `powervs-service` represents a PowerVS Service Instance of the IBM Cloud.
+IBM Cloud janitor supports resources of type `powervs-service` and `vpc-service`.
+- Each resource of type `powervs-service` represents a PowerVS Service Instance. For this resource type, the janitor cleans up the virtual server instances and network instances in a given service instance.
+- Each resource of type `vpc-service` represents a Virtual Private Cloud(VPC). For this resource type, the janitor cleans up the virtual server instances, subnets, public gateways, floating IPs and VPCs belonging to a particular resource group in a given region. The region and resource group are added to the user data of a resource.
 
 ```yaml
 ---
@@ -15,32 +16,48 @@ resources:
     - "k8s-boskos-powervs-lon04-01"
     - "k8s-boskos-powervs-lon06-00"
     - "k8s-boskos-powervs-osa21-00"
+  - type: "vpc-service"
+    state: dirty
+    names:
+    - "k8s-boskos-vpc-00"
+    - "k8s-boskos-vpc-01"
+    - "k8s-boskos-vpc-02"
+    - "k8s-boskos-vpc-03"
 ```
-> For more information on IBM Power Systems Virtual Servers, refer [here](https://cloud.ibm.com/docs/power-iaas?topic=power-iaas-getting-started).
+> For more information on IBM Power Systems Virtual Servers, refer [here](https://cloud.ibm.com/docs/power-iaas?topic=power-iaas-getting-started) and for VPC, refer [here](https://www.ibm.com/cloud/learn/vpc)
 
 ## Architecture
 
 <img src="./images/flow.png" width="800" height="500">
 
-A resource `k8s-boskos-powervs-lon04-00` representing a  [service instance](https://cloud.ibm.com/docs/power-iaas?topic=power-iaas-creating-power-virtual-server#creating-power-virtual-server) is mapped to a [Service ID](https://cloud.ibm.com/docs/account?topic=account-serviceids&interface=ui) in the IBM Cloud. An [API key](https://cloud.ibm.com/docs/account?topic=account-userapikey&interface=ui) specific to a service ID can be created  and used by an application to authenticate IBM Cloud services.
-The API key is updated as a part of resource user data and can be used by an owner acquiring it.
+- A resource of type `powervs-service` which represents a  [service instance](https://cloud.ibm.com/docs/power-iaas?topic=power-iaas-creating-power-virtual-server#creating-power-virtual-server) or of type `vpc-service` which represents a [VPC](https://cloud.ibm.com/docs/vpc?topic=vpc-getting-started) is mapped to a [Service ID](https://cloud.ibm.com/docs/account?topic=account-serviceids&interface=ui) in the IBM Cloud. 
+- An [API key](https://cloud.ibm.com/docs/account?topic=account-userapikey&interface=ui) specific to a service ID can be created  and used by an application to authenticate IBM Cloud services.
+- The API key is updated as a part of resource user data and can be used by an owner acquiring it.
 
 ## User Data of a resource
 
-Every resource stores the following user data.
+Every resource of type `powervs-service` stores the following user data.
 
 | Name    | Description                    |
 | ------- | ------------------------------ |
 | `service-instance-id`  | ID of service instance        |
-| `api-key` | API Key of a Service ID         |
+| `api-key` | API Key of mapped Service ID         |
 | `region` | PowerVS region  |
 | `zone` | PowerVS zone of a given region  |
 | `resource-group` | Resource group of the service instances  |
 
+Every resource of type `vpc-service` stores the following user data.
+
+| Name    | Description                    |
+| ------- | ------------------------------ |
+| `api-key` | API Key of mapped Service ID         |
+| `region` | VPC region  |
+| `resource-group` | Resource group of the cloud instances |
+
 You can use `/update` to update the resource. Owner needs to match current owner.
 
 ```bash
-curl -X POST -d '{"service-instance-id":"your-service-instance-id","api-key":"dummyAPiKey","region":"lon","zone":"lon04","resource-group":"cloud-resource-group"}' "http://localhost:8080/update?name=service-instance-1&state=busy&owner=IBMCloudJanitor"
+curl -X POST -d '{"api-key":"dummyAPiKey","region":"lon","resource-group":"cloud-resource-group"}' "http://localhost:8080/update?name=boskos-resource-name&state=busy&owner=IBMCloudJanitor"
 ```
 
 ## How to run on local k8s cluster
@@ -96,11 +113,11 @@ spec:
 ## How to run it locally
 1. Start boskos with a resources config.yaml, with `go run boskos.go -in_memory -config=/path/to/config.yaml`
 
-2. Start the janitor by running ` go run main.go --boskos-url=http://localhost:8080`. Pass the `--debug` flag set to true for enabling debug logs from the PowerVS client.
+2. Start the janitor by running ` go run main.go --boskos-url=http://localhost:8080`. Pass the `--debug` flag set to true for enabling debug logs from the PowerVS or VPC client.
 
 3. You can send local requests to boskos by running
 ```
-curl 'http://localhost:8080/acquire?type=powervs-service&state=free&dest=busy&owner=user'
+curl 'http://localhost:8080/acquire?type=<resource-type>&state=free&dest=busy&owner=user'
 ```
 
 
