@@ -23,7 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/logrusutil"
+
 	boskosClient "sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/internal/ibmcloud-janitor/resources"
@@ -87,8 +89,8 @@ func main() {
 	logrus.SetLevel(level)
 
 	if len(rTypes) == 0 {
-		logrus.Info("--resource-type is empty! Setting it to default: powervs-service")
-		rTypes = []string{"powervs-service"}
+		logrus.Info("--resource-type is empty! Setting it to the defaults: powervs-service and vpc-service")
+		rTypes = []string{"powervs-service", "vpc-service"}
 	}
 
 	boskos, err := boskosClient.NewClient("IBMCloudJanitor", *boskosURL, *username, *passwordFile)

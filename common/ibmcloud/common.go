@@ -29,16 +29,21 @@ const (
 	APIKey            = "api-key"
 	Region            = "region"
 	Zone              = "zone"
+	ResourceGroup     = "resource-group"
 )
 
-type ResourceData struct {
+type PowerVSResourceData struct {
 	ServiceInstanceID string
-	Region            string
 	Zone              string
 }
 
-// Fetches the resource user data
-func GetResourceData(r *common.Resource) (*ResourceData, error) {
+type VPCResourceData struct {
+	Region        string
+	ResourceGroup string
+}
+
+// Fetches the resource user data for type powervs-service
+func GetPowerVSResourceData(r *common.Resource) (*PowerVSResourceData, error) {
 	if !strings.HasPrefix(r.Type, "powervs") {
 		return nil, fmt.Errorf("invalid resource type %q", r.Type)
 	}
@@ -48,20 +53,35 @@ func GetResourceData(r *common.Resource) (*ResourceData, error) {
 		return nil, errors.New("no Service Instance ID in UserData")
 	}
 
-	region, ok := r.UserData.Map.Load(Region)
-	if !ok {
-		return nil, errors.New("no region in UserData")
-	}
-
 	zone, ok := r.UserData.Map.Load(Zone)
 	if !ok {
 		return nil, errors.New("no zone in UserData")
 	}
 
-	return &ResourceData{
+	return &PowerVSResourceData{
 		ServiceInstanceID: sid.(string),
-		Region:            region.(string),
 		Zone:              zone.(string),
+	}, nil
+}
+
+// Fetches the resource user data for type vpc-service
+func GetVPCResourceData(r *common.Resource) (*VPCResourceData, error) {
+	if !strings.HasPrefix(r.Type, "vpc") {
+		return nil, fmt.Errorf("invalid resource type %q", r.Type)
+	}
+
+	region, ok := r.UserData.Map.Load(Region)
+	if !ok {
+		return nil, errors.New("no region in UserData")
+	}
+	rg, ok := r.UserData.Map.Load(ResourceGroup)
+	if !ok {
+		return nil, errors.New("no resource group in UserData")
+	}
+
+	return &VPCResourceData{
+		Region:        region.(string),
+		ResourceGroup: rg.(string),
 	}, nil
 }
 

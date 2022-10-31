@@ -21,18 +21,19 @@ import (
 
 	"github.com/IBM-Cloud/power-go-client/clients/instance"
 	"github.com/IBM-Cloud/power-go-client/ibmpisession"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-type PowervsNetwork struct {
+type PowerVSNetwork struct {
 	networkClient     *instance.IBMPINetworkClient
 	serviceInstanceID string
 }
 
 // Creates a new PowerVS Network client
-func NewNetworkClient(sess *ibmpisession.IBMPISession, instanceID string) *PowervsNetwork {
-	c := &PowervsNetwork{
+func NewNetworkClient(sess *ibmpisession.IBMPISession, instanceID string) *PowerVSNetwork {
+	c := &PowerVSNetwork{
 		serviceInstanceID: instanceID,
 	}
 	c.networkClient = instance.NewIBMPINetworkClient(context.Background(), sess, instanceID)
@@ -40,7 +41,7 @@ func NewNetworkClient(sess *ibmpisession.IBMPISession, instanceID string) *Power
 }
 
 // Cleans up the networks in the PowerVS service instance
-func (n PowervsNetwork) cleanup(options *CleanupOptions) error {
+func (n PowerVSNetwork) cleanup(options *CleanupOptions) error {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the networks")
 	pclient, err := NewPowerVSClient(options)
