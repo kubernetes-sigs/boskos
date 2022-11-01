@@ -51,6 +51,9 @@ type Options struct {
 
 	// If true, skip managed zone check and managed resource name check.
 	SkipRoute53ManagementCheck bool
+
+	// If ture, clean DNS zones.
+	EnableDNSZoneClean bool
 }
 
 type Type interface {

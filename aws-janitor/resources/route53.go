@@ -180,6 +180,15 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 				logger.Warningf("unable to delete DNS records: %v", err)
 			}
 		}
+
+		if opts.EnableDNSZoneClean && len(toDelete) > 0 {
+			deleteHostZoneReq := &route53.DeleteHostedZoneInput{
+				Id: zone.Id,
+			}
+			if _, err := svc.DeleteHostedZone(deleteHostZoneReq); err != nil {
+				logger.Warningf("unable to delete DNS zone: %v", err)
+			}
+		}
 	}
 
 	return nil
