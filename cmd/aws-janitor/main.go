@@ -42,7 +42,7 @@ import (
 var (
 	maxTTL                     = flag.Duration("ttl", 24*time.Hour, "Maximum time before attempting to delete a resource. Set to 0s to nuke all non-default resources.")
 	region                     = flag.String("region", "", "The region to clean (otherwise defaults to all regions)")
-	path                       = flag.String("path", "", "S3 path for mark data (required when -all=false)")
+	path                       = flag.String("path", "", "S3 path for mark data, the bucket must be marked with excludeTags if s3 bucket clean is on (required when -all=false)")
 	cleanAll                   = flag.Bool("all", false, "Clean all resources (ignores -path)")
 	logLevel                   = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	dryRun                     = flag.Bool("dry-run", false, "If set, don't delete any resources, only log what would be done")
@@ -53,6 +53,7 @@ var (
 	enableVPCEndpointsClean    = flag.Bool("enable-vpc-endpoints-clean", false, "If true, clean vpc endpoints.")
 	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
+	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
 
 	excludeTags common.CommaSeparatedStrings
 	includeTags common.CommaSeparatedStrings
@@ -142,6 +143,7 @@ func main() {
 		EnableVPCEndpointsClean:    *enableVPCEndpointsClean,
 		SkipRoute53ManagementCheck: *skipRoute53ManagementCheck,
 		EnableDNSZoneClean:         *enableDNSZoneClean,
+		EnableS3BucketsClean:       *enableS3BucketsClean,
 	}
 
 	if *cleanAll {
@@ -162,7 +164,17 @@ func markAndSweep(opts resources.Options, region string) error {
 	if err != nil {
 		return errors.Wrapf(err, "-path %q isn't a valid S3 path", *path)
 	}
-
+	// If we enable S3 buckets clean, the state bucket which stores janitor state data must be tagged with exclude-tags.
+	// Otherwise, if it got cleaned by janitor, the metadata about other resources will also be deleted unintentionally.
+	if *enableS3BucketsClean {
+		isManagedBucket, err := resources.IsManagedS3Bucket(opts, region, s3p.Bucket)
+		if err != nil {
+			return errors.Wrapf(err, "Error checking bucket: %s management state", s3p.Bucket)
+		}
+		if isManagedBucket {
+			return fmt.Errorf("state bucket %s, must be tagged with exclude-tags", s3p.Bucket)
+		}
+	}
 	regionList, err := regions.ParseRegion(opts.Session, region)
 	if err != nil {
 		return err
