@@ -22,6 +22,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -91,6 +92,14 @@ func fromEC2Tags(ec2tags []*ec2.Tag) Tags {
 	tags := make(Tags, len(ec2tags))
 	for _, ec2t := range ec2tags {
 		tags.Add(ec2t.Key, ec2t.Value)
+	}
+	return tags
+}
+
+func fromS3Tags(s3Tags []*s3.Tag) Tags {
+	tags := make(Tags, len(s3Tags))
+	for _, s3tag := range s3Tags {
+		tags.Add(s3tag.Key, s3tag.Value)
 	}
 	return tags
 }

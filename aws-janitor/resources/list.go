@@ -52,8 +52,11 @@ type Options struct {
 	// If true, skip managed zone check and managed resource name check.
 	SkipRoute53ManagementCheck bool
 
-	// If ture, clean DNS zones.
+	// If true, clean DNS zones.
 	EnableDNSZoneClean bool
+
+	// If true, clean S3 Buckets.
+	EnableS3BucketsClean bool
 }
 
 type Type interface {
@@ -97,6 +100,7 @@ var RegionalTypeList = []Type{
 	// ELBV2 target groups,
 	TargetGroups{},
 	KeyPairs{},
+	S3Bucket{},
 }
 
 // Non-regional AWS resource types, in dependency order

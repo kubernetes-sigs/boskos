@@ -34,6 +34,7 @@ var (
 	enableVPCEndpointsClean    = flag.Bool("enable-vpc-endpoints-clean", false, "If true, clean vpc endpoints.")
 	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
+	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
 )
 
 func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
@@ -49,6 +50,7 @@ func listResources(res resources.Type, sess *session.Session, acct string, regio
 			EnableVPCEndpointsClean:    *enableVPCEndpointsClean,
 			SkipRoute53ManagementCheck: *skipRoute53ManagementCheck,
 			EnableDNSZoneClean:         *enableDNSZoneClean,
+			EnableS3BucketsClean:       *enableS3BucketsClean,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
