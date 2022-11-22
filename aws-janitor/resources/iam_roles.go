@@ -166,6 +166,19 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 		return errors.Wrapf(err, "error listing IAM role policies for %q", roleName)
 	}
 
+	var attachedRolePolicyArns []string
+	attachedRolePoliciesReq := &iam.ListAttachedRolePoliciesInput{RoleName: aws.String(roleName)}
+	err = svc.ListAttachedRolePoliciesPages(attachedRolePoliciesReq, func(page *iam.ListAttachedRolePoliciesOutput, _ bool) bool {
+		for _, attachedRolePolicy := range page.AttachedPolicies {
+			attachedRolePolicyArns = append(attachedRolePolicyArns, aws.StringValue(attachedRolePolicy.PolicyArn))
+		}
+		return true
+	})
+
+	if err != nil {
+		return errors.Wrapf(err, "error listing IAM attached role policies for %q", roleName)
+	}
+
 	for _, policyName := range policyNames {
 		logger.Infof("Deleting IAM role policy %q %q", roleName, policyName)
 
@@ -177,6 +190,20 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 		if _, err := svc.DeleteRolePolicy(deletePolicyReq); err != nil {
 			return errors.Wrapf(err, "error deleting IAM role policy %q %q", roleName, policyName)
 		}
+	}
+
+	for _, attachedRolePolicyArn := range attachedRolePolicyArns {
+		logger.Infof("Detaching IAM attached role policy %q %q", roleName, attachedRolePolicyArn)
+
+		detachRolePolicyReq := &iam.DetachRolePolicyInput{
+			PolicyArn: aws.String(attachedRolePolicyArn),
+			RoleName:  aws.String(roleName),
+		}
+
+		if _, err := svc.DetachRolePolicy(detachRolePolicyReq); err != nil {
+			return errors.Wrapf(err, "error detaching IAM role policy %q %q", roleName, attachedRolePolicyArn)
+		}
+
 	}
 
 	logger.Debugf("Deleting IAM role %q", roleName)
