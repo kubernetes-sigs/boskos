@@ -80,6 +80,7 @@ var RegionalTypeList = []Type{
 	LaunchConfigurations{},
 	LaunchTemplates{},
 	Instances{},
+	VPCEndpoints{},
 	// Addresses
 	NetworkInterfaces{},
 	Subnets{},
@@ -90,7 +91,6 @@ var RegionalTypeList = []Type{
 	RouteTables{},
 	NATGateway{},
 	VPCs{},
-	VPCEndpoints{},
 	DHCPOptions{},
 	Snapshots{},
 	Volumes{},

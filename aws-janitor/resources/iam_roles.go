@@ -203,7 +203,6 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 		if _, err := svc.DetachRolePolicy(detachRolePolicyReq); err != nil {
 			return errors.Wrapf(err, "error detaching IAM role policy %q %q", roleName, attachedRolePolicyArn)
 		}
-
 	}
 
 	logger.Debugf("Deleting IAM role %q", roleName)
