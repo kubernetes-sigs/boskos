@@ -167,7 +167,7 @@ func markAndSweep(opts resources.Options, region string) error {
 	// If we enable S3 buckets clean, the state bucket which stores janitor state data must be tagged with exclude-tags.
 	// Otherwise, if it got cleaned by janitor, the metadata about other resources will also be deleted unintentionally.
 	if *enableS3BucketsClean {
-		isManagedBucket, err := resources.IsManagedS3Bucket(opts, region, s3p.Bucket)
+		isManagedBucket, err := resources.IsManagedS3Bucket(opts, s3p.Region, s3p.Bucket)
 		if err != nil {
 			return errors.Wrapf(err, "Error checking bucket: %s management state", s3p.Bucket)
 		}
