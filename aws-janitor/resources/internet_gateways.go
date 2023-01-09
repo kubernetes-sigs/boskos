@@ -77,6 +77,37 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 				break
 			}
 
+			var publicIPsToRelease []*string
+
+			pageFunc := func(page *ec2.DescribeNetworkInterfacesOutput, _ bool) bool {
+				for _, eni := range page.NetworkInterfaces {
+					publicIPsToRelease = append(publicIPsToRelease, eni.Association.PublicIp)
+				}
+				return true
+			}
+
+			if err := svc.DescribeNetworkInterfacesPages(&ec2.DescribeNetworkInterfacesInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   aws.String("vpc-id"),
+						Values: []*string{aws.String(*att.VpcId)},
+					},
+				},
+			}, pageFunc); err != nil {
+				return err
+			}
+
+			// According to https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html#detach-igw
+			// Before detaching the internet gateway, we must dissassociate elastic IPs first.
+			for _, publicIP := range publicIPsToRelease {
+				disassociateReq := &ec2.DisassociateAddressInput{
+					PublicIp: aws.String(*publicIP),
+				}
+				if _, err := svc.DisassociateAddress(disassociateReq); err != nil {
+					logger.Warningf("%s: disassociate failed: %v", *publicIP, err)
+				}
+			}
+
 			detachReq := &ec2.DetachInternetGatewayInput{
 				InternetGatewayId: ig.InternetGatewayId,
 				VpcId:             att.VpcId,
