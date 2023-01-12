@@ -94,9 +94,11 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 			if !set.Mark(opts, o, nil, zoneTags) {
 				continue
 			}
-			logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
-			if !opts.DryRun {
-				toDelete = append(toDelete, o)
+			if _, ok := opts.SkipResourceRecordSetTypes[*rrs.Type]; !ok {
+				logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
+				if !opts.DryRun {
+					toDelete = append(toDelete, o)
+				}
 			}
 		}
 		return true
@@ -177,7 +179,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 			}
 
 			if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
-				logger.Warningf("unable to delete DNS records: %v", err)
+				logger.Warningf("unable to delete DNS records for zone %v with error: %v", aws.StringValue(zone.Id), err)
 			}
 		}
 
@@ -186,7 +188,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 				Id: zone.Id,
 			}
 			if _, err := svc.DeleteHostedZone(deleteHostZoneReq); err != nil {
-				logger.Warningf("unable to delete DNS zone: %v", err)
+				logger.Warningf("unable to delete DNS zone %v with error: %v", aws.StringValue(zone.Id), err)
 			}
 		}
 	}
