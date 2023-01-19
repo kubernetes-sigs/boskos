@@ -3,10 +3,10 @@ module sigs.k8s.io/boskos
 go 1.18
 
 require (
-	github.com/IBM-Cloud/power-go-client v1.2.1
-	github.com/IBM/go-sdk-core/v5 v5.10.2
-	github.com/IBM/platform-services-go-sdk v0.28.6
-	github.com/IBM/vpc-go-sdk v0.27.0
+	github.com/IBM-Cloud/power-go-client v1.2.2
+	github.com/IBM/go-sdk-core/v5 v5.12.1
+	github.com/IBM/platform-services-go-sdk v0.31.4
+	github.com/IBM/vpc-go-sdk v0.31.0
 	github.com/aws/aws-sdk-go v1.44.72
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-test/deep v1.0.7
