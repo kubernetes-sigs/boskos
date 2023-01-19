@@ -78,6 +78,18 @@ func (c *IBMVPCClient) UnsetSubnetPublicGateway(options *vpcv1.UnsetSubnetPublic
 	return c.vpcService.UnsetSubnetPublicGateway(options)
 }
 
+func (c *IBMVPCClient) DeleteLoadBalancer(options *vpcv1.DeleteLoadBalancerOptions) (*core.DetailedResponse, error) {
+	return c.vpcService.DeleteLoadBalancer(options)
+}
+
+func (c *IBMVPCClient) ListLoadBalancers(options *vpcv1.ListLoadBalancersOptions) (*vpcv1.LoadBalancerCollection, *core.DetailedResponse, error) {
+	return c.vpcService.ListLoadBalancers(options)
+}
+
+func (c *IBMVPCClient) GetLoadBalancer(options *vpcv1.GetLoadBalancerOptions) (result *vpcv1.LoadBalancer, response *core.DetailedResponse, err error) {
+	return c.vpcService.GetLoadBalancer(options)
+}
+
 // Creates a new VPC Client
 func NewVPCClient(options *CleanupOptions) (*IBMVPCClient, error) {
 	client := &IBMVPCClient{}

@@ -45,6 +45,7 @@ var PowervsResources = []Resource{
 
 var VpcResources = []Resource{
 	VPCInstance{},
+	VPCLoadBalancer{},
 	VPCNetwork{},
 	VPCs{},
 }
@@ -74,6 +75,9 @@ type VPC interface {
 	GetSubnetPublicGateway(options *vpcv1.GetSubnetPublicGatewayOptions) (*vpcv1.PublicGateway, *core.DetailedResponse, error)
 	DeletePublicGateway(options *vpcv1.DeletePublicGatewayOptions) (*core.DetailedResponse, error)
 	UnsetSubnetPublicGateway(options *vpcv1.UnsetSubnetPublicGatewayOptions) (*core.DetailedResponse, error)
+	DeleteLoadBalancer(options *vpcv1.DeleteLoadBalancerOptions) (*core.DetailedResponse, error)
+	ListLoadBalancers(options *vpcv1.ListLoadBalancersOptions) (*vpcv1.LoadBalancerCollection, *core.DetailedResponse, error)
+	GetLoadBalancer(options *vpcv1.GetLoadBalancerOptions) (result *vpcv1.LoadBalancer, response *core.DetailedResponse, err error)
 }
 
 type ServiceIDClient interface {
