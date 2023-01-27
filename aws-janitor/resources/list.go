@@ -57,6 +57,9 @@ type Options struct {
 
 	// If true, clean S3 Buckets.
 	EnableS3BucketsClean bool
+
+	// Resource record set types that shoud not be deleted.
+	SkipResourceRecordSetTypes map[string]bool
 }
 
 type Type interface {

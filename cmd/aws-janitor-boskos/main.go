@@ -61,10 +61,12 @@ var (
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
 	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
 
-	excludeTags common.CommaSeparatedStrings
-	includeTags common.CommaSeparatedStrings
-	excludeTM   resources.TagMatcher
-	includeTM   resources.TagMatcher
+	excludeTags                common.CommaSeparatedStrings
+	includeTags                common.CommaSeparatedStrings
+	skipResourceRecordSetTypes common.CommaSeparatedStrings
+
+	excludeTM resources.TagMatcher
+	includeTM resources.TagMatcher
 
 	instrumentationOptions prowflagutil.InstrumentationOptions
 
@@ -90,6 +92,7 @@ func init() {
 		"Resources with any of these tags will not be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
 	flag.Var(&includeTags, "include-tags",
 		"Resources must include all of these tags in order to be managed by the janitor. Given as a comma-separated list of tags in key[=value] format; excluding the value will match any tag with that key. Keys can be repeated.")
+	flag.Var(&skipResourceRecordSetTypes, "skip-resource-record-set-types", "A list of resource record types which should not be deleted, splitted using comma.")
 
 	prometheus.MustRegister(cleaningTimeHistogram)
 	prometheus.MustRegister(sweepsGauge)
@@ -185,6 +188,19 @@ func cleanResource(res *common.Resource) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed retrieving account")
 	}
+	skipResourceRecordSetTypesSet := map[string]bool{}
+	// A HostedZone must contain at least one NS record for the zone itself.
+	// A HostedZone must contain exactly one SOA record.
+	// Thus, by default, we should not delete record set with type 'NS' or 'SOA'.
+	if len(skipResourceRecordSetTypes) == 0 {
+		err := skipResourceRecordSetTypes.Set("SOA,NS")
+		if err != nil {
+			logrus.Fatalf("Error setting --skip-resource-record-set-types: %v", err)
+		}
+	}
+	for _, resourceRecordType := range skipResourceRecordSetTypes {
+		skipResourceRecordSetTypesSet[resourceRecordType] = true
+	}
 	opts := resources.Options{
 		Session:                    s,
 		Account:                    acct,
@@ -198,6 +214,7 @@ func cleanResource(res *common.Resource) error {
 		SkipRoute53ManagementCheck: *skipRoute53ManagementCheck,
 		EnableDNSZoneClean:         *enableDNSZoneClean,
 		EnableS3BucketsClean:       *enableS3BucketsClean,
+		SkipResourceRecordSetTypes: skipResourceRecordSetTypesSet,
 	}
 
 	logrus.WithField("name", res.Name).Info("beginning cleaning")
