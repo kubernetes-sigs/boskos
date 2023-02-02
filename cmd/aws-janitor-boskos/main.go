@@ -60,6 +60,7 @@ var (
 	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
 	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
+	disassociatePublicIP       = flag.Bool("disassociate-public-ip", false, "If true, disassociate public IP before detaching internet gateways.")
 
 	excludeTags                common.CommaSeparatedStrings
 	includeTags                common.CommaSeparatedStrings
@@ -215,6 +216,7 @@ func cleanResource(res *common.Resource) error {
 		EnableDNSZoneClean:         *enableDNSZoneClean,
 		EnableS3BucketsClean:       *enableS3BucketsClean,
 		SkipResourceRecordSetTypes: skipResourceRecordSetTypesSet,
+		DisassociatePublicIP:       *disassociatePublicIP,
 	}
 
 	logrus.WithField("name", res.Name).Info("beginning cleaning")

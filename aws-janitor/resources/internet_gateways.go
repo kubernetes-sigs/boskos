@@ -66,9 +66,6 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 		logger.Warningf("%s: deleting %T: %s (%s)", i.ARN(), ig, i.ID, tags[NameTagKey])
-		if opts.DryRun {
-			continue
-		}
 
 		isDefault := false
 		for _, att := range ig.Attachments {
@@ -77,35 +74,45 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 				break
 			}
 
-			var publicIPsToRelease []*string
+			if opts.DisassociatePublicIP {
+				var publicIPsToRelease []*string
 
-			pageFunc := func(page *ec2.DescribeNetworkInterfacesOutput, _ bool) bool {
-				for _, eni := range page.NetworkInterfaces {
-					publicIPsToRelease = append(publicIPsToRelease, eni.Association.PublicIp)
+				pageFunc := func(page *ec2.DescribeNetworkInterfacesOutput, _ bool) bool {
+					for _, eni := range page.NetworkInterfaces {
+						publicIPsToRelease = append(publicIPsToRelease, eni.Association.PublicIp)
+					}
+					return true
 				}
-				return true
-			}
 
-			if err := svc.DescribeNetworkInterfacesPages(&ec2.DescribeNetworkInterfacesInput{
-				Filters: []*ec2.Filter{
-					{
-						Name:   aws.String("vpc-id"),
-						Values: []*string{aws.String(*att.VpcId)},
+				if err := svc.DescribeNetworkInterfacesPages(&ec2.DescribeNetworkInterfacesInput{
+					Filters: []*ec2.Filter{
+						{
+							Name:   aws.String("vpc-id"),
+							Values: []*string{aws.String(*att.VpcId)},
+						},
 					},
-				},
-			}, pageFunc); err != nil {
-				return err
-			}
+				}, pageFunc); err != nil {
+					logger.Warningf("fail to get public IP for vpc %s: %v", *att.VpcId, err)
+				}
 
-			// According to https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html#detach-igw
-			// Before detaching the internet gateway, we must dissassociate elastic IPs first.
-			for _, publicIP := range publicIPsToRelease {
-				disassociateReq := &ec2.DisassociateAddressInput{
-					PublicIp: aws.String(*publicIP),
+				logger.Warningf("%s: disassociating public IPs for vpc: %s", i.ARN(), *att.VpcId)
+				if opts.DryRun {
+					continue
 				}
-				if _, err := svc.DisassociateAddress(disassociateReq); err != nil {
-					logger.Warningf("%s: disassociate failed: %v", *publicIP, err)
+				// According to https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html#detach-igw
+				// Before detaching the internet gateway, we must dissassociate elastic IPs first.
+				for _, publicIP := range publicIPsToRelease {
+					disassociateReq := &ec2.DisassociateAddressInput{
+						PublicIp: aws.String(*publicIP),
+					}
+					if _, err := svc.DisassociateAddress(disassociateReq); err != nil {
+						logger.Warningf("%s: disassociate failed: %v", *publicIP, err)
+					}
 				}
+			}
+			logger.Warningf("%s: detaching internet gateway: %s for vpc: %s", i.ARN(), *ig.InternetGatewayId, *att.VpcId)
+			if opts.DryRun {
+				continue
 			}
 
 			detachReq := &ec2.DetachInternetGatewayInput{
@@ -120,6 +127,10 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 		if isDefault {
 			logger.Infof("%s: skipping delete as IGW is the default for the VPC %T: %s", i.ARN(), ig, i.ID)
+			continue
+		}
+
+		if opts.DryRun {
 			continue
 		}
 

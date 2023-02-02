@@ -60,6 +60,9 @@ type Options struct {
 
 	// Resource record set types that shoud not be deleted.
 	SkipResourceRecordSetTypes map[string]bool
+
+	// If true, dissociate public IP before detaching internet gateways.
+	DisassociatePublicIP bool
 }
 
 type Type interface {
