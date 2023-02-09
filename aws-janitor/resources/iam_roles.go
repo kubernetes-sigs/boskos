@@ -48,6 +48,14 @@ func fetchRoleAndTags(svc *iam.IAM, roleName *string) (*iam.Role, Tags, error) {
 	return role, tags, nil
 }
 
+func fetchPolicyTag(policy *iam.Policy) Tags {
+	tags := make(Tags, len(policy.Tags))
+	for _, t := range policy.Tags {
+		tags.Add(t.Key, t.Value)
+	}
+	return tags
+}
+
 // Roles defined by AWS documentation that do not live in the /aws-service-role/ path.
 var builtinRoles = sets.NewString(
 	// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet-requests.html
@@ -91,9 +99,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 					continue
 				}
 				logger.Warningf("%s: deleting %T: %s", l.ARN(), role, l.roleName)
-				if !opts.DryRun {
-					toDelete = append(toDelete, l)
-				}
+				toDelete = append(toDelete, l)
 			}
 		}
 		return true
@@ -103,8 +109,25 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 		return err
 	}
 
+	// If we delete detached policies, we only need to handle customer managed policies and skip aws managed policies.
+	// Thus, we list all attached customer managed policies here as the candiate list.
+	// When detaching policies from IAM roles, we only need to delete orphaned policies which exist in the list.
+	customerManagedPolicyArns := make(map[string]bool)
+	if opts.DeleteDetachedPolicy {
+		pageFunc := func(page *iam.ListPoliciesOutput, _ bool) bool {
+			for _, p := range page.Policies {
+				customerManagedPolicyArns[*p.Arn] = true
+			}
+			return true
+		}
+		// set the scope to be iam.PolicyScopeTypeLocal, only list customer managed policies.
+		if err := svc.ListPoliciesPages(&iam.ListPoliciesInput{Scope: aws.String(iam.PolicyScopeTypeLocal), OnlyAttached: aws.Bool(true)}, pageFunc); err != nil {
+			logger.Warningf("failed listing policies: %v", err)
+		}
+	}
+
 	for _, r := range toDelete {
-		if err := r.delete(svc, logger); err != nil {
+		if err := r.delete(svc, logger, opts, customerManagedPolicyArns); err != nil {
 			logger.Warningf("%s: delete failed: %v", r.ARN(), err)
 		}
 	}
@@ -149,7 +172,7 @@ func (r iamRole) ResourceKey() string {
 	return r.roleID + "::" + r.ARN()
 }
 
-func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
+func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger, opts Options, customerManagedPolicyArns map[string]bool) error {
 	roleName := r.roleName
 
 	var policyNames []string
@@ -181,38 +204,65 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 
 	for _, policyName := range policyNames {
 		logger.Infof("Deleting IAM role policy %q %q", roleName, policyName)
+		if !opts.DryRun {
+			deletePolicyReq := &iam.DeleteRolePolicyInput{
+				RoleName:   aws.String(roleName),
+				PolicyName: aws.String(policyName),
+			}
 
-		deletePolicyReq := &iam.DeleteRolePolicyInput{
-			RoleName:   aws.String(roleName),
-			PolicyName: aws.String(policyName),
-		}
-
-		if _, err := svc.DeleteRolePolicy(deletePolicyReq); err != nil {
-			return errors.Wrapf(err, "error deleting IAM role policy %q %q", roleName, policyName)
+			if _, err := svc.DeleteRolePolicy(deletePolicyReq); err != nil {
+				return errors.Wrapf(err, "error deleting IAM role policy %q %q", roleName, policyName)
+			}
 		}
 	}
 
 	for _, attachedRolePolicyArn := range attachedRolePolicyArns {
 		logger.Infof("Detaching IAM attached role policy %q %q", roleName, attachedRolePolicyArn)
+		if !opts.DryRun {
+			detachRolePolicyReq := &iam.DetachRolePolicyInput{
+				PolicyArn: aws.String(attachedRolePolicyArn),
+				RoleName:  aws.String(roleName),
+			}
 
-		detachRolePolicyReq := &iam.DetachRolePolicyInput{
-			PolicyArn: aws.String(attachedRolePolicyArn),
-			RoleName:  aws.String(roleName),
+			if _, err := svc.DetachRolePolicy(detachRolePolicyReq); err != nil {
+				return errors.Wrapf(err, "error detaching IAM role policy %q %q", roleName, attachedRolePolicyArn)
+			}
 		}
-
-		if _, err := svc.DetachRolePolicy(detachRolePolicyReq); err != nil {
-			return errors.Wrapf(err, "error detaching IAM role policy %q %q", roleName, attachedRolePolicyArn)
+		if opts.DeleteDetachedPolicy {
+			getPolicyOutput, err := svc.GetPolicy(&iam.GetPolicyInput{PolicyArn: aws.String(attachedRolePolicyArn)})
+			policy := getPolicyOutput.Policy
+			if err != nil {
+				logger.Warningf("failed get policy %v with error %v", attachedRolePolicyArn, err)
+			} else if *policy.AttachmentCount == 0 {
+				tags := fetchPolicyTag(policy)
+				if opts.ManagedPerTags(tags) {
+					// Only handle customer managed policies, skip aws managed policies.
+					if _, ok := customerManagedPolicyArns[attachedRolePolicyArn]; ok {
+						logger.Warningf("Deleting policy %v", attachedRolePolicyArn)
+						if !opts.DryRun {
+							deletePolicyReq := &iam.DeletePolicyInput{
+								PolicyArn: aws.String(attachedRolePolicyArn),
+							}
+							if _, err := svc.DeletePolicy(deletePolicyReq); err != nil {
+								logger.Warningf("error deleting policy %q", attachedRolePolicyArn)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
 	logger.Debugf("Deleting IAM role %q", roleName)
 
-	deleteReq := &iam.DeleteRoleInput{
-		RoleName: aws.String(roleName),
-	}
+	if !opts.DryRun {
+		deleteReq := &iam.DeleteRoleInput{
+			RoleName: aws.String(roleName),
+		}
 
-	if _, err := svc.DeleteRole(deleteReq); err != nil {
-		return errors.Wrapf(err, "error deleting IAM role %q", roleName)
+		if _, err := svc.DeleteRole(deleteReq); err != nil {
+			return errors.Wrapf(err, "error deleting IAM role %q", roleName)
+		}
 	}
 
 	return nil

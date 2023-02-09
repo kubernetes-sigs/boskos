@@ -54,6 +54,7 @@ var (
 	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
 	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
+	deleteDetachedPolicy       = flag.Bool("delete-detached-policy", false, "If true, delete detached IAM policies when deleting IAM roles.")
 
 	excludeTags                common.CommaSeparatedStrings
 	includeTags                common.CommaSeparatedStrings
@@ -160,6 +161,7 @@ func main() {
 		EnableDNSZoneClean:         *enableDNSZoneClean,
 		EnableS3BucketsClean:       *enableS3BucketsClean,
 		SkipResourceRecordSetTypes: skipResourceRecordSetTypesSet,
+		DeleteDetachedPolicy:       *deleteDetachedPolicy,
 	}
 
 	if *cleanAll {

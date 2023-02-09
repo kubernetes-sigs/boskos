@@ -60,6 +60,9 @@ type Options struct {
 
 	// Resource record set types that shoud not be deleted.
 	SkipResourceRecordSetTypes map[string]bool
+
+	// If true, delete detached IAM policies when deleting IAM roles.
+	DeleteDetachedPolicy bool
 }
 
 type Type interface {
