@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/logrusutil"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
@@ -28,6 +29,7 @@ import (
 
 var (
 	rTypes            common.CommaSeparatedStrings
+	rTypesConfig      string
 	extraSourceStates common.CommaSeparatedStrings
 	boskosURL         = flag.String("boskos-url", "http://boskos", "Boskos URL")
 	username          = flag.String("username", "", "Username used to access the Boskos server")
@@ -42,6 +44,7 @@ type resetClient interface {
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be reset")
+	flag.StringVar(&rTypesConfig, "resource-type-from-config", "", "extract a list of resources need to be reset from boskos' config file")
 	flag.Var(&extraSourceStates, "extra-source-states", "comma-separated list of extra source states need to be reset")
 }
 
@@ -55,18 +58,25 @@ func main() {
 	}
 	logrus.Infof("Initialized boskos client!")
 
-	if len(rTypes) == 0 {
-		logrus.Fatal("--resource-type must not be empty!")
+	if len(rTypes) == 0 && rTypesConfig == "" {
+		logrus.Fatal("--resource-type or --resource-type-from-config must be set")
 	}
 
 	if targetState == nil {
 		logrus.Fatal("--target-state must not be empty!")
 	}
 
+	var rt ResourceTypes
+	if rt, err = NewResourceTypes(rTypes, rTypesConfig); err != nil {
+		logrus.WithError(err).Fatal("new resource types")
+	}
+	logrus.Info("initialized resource types")
+
 	reap := &reaper{extraSourceStates, *expiryDuration, *targetState}
 
+	logrus.Infof("resource types: %+v", rt.Types())
 	for range time.Tick(time.Minute) {
-		for _, r := range rTypes {
+		for _, r := range rt.Types() {
 			reap.sync(boskos, r)
 		}
 	}
