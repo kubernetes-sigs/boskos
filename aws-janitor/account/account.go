@@ -23,19 +23,26 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/sts"
 )
 
 func GetAccount(sess *session.Session, region string) (string, error) {
 	svc := iam.New(sess, &aws.Config{Region: aws.String(region)})
 	resp, err := svc.GetUser(nil)
+	if err == nil {
+		arn, err := parseARN(*resp.User.Arn)
+		if err != nil {
+			return "", err
+		}
+		return arn.account, nil
+	}
+	svc2 := sts.New(sess)
+	input := &sts.GetCallerIdentityInput{}
+	result, err := svc2.GetCallerIdentity(input)
 	if err != nil {
 		return "", err
 	}
-	arn, err := parseARN(*resp.User.Arn)
-	if err != nil {
-		return "", err
-	}
-	return arn.account, nil
+	return *result.Account, nil
 }
 
 func parseARN(s string) (*arn, error) {
