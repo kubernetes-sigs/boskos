@@ -404,6 +404,8 @@ def clear_resources(project, cols, resource, rate_limit):
             cmd = base + list(clean)
             if condition:
                 cmd.append(condition)
+            if resource.group == 'filestore':
+                cmd.append("--force")
             thread = threading.Thread(
                 target=asyncCall, args=(cmd, resource.tolerate, resource.name, errs, lock, False))
             threads.append(thread)
