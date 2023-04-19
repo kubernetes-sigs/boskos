@@ -557,16 +557,16 @@ func (s *Storage) syncStaticResources(newResourcesByName, existingResourcesByNam
 
 	// Delete resources
 	for _, res := range existingResourcesByName {
-		_, exists := newResourcesByName[res.Name]
-		if !exists {
+		r, exists := newResourcesByName[res.Name]
+		if !exists || r.Spec.Type != res.Spec.Type {
 			resToDelete = append(resToDelete, res)
 		}
 	}
 
 	// Add new resources
 	for _, res := range newResourcesByName {
-		_, exists := existingResourcesByName[res.Name]
-		if !exists {
+		r, exists := existingResourcesByName[res.Name]
+		if !exists || r.Spec.Type != res.Spec.Type {
 			resToAdd = append(resToAdd, res)
 		}
 	}

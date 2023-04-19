@@ -1473,6 +1473,36 @@ func TestSyncResources(t *testing.T) {
 				},
 			}}},
 		},
+		{
+			name: "move names over types",
+			config: &common.BoskosConfig{Resources: []common.ResourceEntry{
+				{
+					Type:  "type-0",
+					State: common.Free,
+					Names: []string{
+						"res-0-type-0",
+					},
+				},
+				{
+					Type:  "type-1",
+					State: common.Free,
+					Names: []string{
+						"res-1-type-0",
+						"res-0-type-1",
+					},
+				},
+			}},
+			currentRes: []runtime.Object{
+				newResource("res-0-type-0", "type-0", common.Free, "", startTime),
+				newResource("res-1-type-0", "type-0", common.Free, "", startTime),
+				newResource("res-0-type-1", "type-1", common.Free, "", startTime),
+			},
+			expectedRes: &crds.ResourceObjectList{Items: []crds.ResourceObject{
+				*newResource("res-0-type-0", "type-0", common.Free, "", startTime),
+				*newResource("res-1-type-0", "type-1", common.Free, "", fakeNow),
+				*newResource("res-0-type-1", "type-1", common.Free, "", startTime),
+			}},
+		},
 	}
 
 	for _, tc := range testcases {
