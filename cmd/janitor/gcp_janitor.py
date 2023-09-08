@@ -418,6 +418,85 @@ def clear_resources(project, cols, resource, rate_limit):
     return len(errs)
 
 
+def clean_secondary_ip_ranges(project, age, filt):
+    """Clean up additional subnet ranges"""
+
+    # List Subnets
+    log("Listing subnets")
+    cmd = [
+        'gcloud', 'compute', 'networks', 'subnets', 'list',
+        '--project=%s' % project,
+        '--filter=%s' % filt,
+        '--format=json(name,region)'
+    ]
+    log('running %s' % cmd)
+
+    output = ''
+    try:
+        output = subprocess.check_output(cmd)
+    except subprocess.CalledProcessError as exc:
+        # expected error
+        log('Cannot list subnets with %r, continue' %  (exc))
+        raise
+    # Get Subnets (Regional)
+    subnets = []
+    Subnet = collections.namedtuple('Subnet', ['name', 'region'])
+    for item in json.loads(output):
+        log('subnet info: %r' % item)
+        if 'name' not in item:
+            raise ValueError('name must be present: %r' % item)
+        if 'region' not in item:
+            raise ValueError('region must be present: %r' % item)
+        name = item['name']
+        region = item['region'].split('/')[-1]
+        if not region or not name:
+            raise ValueError('name and regsion unset')
+        subnets.append(Subnet(name, region))
+
+    # List secondary address rangeds
+    for subnet in subnets:
+        log('Describing subnets')
+        cmd = [
+            'gcloud', 'compute', 'networks', 'subnets', 'describe',
+            '--project=%s' % project,
+            '--region=%s' % subnet.region,
+            '--format=json(secondaryIpRanges)',
+            subnet.name,
+        ]
+        log('running %s' % cmd)
+        output = ''
+        try:
+            output = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError as exc:
+            # expected error
+            log('Cannot describe subnets with %r, continue' %  (exc))
+            continue
+
+        ip_ranges = json.loads(output)
+        if not ip_ranges or 'secondaryIpRanges' not in ip_ranges:
+            continue
+        ranges = []
+        for ip_range in ip_ranges['secondaryIpRanges']:
+            if 'rangeName' not in ip_range:
+                raise ValueError('rangeName not in %s' % ip_range)
+            ranges.append(ip_range["rangeName"])
+
+        # Delete secondary ip ranges.
+        cmd = [
+            'gcloud', 'compute', 'networks', 'subnets', 'update',
+            '--project=%s' % project,
+            '--region=%s' % subnet.region,
+            '--remove-secondary-ranges=%s' % (",".join(ranges)),
+            subnet.name,
+        ]
+        try:
+            subprocess.check_output(cmd)
+        except subprocess.CalledProcessError as exc:
+            # expected error
+            log('Cannot delete secondary ip ranges with %r, continue' %  (exc))
+            continue
+
+
 def clean_gke_cluster(project, age, filt):
     """Clean up potential leaking gke cluster"""
 
@@ -563,12 +642,18 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
             print('Failed to set quota project %r' % project, file=sys.stderr)
             sys.exit(err)
 
+    # try to clean leaked secondary ip ranges.
+    try:
+        clean_secondary_ip_ranges(project, age, filt)
+    except ValueError:
+        print('Fail to clean up secondary ip ranges from project %r' % project, file=sys.stderr)
+ 
     # try to clean a leaked GKE cluster first, rather than attempting to delete
     # its associated resources individually.
     try:
         err |= clean_gke_cluster(project, age, filt)
     except ValueError:
-        err |= 1  # keep clean the other resource
+        err |= 1  # keep cleaning the other resource
         print('Fail to clean up cluster from project %r' % project, file=sys.stderr)
 
     zones = BASE_ZONES + additional_zones
