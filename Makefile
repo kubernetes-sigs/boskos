@@ -93,7 +93,7 @@ verify-boilerplate:
 .PHONY: verify-lint
 # TODO(ixdy): fix legacy errors and remove --new-from-rev
 verify-lint: $(GOLANGCI_LINT)
-	./hack/tools/bin/golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 -v --new-from-rev HEAD~
+	./hack/tools/bin/golangci-lint run --timeout='2m0s' --max-issues-per-linter 0 --max-same-issues 0 -v --new-from-rev HEAD~
 
 .PHONY: verify-codegen
 verify-codegen: $(CONTROLLER_GEN)
