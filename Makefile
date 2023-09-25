@@ -40,7 +40,7 @@ CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
 
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 
-export GO_VERSION=1.18.3
+export GO_VERSION=1.19.12
 export GO111MODULE=on
 export DOCKER_REPO
 export DOCKER_TAG
