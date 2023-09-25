@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -86,13 +87,13 @@ func (o *KubernetesClientOptions) Manager(namespace string, enableLeaderElection
 	if o.inMemory {
 		return manager.New(&rest.Config{}, manager.Options{
 			LeaderElection:     false,
-			MapperProvider:     func(_ *rest.Config) (meta.RESTMapper, error) { return &fakeRESTMapper{}, nil },
+			MapperProvider:     func(_ *rest.Config, _ *http.Client) (meta.RESTMapper, error) { return &fakeRESTMapper{}, nil },
 			MetricsBindAddress: "0",
 			NewCache: func(_ *rest.Config, _ cache.Options) (cache.Cache, error) {
 				return &informertest.FakeInformers{}, nil
 			},
-			NewClient: func(_ cache.Cache, _ *rest.Config, _ ctrlruntimeclient.Options, _ ...ctrlruntimeclient.Object) (ctrlruntimeclient.Client, error) {
-				return fakectrlruntimeclient.NewFakeClient(), nil
+			NewClient: func(_ *rest.Config, _ ctrlruntimeclient.Options) (ctrlruntimeclient.Client, error) {
+				return fakectrlruntimeclient.NewClientBuilder().Build(), nil
 			},
 			EventBroadcaster: record.NewBroadcasterForTests(time.Hour),
 		})
