@@ -54,7 +54,7 @@ func Add(mgr manager.Manager, boskosClient cleaner.RecycleBoskosClient, namespac
 		return fmt.Errorf("failed to create controller: %v", err)
 	}
 
-	if err := c.Watch(&source.Kind{Type: &crds.ResourceObject{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &crds.ResourceObject{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return fmt.Errorf("failed to create watch: %v", err)
 	}
 

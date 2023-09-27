@@ -217,10 +217,10 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 		return fmt.Errorf("failed to construct controller: %w", err)
 	}
 
-	if err := ctrl.Watch(&source.Kind{Type: &crds.ResourceObject{}}, constHandler(), resourceUpdatePredicate()); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.ResourceObject{}), constHandler(), resourceUpdatePredicate()); err != nil {
 		return fmt.Errorf("failed to watch boskos resources: %w", err)
 	}
-	if err := ctrl.Watch(&source.Kind{Type: &crds.DRLCObject{}}, constHandler()); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.DRLCObject{}), constHandler()); err != nil {
 		return fmt.Errorf("failed to watch boskos dynamic resources: %w", err)
 	}
 	if err := ctrl.Watch(&source.Channel{Source: configChangeEvent}, constHandler()); err != nil {
@@ -232,7 +232,7 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 
 func constHandler() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(
-		func(object ctrlruntimeclient.Object) []reconcile.Request {
+		func(_ context.Context, object ctrlruntimeclient.Object) []reconcile.Request {
 			return []reconcile.Request{{}}
 		})
 }
