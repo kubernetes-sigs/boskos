@@ -52,7 +52,7 @@ func main() {
 	logrusutil.ComponentInit()
 
 	flag.Parse()
-	boskos, err := client.NewClient("Reaper", *boskosURL, *username, *passwordFile)
+	boskos, err := client.NewClient("Reaper", *boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}

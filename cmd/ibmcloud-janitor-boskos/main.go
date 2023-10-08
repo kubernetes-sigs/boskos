@@ -93,7 +93,7 @@ func main() {
 		rTypes = []string{"powervs-service", "vpc-service"}
 	}
 
-	boskos, err := boskosClient.NewClient("IBMCloudJanitor", *boskosURL, *username, *passwordFile)
+	boskos, err := boskosClient.NewClient("IBMCloudJanitor", *boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}

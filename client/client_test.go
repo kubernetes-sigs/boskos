@@ -92,7 +92,7 @@ func TestAcquire(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -161,7 +161,7 @@ func TestRelease(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		defer ts.Close()
 
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -226,7 +226,7 @@ func TestUpdate(t *testing.T) {
 	for _, tc := range testcases {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		defer ts.Close()
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -252,7 +252,7 @@ func TestReset(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c, err := NewClient("user", ts.URL, "", "")
+	c, err := NewClient("user", ts.URL)
 	if err != nil {
 		t.Fatalf("failed to create the Boskos client")
 	}
@@ -281,7 +281,7 @@ func TestMetric(t *testing.T) {
 		},
 	}
 
-	c, err := NewClient("user", ts.URL, "", "")
+	c, err := NewClient("user", ts.URL)
 	if err != nil {
 		t.Fatalf("failed to create the Boskos client")
 	}

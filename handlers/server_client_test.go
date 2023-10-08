@@ -104,7 +104,7 @@ func TestAcquireUpdate(t *testing.T) {
 			r := MakeTestRanch([]runtime.Object{tc.resource})
 			boskos := makeTestBoskos(t, r)
 			owner := "owner"
-			client, err := client.NewClient(owner, boskos.URL, "", "")
+			client, err := client.NewClient(owner, boskos.URL)
 			if err != nil {
 				t.Fatalf("failed to create the Boskos client")
 			}
@@ -194,7 +194,7 @@ func TestAcquireByState(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := MakeTestRanch(tc.resources)
 			boskos := makeTestBoskos(t, r)
-			client, err := client.NewClient(owner, boskos.URL, "", "")
+			client, err := client.NewClient(owner, boskos.URL)
 			if err != nil {
 				t.Fatalf("failed to create the Boskos client")
 			}
@@ -275,7 +275,7 @@ func TestClientServerUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := MakeTestRanch([]runtime.Object{tc.resource})
 			boskos := makeTestBoskos(t, r)
-			client, err := client.NewClient(owner, boskos.URL, "", "")
+			client, err := client.NewClient(owner, boskos.URL)
 			if err != nil {
 				t.Fatalf("failed to create the Boskos client")
 			}
