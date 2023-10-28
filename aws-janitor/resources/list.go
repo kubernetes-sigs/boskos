@@ -91,6 +91,7 @@ var RegionalTypeList = []Type{
 	// NetworkACLs
 	// VPN Connections
 	InternetGateways{},
+	EgressOnlyInternetGateways{},
 	RouteTables{},
 	NATGateway{},
 	VPCs{},
