@@ -40,6 +40,8 @@ RESOURCES_BY_API = {
 
     # compute resources
     'compute.googleapis.com': [
+        Resource('', 'compute', 'ssl-policies', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'ssl-policies', None, 'region', None, False, True, None),
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
         Resource('', 'compute', 'addresses', None, 'global', None, False, True, None),
         Resource('', 'compute', 'addresses', None, 'region', None, False, True, None),
