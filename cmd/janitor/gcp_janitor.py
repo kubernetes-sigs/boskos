@@ -62,6 +62,8 @@ RESOURCES_BY_API = {
         Resource('', 'compute', 'backend-services', None, 'global', None, False, True, None),
         Resource('', 'compute', 'backend-services', None, 'region', None, False, True, None),
         Resource('', 'compute', 'target-pools', None, 'region', None, False, True, None),
+        Resource('', 'compute', 'security-policies', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'security-policies', None, 'region', None, False, True, None),
         Resource('', 'compute', 'health-checks', None, 'global', None, False, True, None),
         Resource('', 'compute', 'health-checks', None, 'region', None, False, True, None),
         Resource('', 'compute', 'http-health-checks', None, None, None, False, True, None),
