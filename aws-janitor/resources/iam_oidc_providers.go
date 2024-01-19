@@ -61,10 +61,9 @@ func fetchOIDCProviderAndTags(ctx context.Context, svc *iam.IAM, arn string) (*i
 func oidcProviderIsManaged(_oidcProvider *iam.GetOpenIDConnectProviderOutput, tags Tags) bool {
 	// Look for one of the kubernetes cluster ownership tags
 	for k := range tags {
-		if strings.HasPrefix(k, "kubernetes.io/cluster/") {
-			return true
-		}
-		if k == "KubernetesCluster" {
+		if strings.HasPrefix(k, "kubernetes.io/cluster/") ||
+			strings.HasPrefix(k, "alpha.eksctl.io/cluster-name") ||
+			k == "KubernetesCluster" {
 			return true
 		}
 	}
