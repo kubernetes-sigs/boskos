@@ -121,7 +121,9 @@ def file_passes(filename, refs, regexs):  # pylint: disable=too-many-locals
         (data, found) = con.subn("", data, 1)
         con = regexs["go_build_constraints_2"]
         (data, found) = con.subn("", data, 1)
-
+        con = regexs["go_build_constraints_3"]
+        (data, found) = con.subn("", data, 1)
+        
     # remove shebang from the top of shell files
     if extension in ("sh", "py"):
         she = regexs["shebang"]
@@ -234,6 +236,8 @@ def get_regexs():
         r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip //go:build build constraints
     regexs["go_build_constraints_2"] = re.compile(
+        r"^(//go:build.*\n)+\n", re.MULTILINE)
+    regexs["go_build_constraints_3"] = re.compile(
         r"^(//go:build.*\n)", re.MULTILINE)
     # strip #!.* from shell/python scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
