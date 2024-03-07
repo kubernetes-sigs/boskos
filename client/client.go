@@ -35,10 +35,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	klog "k8s.io/klog/v2"
 
-	"k8s.io/test-infra/prow/config/secret"
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/storage"
 )
@@ -69,11 +68,9 @@ type Client struct {
 	// http is the http.Client used to interact with the boskos REST API
 	http http.Client
 
-	owner       string
-	url         string
-	username    string
-	getPassword func() []byte
-	lock        sync.Mutex
+	owner string
+	url   string
+	lock  sync.Mutex
 
 	storage storage.PersistenceLayer
 }
@@ -82,44 +79,11 @@ type Client struct {
 //
 // Clients created with this function default to retrying failed connection
 // attempts three times with a ten second pause between each attempt.
-func NewClient(owner string, urlString, username, passwordFile string) (*Client, error) {
-
-	if (username == "") != (passwordFile == "") {
-		return nil, fmt.Errorf("username and passwordFile must be specified together")
-	}
-
-	var getPassword func() []byte
-	if passwordFile != "" {
-		u, err := url.Parse(urlString)
-		if err != nil {
-			return nil, err
-		}
-		if u.Scheme != "https" {
-			// returning error here would make the tests hard
-			// we print out a warning message here instead
-			fmt.Printf("[WARNING] should NOT use password without enabling TLS: '%s'\n", urlString)
-		}
-
-		if err := secret.Add(passwordFile); err != nil {
-			logrus.WithError(err).Fatal("Failed to start secrets agent")
-		}
-		getPassword = secret.GetTokenGenerator(passwordFile)
-	}
-
-	return NewClientWithPasswordGetter(owner, urlString, username, getPassword)
-}
-
-// NewClientWithPasswordGetter creates a Boskos client for the specified URL and resource owner.
-//
-// Clients created with this function default to retrying failed connection
-// attempts three times with a ten second pause between each attempt.
-func NewClientWithPasswordGetter(owner string, urlString, username string, passwordGetter func() []byte) (*Client, error) {
+func NewClient(owner, urlString string) (*Client, error) {
 	client := &Client{
-		url:         urlString,
-		username:    username,
-		getPassword: passwordGetter,
-		owner:       owner,
-		storage:     storage.NewMemoryStorage(),
+		url:     urlString,
+		owner:   owner,
+		storage: storage.NewMemoryStorage(),
 	}
 
 	// Configure the dialer to attempt three additional times to establish
@@ -136,7 +100,6 @@ func NewClientWithPasswordGetter(owner string, urlString, username string, passw
 	// values used for the http.DefaultTransport.
 	client.Dialer.Timeout = 30 * time.Second
 	client.Dialer.KeepAlive = 30 * time.Second
-	client.Dialer.DualStack = true
 	client.http.Transport = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		Dial:                  client.Dialer.Dial,
@@ -149,8 +112,6 @@ func NewClientWithPasswordGetter(owner string, urlString, username string, passw
 
 	return client, nil
 }
-
-// public method
 
 // Acquire asks boskos for a resource of certain type in certain state, and set the resource to dest state.
 // Returns the resource on success.
@@ -322,7 +283,7 @@ func (c *Client) SyncAll() error {
 		return err
 	}
 	if len(resources) == 0 {
-		logrus.Info("no resource to sync")
+		klog.Info("no resource to sync")
 		return nil
 	}
 	var allErrors error
@@ -613,9 +574,6 @@ func (c *Client) httpGet(action string, values url.Values) (*http.Response, erro
 	if err != nil {
 		return nil, err
 	}
-	if c.username != "" && c.getPassword != nil {
-		req.SetBasicAuth(c.username, string(c.getPassword()))
-	}
 	return c.http.Do(req)
 }
 
@@ -626,9 +584,6 @@ func (c *Client) httpPost(action string, values url.Values, contentType string, 
 	req, err := http.NewRequest(http.MethodPost, u.String(), body)
 	if err != nil {
 		return nil, err
-	}
-	if c.username != "" && c.getPassword != nil {
-		req.SetBasicAuth(c.username, string(c.getPassword()))
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)

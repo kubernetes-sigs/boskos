@@ -90,7 +90,7 @@ func main() {
 		}
 	}
 
-	client, err := client.NewClient(defaultOwner, boskosURL, username, passwordFile)
+	client, err := client.NewClient(defaultOwner, boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}

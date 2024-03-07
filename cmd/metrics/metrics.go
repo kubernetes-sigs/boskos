@@ -66,7 +66,7 @@ func main() {
 		logrus.Fatalf("Invalid options: %v", err)
 	}
 
-	boskos, err := client.NewClient("Metrics", boskosURL, username, passwordFile)
+	boskos, err := client.NewClient("Metrics", boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}
@@ -108,8 +108,8 @@ func updateResourcesMetric(boskos *client.Client) error {
 	return nil
 }
 
-//  handleMetric: Handler for /
-//  Method: GET
+// handleMetric: Handler for /
+// Method: GET
 func handleMetric(boskos *client.Client) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log := logrus.WithField("handler", "handleMetric")

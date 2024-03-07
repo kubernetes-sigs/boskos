@@ -33,10 +33,8 @@ import (
 
 type options struct {
 	// common, used to create the client
-	serverURL    string
-	username     string
-	passwordFile string
-	ownerName    string
+	serverURL string
+	ownerName string
 
 	c *client.Client
 
@@ -47,7 +45,7 @@ type options struct {
 }
 
 func (o *options) initializeClient() error {
-	c, err := client.NewClient(o.ownerName, o.serverURL, o.username, o.passwordFile)
+	c, err := client.NewClient(o.ownerName, o.serverURL)
 	if err != nil {
 		return err
 	}
@@ -100,8 +98,6 @@ scripts with a simple interface.`,
 		Args: cobra.NoArgs,
 	}
 	root.PersistentFlags().StringVar(&options.serverURL, "server-url", "", "URL of the Boskos server")
-	root.PersistentFlags().StringVar(&options.username, "username", "", "Username used to access the Boskos server")
-	root.PersistentFlags().StringVar(&options.passwordFile, "password-file", "", "The path to password file used to access the Boskos server")
 	root.PersistentFlags().StringVar(&options.ownerName, "owner-name", "", "Name identifying the user of this client")
 	for _, flag := range []string{"server-url", "owner-name"} {
 		if err := root.MarkPersistentFlagRequired(flag); err != nil {
