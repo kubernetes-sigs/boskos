@@ -66,8 +66,8 @@ func main() {
 		logrus.Fatal("--target-state must not be empty!")
 	}
 
-	var rt ResourceTypes
-	if rt, err = NewResourceTypes(rTypes, rTypesConfig); err != nil {
+	var rt common.ResourceTypes
+	if rt, err = common.NewResourceTypes(rTypes, rTypesConfig); err != nil {
 		logrus.WithError(err).Fatal("new resource types")
 	}
 	logrus.Info("initialized resource types")
