@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package common
 
 import (
 	"fmt"
@@ -24,7 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/boskos/common"
 )
 
 type ResourceTypes interface {
@@ -105,11 +104,11 @@ func (rtw *resourceTypesWatcher) Types() []string {
 
 func parseResourceTypesFromConfig(config string) ([]string, error) {
 	types := make([]string, 0)
-	cfg, err := common.ParseConfig(config)
+	cfg, err := ParseConfig(config)
 	if err != nil {
 		return types, fmt.Errorf("parse config %q: %w", config, err)
 	}
-	if err := common.ValidateConfig(cfg); err != nil {
+	if err := ValidateConfig(cfg); err != nil {
 		return types, fmt.Errorf("validate config %q: %w", config, err)
 	}
 	for _, r := range cfg.Resources {

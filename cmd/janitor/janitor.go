@@ -33,6 +33,7 @@ import (
 var (
 	bufferSize      = 1 // Maximum holding resources
 	rTypes          common.CommaSeparatedStrings
+	rTypesConfig    string
 	poolSize        int
 	updateFrequency time.Duration
 	janitorPath     = flag.String("janitor-path", "/bin/gcp_janitor.py", "Path to janitor binary path")
@@ -44,6 +45,8 @@ var (
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be cleaned up")
+	flag.StringVar(&rTypesConfig, "resource-type-from-config", "", "extract a list of resources need to be cleaned up from boskos' config file; "+
+		"if both resource-type and resource-type-from-config are specified, resource-type will take priority")
 	flag.IntVar(&poolSize, "pool-size", 20, "number of concurrent janitor goroutine")
 	flag.DurationVar(&updateFrequency, "update-frequency", 5*time.Minute, "How often to heartbeat owning resources.")
 }
@@ -66,9 +69,15 @@ func main() {
 	}
 	logrus.Info("Initialized boskos client!")
 
-	if len(rTypes) == 0 {
-		logrus.Fatal("--resource-type must not be empty!")
+	if len(rTypes) == 0 && rTypesConfig == "" {
+		logrus.Fatal("--resource-type or --resource-type-from-config must be set")
 	}
+
+	var rt common.ResourceTypes
+	if rt, err = common.NewResourceTypes(rTypes, rTypesConfig); err != nil {
+		logrus.WithError(err).Fatal("new resource types")
+	}
+	logrus.Infof("initialized resource types: %+v", rt.Types())
 
 	go func(boskos boskosClient) {
 		for range time.Tick(updateFrequency) {
@@ -81,7 +90,7 @@ func main() {
 	buffer := setup(boskos, poolSize, bufferSize, janitorClean, extraJanitorFlags)
 
 	for {
-		run(boskos, buffer, rTypes)
+		run(boskos, buffer, rt.Types())
 		time.Sleep(time.Minute)
 	}
 }
