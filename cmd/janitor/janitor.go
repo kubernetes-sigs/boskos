@@ -45,7 +45,8 @@ var (
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be cleaned up")
-	flag.StringVar(&rTypesConfig, "resource-type-from-config", "", "extract a list of resources need to be cleaned up from boskos' config file")
+	flag.StringVar(&rTypesConfig, "resource-type-from-config", "", "extract a list of resources need to be cleaned up from boskos' config file; "+
+		"if both resource-type and resource-type-from-config are specified, resource-type will take priority")
 	flag.IntVar(&poolSize, "pool-size", 20, "number of concurrent janitor goroutine")
 	flag.DurationVar(&updateFrequency, "update-frequency", 5*time.Minute, "How often to heartbeat owning resources.")
 }
