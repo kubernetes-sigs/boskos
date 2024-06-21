@@ -37,7 +37,12 @@ RESOURCES_BY_API = {
     'file.googleapis.com': [
         Resource('', 'filestore', 'instances', None, 'zone', None, False, False, None),
     ],
-
+    
+    #secretmanager resources
+    'secretmanager.googleapis.com': [
+        Resource('', 'secretmanager', 'secrets', None, 'zone', None, False, True, None),
+    ],
+    
     # compute resources
     'compute.googleapis.com': [
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
