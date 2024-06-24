@@ -26,7 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/test-infra/prow/logrusutil"
+	"sigs.k8s.io/prow/pkg/logrusutil"
 
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"

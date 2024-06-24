@@ -28,11 +28,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/pkg/flagutil"
-	"k8s.io/test-infra/prow/config"
-	prowflagutil "k8s.io/test-infra/prow/flagutil"
-	"k8s.io/test-infra/prow/logrusutil"
-	prowmetrics "k8s.io/test-infra/prow/metrics"
+	"sigs.k8s.io/prow/pkg/config"
+	prowflagutil "sigs.k8s.io/prow/pkg/flagutil"
+	"sigs.k8s.io/prow/pkg/logrusutil"
+	prowmetrics "sigs.k8s.io/prow/pkg/metrics"
 
 	"sigs.k8s.io/boskos/aws-janitor/account"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
@@ -100,7 +99,7 @@ func init() {
 
 func main() {
 	logrusutil.ComponentInit()
-	for _, o := range []flagutil.OptionGroup{&instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&instrumentationOptions} {
 		o.AddFlags(flag.CommandLine)
 	}
 	flag.Parse()
@@ -111,7 +110,7 @@ func main() {
 	}
 	logrus.SetLevel(level)
 
-	for _, o := range []flagutil.OptionGroup{&instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&instrumentationOptions} {
 		if err := o.Validate(false); err != nil {
 			logrus.Fatalf("Invalid options: %v", err)
 		}

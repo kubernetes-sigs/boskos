@@ -37,12 +37,13 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"k8s.io/test-infra/prow/interrupts"
+	"sigs.k8s.io/prow/pkg/interrupts"
 )
 
 // KubernetesClientOptions are flag options used to create a kube client.
-// It implements the k8s.io/test-infra/pkg/flagutil.OptionGroup interface.
+// It implements the sigs.k8s.io/prow/pkg/flagutil.OptionGroup interface.
 type KubernetesClientOptions struct {
 	inMemory           bool
 	kubeConfig         string
@@ -86,9 +87,9 @@ func (o *KubernetesClientOptions) Client() (ctrlruntimeclient.Client, error) {
 func (o *KubernetesClientOptions) Manager(namespace string, enableLeaderElection bool, startCacheFor ...ctrlruntimeclient.Object) (manager.Manager, error) {
 	if o.inMemory {
 		return manager.New(&rest.Config{}, manager.Options{
-			LeaderElection:     false,
-			MapperProvider:     func(_ *rest.Config, _ *http.Client) (meta.RESTMapper, error) { return &fakeRESTMapper{}, nil },
-			MetricsBindAddress: "0",
+			LeaderElection: false,
+			MapperProvider: func(_ *rest.Config, _ *http.Client) (meta.RESTMapper, error) { return &fakeRESTMapper{}, nil },
+			Metrics:        server.Options{BindAddress: "0"},
 			NewCache: func(_ *rest.Config, _ cache.Options) (cache.Cache, error) {
 				return &informertest.FakeInformers{}, nil
 			},
@@ -111,8 +112,8 @@ func (o *KubernetesClientOptions) Manager(namespace string, enableLeaderElection
 		LeaderElectionReleaseOnCancel: true,
 		LeaderElectionResourceLock:    "leases",
 		LeaderElectionID:              "boskos-server",
-		Namespace:                     namespace,
-		MetricsBindAddress:            "0",
+		Cache:                         cache.Options{DefaultNamespaces: map[string]cache.Config{namespace: {}}},
+		Metrics:                       server.Options{BindAddress: "0"},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct manager: %v", err)

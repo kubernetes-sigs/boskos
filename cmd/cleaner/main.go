@@ -27,20 +27,21 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"k8s.io/test-infra/pkg/flagutil"
-	"k8s.io/test-infra/prow/config"
-	prowflagutil "k8s.io/test-infra/prow/flagutil"
-	"k8s.io/test-infra/prow/interrupts"
-	"k8s.io/test-infra/prow/logrusutil"
-	prowmetrics "k8s.io/test-infra/prow/metrics"
-	"k8s.io/test-infra/prow/pjutil/pprof"
 	"sigs.k8s.io/boskos/cleaner"
 	cleanerv2 "sigs.k8s.io/boskos/cleaner/v2"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/crds"
 	"sigs.k8s.io/boskos/ranch"
+	"sigs.k8s.io/prow/pkg/config"
+	prowflagutil "sigs.k8s.io/prow/pkg/flagutil"
+	"sigs.k8s.io/prow/pkg/interrupts"
+	"sigs.k8s.io/prow/pkg/logrusutil"
+	prowmetrics "sigs.k8s.io/prow/pkg/metrics"
+	"sigs.k8s.io/prow/pkg/pjutil/pprof"
 )
 
 const (
@@ -74,7 +75,7 @@ func init() {
 
 func main() {
 	logrusutil.ComponentInit()
-	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
 		o.AddFlags(flag.CommandLine)
 	}
 	flag.Parse()
@@ -84,7 +85,7 @@ func main() {
 		logrus.WithError(err).Fatal("invalid log level specified")
 	}
 	logrus.SetLevel(level)
-	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
 		if err := o.Validate(false); err != nil {
 			logrus.Fatalf("Invalid options: %v", err)
 		}
@@ -133,8 +134,8 @@ func v2Main(client *client.Client) {
 		LeaderElection:          true,
 		LeaderElectionNamespace: namespace,
 		LeaderElectionID:        "boskos-cleaner-leaderlock",
-		Namespace:               namespace,
-		MetricsBindAddress:      "0",
+		Cache:                   cache.Options{DefaultNamespaces: map[string]cache.Config{namespace: {}}},
+		Metrics:                 server.Options{BindAddress: "0"},
 	})
 	if err != nil {
 		logrus.WithError(err).Fatal("failed to construct manager.")

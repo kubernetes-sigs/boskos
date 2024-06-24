@@ -24,7 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
-	"k8s.io/test-infra/prow/logrusutil"
+	"sigs.k8s.io/prow/pkg/logrusutil"
 
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
