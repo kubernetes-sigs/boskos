@@ -28,9 +28,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
-	"k8s.io/test-infra/prow/simplifypath"
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/ranch"
+	"sigs.k8s.io/prow/pkg/simplifypath"
 )
 
 // l keeps the tree legible
@@ -50,7 +50,7 @@ func NewBoskosSimplifier() simplifypath.Simplifier {
 	))
 }
 
-//NewBoskosHandler constructs the boskos handler.
+// NewBoskosHandler constructs the boskos handler.
 func NewBoskosHandler(r *ranch.Ranch) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/", handleDefault(r))
@@ -85,7 +85,7 @@ func errorToStatus(err error) int {
 	}
 }
 
-//  handleDefault: Handler for /, always pass with 200
+// handleDefault: Handler for /, always pass with 200
 func handleDefault(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleDefault").Infof("From %v", req.RemoteAddr)
@@ -109,13 +109,13 @@ func init() {
 	prometheus.MustRegister(acquireDurationSeconds)
 }
 
-//  handleAcquire: Handler for /acquire
-//  Method: POST
-// 	URLParams:
-//		Required: type=[string]  : type of requested resource
-//		Required: state=[string] : current state of the requested resource
-//		Required: dest=[string] : destination state of the requested resource
-//		Required: owner=[string] : requester of the resource
+//	 handleAcquire: Handler for /acquire
+//	 Method: POST
+//		URLParams:
+//			Required: type=[string]  : type of requested resource
+//			Required: state=[string] : current state of the requested resource
+//			Required: dest=[string] : destination state of the requested resource
+//			Required: owner=[string] : requester of the resource
 func handleAcquire(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleStart").Infof("From %v", req.RemoteAddr)
@@ -167,13 +167,13 @@ func handleAcquire(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
-//  handleAcquireByState: Handler for /acquirebystate
-//  Method: POST
-// 	URLParams:
-//		Required: state=[string] : current state of the requested resource
-//		Required: dest=[string]  : destination state of the requested resource
-//		Required: owner=[string] : requester of the resource
-//		Required: names=[string] : expected resources names
+//	 handleAcquireByState: Handler for /acquirebystate
+//	 Method: POST
+//		URLParams:
+//			Required: state=[string] : current state of the requested resource
+//			Required: dest=[string]  : destination state of the requested resource
+//			Required: owner=[string] : requester of the resource
+//			Required: names=[string] : expected resources names
 func handleAcquireByState(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleStart").Infof("From %v", req.RemoteAddr)
@@ -232,12 +232,12 @@ func handleAcquireByState(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
-//  handleRelease: Handler for /release
-//  Method: POST
-//	URL Params:
-//		Required: name=[string]  : name of finished resource
-//		Required: owner=[string] : owner of the resource
-//		Required: dest=[string]  : dest state
+//	 handleRelease: Handler for /release
+//	 Method: POST
+//		URL Params:
+//			Required: name=[string]  : name of finished resource
+//			Required: owner=[string] : owner of the resource
+//			Required: dest=[string]  : dest state
 func handleRelease(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleDone").Infof("From %v", req.RemoteAddr)
@@ -268,13 +268,13 @@ func handleRelease(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
-//  handleReset: Handler for /reset
-//  Method: POST
-//	URL Params:
-//		Required: type=[string] : type of resource in interest
-//		Required: state=[string] : original state
-//		Required: dest=[string] : dest state, for expired resource
-//		Required: expire=[durationStr*] resource has not been updated since before {expire}.
+//	 handleReset: Handler for /reset
+//	 Method: POST
+//		URL Params:
+//			Required: type=[string] : type of resource in interest
+//			Required: state=[string] : original state
+//			Required: dest=[string] : dest state, for expired resource
+//			Required: expire=[durationStr*] resource has not been updated since before {expire}.
 func handleReset(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleReset").Infof("From %v", req.RemoteAddr)
@@ -323,13 +323,13 @@ func handleReset(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
-//  handleUpdate: Handler for /update
-//  Method: POST
-//  URLParams
-//		Required: name=[string]              : name of target resource
-//		Required: owner=[string]             : owner of the resource
-//		Required: state=[string]             : current state of the resource
-//		Optional: userData=[common.UserData] : user data id to update
+//	 handleUpdate: Handler for /update
+//	 Method: POST
+//	 URLParams
+//			Required: name=[string]              : name of target resource
+//			Required: owner=[string]             : owner of the resource
+//			Required: state=[string]             : current state of the resource
+//			Optional: userData=[common.UserData] : user data id to update
 func handleUpdate(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleUpdate").Infof("From %v", req.RemoteAddr)
@@ -375,8 +375,8 @@ func handleUpdate(r *ranch.Ranch) http.HandlerFunc {
 	}
 }
 
-//  handleMetric: Handler for /metric
-//  Method: GET
+// handleMetric: Handler for /metric
+// Method: GET
 func handleMetric(r *ranch.Ranch) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		logrus.WithField("handler", "handleMetric").Infof("From %v", req.RemoteAddr)

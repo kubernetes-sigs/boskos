@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/prow/logrusutil"
+	"sigs.k8s.io/prow/pkg/logrusutil"
 
 	boskosClient "sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"

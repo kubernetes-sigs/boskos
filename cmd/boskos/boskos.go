@@ -39,14 +39,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"k8s.io/test-infra/pkg/flagutil"
-	"k8s.io/test-infra/prow/config"
-	prowflagutil "k8s.io/test-infra/prow/flagutil"
-	"k8s.io/test-infra/prow/interrupts"
-	"k8s.io/test-infra/prow/logrusutil"
-	prowmetrics "k8s.io/test-infra/prow/metrics"
-	"k8s.io/test-infra/prow/pjutil"
-	"k8s.io/test-infra/prow/pjutil/pprof"
+	"sigs.k8s.io/prow/pkg/config"
+	prowflagutil "sigs.k8s.io/prow/pkg/flagutil"
+	"sigs.k8s.io/prow/pkg/interrupts"
+	"sigs.k8s.io/prow/pkg/logrusutil"
+	prowmetrics "sigs.k8s.io/prow/pkg/metrics"
+	"sigs.k8s.io/prow/pkg/pjutil"
+	"sigs.k8s.io/prow/pkg/pjutil/pprof"
 
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/crds"
@@ -90,7 +89,7 @@ func init() {
 
 func main() {
 	logrusutil.ComponentInit()
-	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
 		o.AddFlags(flag.CommandLine)
 	}
 	flag.Parse()
@@ -100,7 +99,7 @@ func main() {
 		logrus.WithError(err).Fatal("invalid log level specified")
 	}
 	logrus.SetLevel(level)
-	for _, o := range []flagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
+	for _, o := range []prowflagutil.OptionGroup{&kubeClientOptions, &instrumentationOptions} {
 		if err := o.Validate(false); err != nil {
 			logrus.Fatalf("Invalid options: %v", err)
 		}
@@ -239,9 +238,9 @@ func constHandler() handler.EventHandler {
 
 // resourceUpdatePredicate prevents the config reconciler from reacting to resource update events
 // except if:
-// * The new status is tombstone, because then we have to delete is
-// * The new owner is empty, because then we have to delete it if it got deleted from the config but
-//   was not deleted from the api to let the current owner finish its work.
+//   - The new status is tombstone, because then we have to delete is
+//   - The new owner is empty, because then we have to delete it if it got deleted from the config but
+//     was not deleted from the api to let the current owner finish its work.
 func resourceUpdatePredicate() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(_ event.CreateEvent) bool { return true },

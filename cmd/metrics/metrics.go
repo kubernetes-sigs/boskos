@@ -26,13 +26,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/flagutil"
-	"k8s.io/test-infra/prow/logrusutil"
-	prowmetrics "k8s.io/test-infra/prow/metrics"
 	"sigs.k8s.io/boskos/client"
 	"sigs.k8s.io/boskos/common"
 	"sigs.k8s.io/boskos/metrics"
+	"sigs.k8s.io/prow/pkg/config"
+	"sigs.k8s.io/prow/pkg/flagutil"
+	"sigs.k8s.io/prow/pkg/logrusutil"
+	prowmetrics "sigs.k8s.io/prow/pkg/metrics"
 )
 
 var (
@@ -108,8 +108,8 @@ func updateResourcesMetric(boskos *client.Client) error {
 	return nil
 }
 
-//  handleMetric: Handler for /
-//  Method: GET
+// handleMetric: Handler for /
+// Method: GET
 func handleMetric(boskos *client.Client) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log := logrus.WithField("handler", "handleMetric")
