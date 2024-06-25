@@ -40,7 +40,7 @@ RESOURCES_BY_API = {
     
     #secretmanager resources
     'secretmanager.googleapis.com': [
-        Resource('', 'secretmanager', 'secrets', None, 'zone', None, False, True, None),
+        Resource('', 'secretmanager', 'secrets', None, None, None, True, True, None),
     ],
     
     # compute resources
