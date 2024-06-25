@@ -93,7 +93,12 @@ RESOURCES_BY_API = {
                  ['container-analysis-notes-v1', 'container-analysis-notes-v1beta1',
                   'container-analysis-occurrences-v1', 'container-analysis-occurrences-v1beta1'])
     ],
-
+    
+    #secretmanager resources
+    'secretmanager.googleapis.com': [
+        Resource('', 'secretmanager', 'secrets', None, None,True, False, True, None),
+    ],
+    
     # GKE hub memberships
     'gkehub.googleapis.com': [
         Resource('', 'container', 'hub', 'memberships', None, None, False, False, None),
