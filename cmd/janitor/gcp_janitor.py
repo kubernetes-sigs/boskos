@@ -79,6 +79,7 @@ RESOURCES_BY_API = {
         Resource('', 'compute', 'routers', None, 'region', None, False, True, None),
         Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, None),
         Resource('', 'compute', 'networks', None, None, None, False, True, None),
+        Resource('', 'network-connectivity', 'internal-ranges', None, None, None, False, False, None),
     ],
 
     # logging resources
