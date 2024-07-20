@@ -38,6 +38,11 @@ RESOURCES_BY_API = {
         Resource('', 'filestore', 'instances', None, 'zone', None, False, False, None),
     ],
 
+    # parallelstore resources
+    'parallelstore.googleapis.com': [
+        Resource('alpha', 'parallelstore', 'instances', None, 'location', None, False, False, None),
+    ],
+
     # compute resources
     'compute.googleapis.com': [
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
@@ -311,6 +316,8 @@ def collect(project, zones, age, resource, filt, clear_all):
         cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(zones)))
     else:
         cmd.append('--filter=%s' % filt)
+    if (resource.group == 'parallelstore'):
+        cmd.append('--location=-')
     log('%r' % cmd)
 
     # TODO(krzyzacy): work around for alpha API list calls
@@ -345,6 +352,10 @@ def collect(project, zones, age, resource, filt, clear_all):
             elif resource.group == 'filestore':
                 # Filestore instances don't have 'zone' field, but require
                 # --zone flag for deletion.
+                colname = item['name'].split('/')[3]
+            elif resource.group == 'parallelstore':
+                # Parallelstore instances don't have 'location' field, but require
+                # --location flag for deletion.
                 colname = item['name'].split('/')[3]
             else:
                 # This item doesn't match the condition, so don't include it.
