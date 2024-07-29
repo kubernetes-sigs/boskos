@@ -17,13 +17,16 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	route53v2 "github.com/aws/aws-sdk-go-v2/service/route53"
+	route53v2types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -33,9 +36,9 @@ import (
 type Route53ResourceRecordSets struct{}
 
 // zoneIsManaged checks if the zone should be managed (and thus have records deleted) by us
-func zoneIsManaged(z *route53.HostedZone) bool {
+func zoneIsManaged(z *route53v2types.HostedZone) bool {
 	// TODO: Move to a tag on the zone?
-	name := aws.StringValue(z.Name)
+	name := *z.Name
 	if "test-cncf-aws.k8s.io." == name {
 		return true
 	}
@@ -62,12 +65,12 @@ var managedNameRegexes = []*regexp.Regexp{
 }
 
 // resourceRecordSetIsManaged checks if the resource record should be managed (and thus deleted) by us
-func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
-	if "A" != aws.StringValue(rrs.Type) {
+func resourceRecordSetIsManaged(rrs *route53v2types.ResourceRecordSet) bool {
+	if "A" != rrs.Type {
 		return false
 	}
 
-	name := aws.StringValue(rrs.Name)
+	name := *rrs.Name
 
 	for _, managedNameRegex := range managedNameRegexes {
 		if managedNameRegex.MatchString(name) {
@@ -80,21 +83,21 @@ func resourceRecordSetIsManaged(rrs *route53.ResourceRecordSet) bool {
 }
 
 // route53ResourceRecordSetsForZone marks all ResourceRecordSets in the provided zone and returns a slice containing those that should be deleted.
-func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, svc *route53.Route53, zone *route53.HostedZone, zoneTags Tags, set *Set) ([]*route53ResourceRecordSet, error) {
+func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, svc *route53v2.Client, zone *route53v2types.HostedZone, zoneTags Tags, set *Set) ([]*route53ResourceRecordSet, error) {
 	var toDelete []*route53ResourceRecordSet
 
-	recordsPageFunc := func(records *route53.ListResourceRecordSetsOutput, _ bool) bool {
+	recordsPageFunc := func(records *route53v2.ListResourceRecordSetsOutput, _ bool) bool {
 		for _, rrs := range records.ResourceRecordSets {
-			if !opts.SkipRoute53ManagementCheck && !resourceRecordSetIsManaged(rrs) {
+			if !opts.SkipRoute53ManagementCheck && !resourceRecordSetIsManaged(&rrs) {
 				continue
 			}
 
-			o := &route53ResourceRecordSet{zone: zone, obj: rrs}
+			o := &route53ResourceRecordSet{zone: zone, obj: &rrs}
 			// no tags for ResourceRecordSets, so use zone tags instead
 			if !set.Mark(opts, o, nil, zoneTags) {
 				continue
 			}
-			if _, ok := opts.SkipResourceRecordSetTypes[*rrs.Type]; !ok {
+			if _, ok := opts.SkipResourceRecordSetTypes[string(rrs.Type)]; !ok {
 				logger.Warningf("%s: deleting %T: %s", o.ARN(), rrs, *rrs.Name)
 				if !opts.DryRun {
 					toDelete = append(toDelete, o)
@@ -104,38 +107,54 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 		return true
 	}
 
-	err := svc.ListResourceRecordSetsPages(&route53.ListResourceRecordSetsInput{HostedZoneId: zone.Id}, recordsPageFunc)
+	err := ListResourceRecordSetsPages(svc, &route53v2.ListResourceRecordSetsInput{HostedZoneId: zone.Id}, recordsPageFunc)
 	if err != nil {
 		return nil, err
 	}
 	return toDelete, nil
 }
 
+func ListResourceRecordSetsPages(svc *route53v2.Client, input *route53v2.ListResourceRecordSetsInput, pageFunc func(records *route53v2.ListResourceRecordSetsOutput, _ bool) bool) error {
+	paginator := route53v2.NewListResourceRecordSetsPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
 func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
 
-	var zones []*route53.HostedZone
+	svc := route53v2.NewFromConfig(*opts.Config, func(opt *route53v2.Options) {
+		opt.Region = opts.Region
+	})
+
+	var zones []*route53v2types.HostedZone
 	zoneTags := make(map[string]Tags)
 
-	pageFunc := func(zs *route53.ListHostedZonesOutput, _ bool) bool {
+	pageFunc := func(zs *route53v2.ListHostedZonesOutput, _ bool) bool {
 		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
 		for _, z := range zs.HostedZones {
-			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(z) {
+			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(&z) {
 				continue
 			}
 
 			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
-			z.Id = aws.String(strings.TrimPrefix(aws.StringValue(z.Id), "/hostedzone/"))
+			z.Id = aws2.String(strings.TrimPrefix(*z.Id, "/hostedzone/"))
 
-			zones = append(zones, z)
-			zoneTags[aws.StringValue(z.Id)] = nil
+			zones = append(zones, &z)
+			zoneTags[*z.Id] = nil
 		}
 
 		return true
 	}
 
-	if err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, pageFunc); err != nil {
+	if err := ListHostedZonesPages(svc, &route53v2.ListHostedZonesInput{}, pageFunc); err != nil {
 		return err
 	}
 
@@ -144,7 +163,7 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 	}
 
 	for _, zone := range zones {
-		toDelete, err := route53ResourceRecordSetsForZone(opts, logger, svc, zone, zoneTags[aws.StringValue(zone.Id)], set)
+		toDelete, err := route53ResourceRecordSetsForZone(opts, logger, svc, zone, zoneTags[*zone.Id], set)
 		if err != nil {
 			return err
 		}
@@ -152,14 +171,14 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 			continue
 		}
 
-		var changes []*route53.Change
+		var changes []route53v2types.Change
 		for _, rrs := range toDelete {
-			change := &route53.Change{
-				Action:            aws.String(route53.ChangeActionDelete),
+			change := &route53v2types.Change{
+				Action:            route53v2types.ChangeActionDelete,
 				ResourceRecordSet: rrs.obj,
 			}
 
-			changes = append(changes, change)
+			changes = append(changes, *change)
 		}
 
 		for len(changes) != 0 {
@@ -173,22 +192,22 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 			}
 
 			logger.Infof("Deleting %d route53 resource records", len(chunk))
-			deleteReq := &route53.ChangeResourceRecordSetsInput{
+			deleteReq := &route53v2.ChangeResourceRecordSetsInput{
 				HostedZoneId: zone.Id,
-				ChangeBatch:  &route53.ChangeBatch{Changes: chunk},
+				ChangeBatch:  &route53v2types.ChangeBatch{Changes: chunk},
 			}
 
-			if _, err := svc.ChangeResourceRecordSets(deleteReq); err != nil {
-				logger.Warningf("unable to delete DNS records for zone %v with error: %v", aws.StringValue(zone.Id), err)
+			if _, err := svc.ChangeResourceRecordSets(context.TODO(), deleteReq); err != nil {
+				logger.Warningf("unable to delete DNS records for zone %v with error: %v", *zone.Id, err)
 			}
 		}
 
 		if opts.EnableDNSZoneClean && len(toDelete) > 0 {
-			deleteHostZoneReq := &route53.DeleteHostedZoneInput{
+			deleteHostZoneReq := &route53v2.DeleteHostedZoneInput{
 				Id: zone.Id,
 			}
-			if _, err := svc.DeleteHostedZone(deleteHostZoneReq); err != nil {
-				logger.Warningf("unable to delete DNS zone %v with error: %v", aws.StringValue(zone.Id), err)
+			if _, err := svc.DeleteHostedZone(context.TODO(), deleteHostZoneReq); err != nil {
+				logger.Warningf("unable to delete DNS zone %v with error: %v", *zone.Id, err)
 			}
 		}
 	}
@@ -197,28 +216,30 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 }
 
 func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
-	svc := route53.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := route53v2.NewFromConfig(*opts.Config, func(opt *route53v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
 
 	var rrsErr error
-	err := svc.ListHostedZonesPages(&route53.ListHostedZonesInput{}, func(zones *route53.ListHostedZonesOutput, _ bool) bool {
+	err := ListHostedZonesPages(svc, &route53v2.ListHostedZonesInput{}, func(zones *route53v2.ListHostedZonesOutput, _ bool) bool {
 		for _, z := range zones.HostedZones {
 			zone := z
-			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(zone) {
+			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(&zone) {
 				continue
 			}
 			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
-			zone.Id = aws.String(strings.TrimPrefix(aws.StringValue(zone.Id), "/hostedzone/"))
+			zone.Id = aws2.String(strings.TrimPrefix(*zone.Id, "/hostedzone/"))
 
-			inp := &route53.ListResourceRecordSetsInput{HostedZoneId: z.Id}
-			err := svc.ListResourceRecordSetsPages(inp, func(recordSets *route53.ListResourceRecordSetsOutput, _ bool) bool {
+			inp := &route53v2.ListResourceRecordSetsInput{HostedZoneId: z.Id}
+			err := ListResourceRecordSetsPages(svc, inp, func(recordSets *route53v2.ListResourceRecordSetsOutput, _ bool) bool {
 				now := time.Now()
 				for _, recordSet := range recordSets.ResourceRecordSets {
 					arn := route53ResourceRecordSet{
 						account: opts.Account,
 						region:  opts.Region,
-						zone:    zone,
-						obj:     recordSet,
+						zone:    &zone,
+						obj:     &recordSet,
 					}.ARN()
 					set.firstSeen[arn] = now
 				}
@@ -240,21 +261,34 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 
 }
 
-func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string]Tags, svc *route53.Route53) error {
+func ListHostedZonesPages(svc *route53v2.Client, input *route53v2.ListHostedZonesInput, pageFunc func(zones *route53v2.ListHostedZonesOutput, _ bool) bool) error {
+	paginator := route53v2.NewListHostedZonesPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string]Tags, svc *route53v2.Client) error {
 	return incrementalFetchTags(zoneTags, 10, func(ids []*string) error {
-		output, err := svc.ListTagsForResources(&route53.ListTagsForResourcesInput{
-			ResourceType: aws.String(route53.TagResourceTypeHostedzone),
-			ResourceIds:  ids,
+		output, err := svc.ListTagsForResources(context.TODO(), &route53v2.ListTagsForResourcesInput{
+			ResourceType: route53v2types.TagResourceTypeHostedzone,
+			ResourceIds:  aws2.ToStringSlice(ids),
 		})
 		if err != nil {
 			return err
 		}
 		for _, rts := range output.ResourceTagSets {
-			rtype := aws.StringValue(rts.ResourceType)
-			if rtype != route53.TagResourceTypeHostedzone {
+			rtype := rts.ResourceType
+			if rtype != route53v2types.TagResourceTypeHostedzone {
 				return fmt.Errorf("invalid type in ListTagsForResources output: %s", rtype)
 			}
-			id := aws.StringValue(rts.ResourceId)
+			id := *rts.ResourceId
 			_, ok := zoneTags[id]
 			if !ok {
 				return fmt.Errorf("unknown zone id in ListTagsForResources output: %s", id)
@@ -273,12 +307,12 @@ func (rrs Route53ResourceRecordSets) fetchZoneTags(zoneTags map[string]Tags, svc
 type route53ResourceRecordSet struct {
 	account string
 	region  string
-	zone    *route53.HostedZone
-	obj     *route53.ResourceRecordSet
+	zone    *route53v2types.HostedZone
+	obj     *route53v2types.ResourceRecordSet
 }
 
 func (r route53ResourceRecordSet) ARN() string {
-	return fmt.Sprintf("arn:aws:route53:%s:%s:%s/%s/%s", r.region, r.account, aws.StringValue(r.obj.Type), aws.StringValue(r.zone.Id), aws.StringValue(r.obj.Name))
+	return fmt.Sprintf("arn:aws:route53:%s:%s:%s/%s/%s", r.region, r.account, r.obj.Type, *r.zone.Id, *r.obj.Name)
 }
 
 func (r route53ResourceRecordSet) ResourceKey() string {

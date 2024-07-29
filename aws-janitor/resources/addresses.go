@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,9 +33,11 @@ type Addresses struct{}
 
 func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	resp, err := svc.DescribeAddresses(nil)
+	resp, err := svc.DescribeAddresses(context.TODO(), nil)
 	if err != nil {
 		return err
 	}
@@ -56,7 +59,7 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 		if opts.DryRun {
 			continue
 		}
-		_, err := svc.ReleaseAddress(&ec2.ReleaseAddressInput{AllocationId: addr.AllocationId})
+		_, err := svc.ReleaseAddress(context.TODO(), &ec2v2.ReleaseAddressInput{AllocationId: addr.AllocationId})
 		if err != nil {
 			logger.Warningf("%s: delete failed: %v", a.ARN(), err)
 		}
@@ -65,11 +68,13 @@ func (Addresses) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (Addresses) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	inp := &ec2.DescribeAddressesInput{}
+	inp := &ec2v2.DescribeAddressesInput{}
 
-	addrs, err := svc.DescribeAddresses(inp)
+	addrs, err := svc.DescribeAddresses(context.TODO(), inp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't describe EC2 addresses for %q in %q", opts.Account, opts.Region)
 	}

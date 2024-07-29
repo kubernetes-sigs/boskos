@@ -17,8 +17,12 @@ limitations under the License.
 package resources
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/eks"
+	"context"
+
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	eksv2 "github.com/aws/aws-sdk-go-v2/service/eks"
+	eksv2types "github.com/aws/aws-sdk-go-v2/service/eks/types"
+
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -27,11 +31,13 @@ type EKS struct{}
 
 func (e EKS) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := eks.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := eksv2.NewFromConfig(*opts.Config, func(opt *eksv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*eksCluster
 	err := e.describeClusters(opts, set, svc, func(cluster *eksCluster) {
-		logger.Warningf("%s: deleting %T: %s", cluster.ARN(), eks.Cluster{}, cluster.name)
+		logger.Warningf("%s: deleting %T: %s", cluster.ARN(), eksv2types.Cluster{}, cluster.name)
 		if !opts.DryRun {
 			toDelete = append(toDelete, cluster)
 		}
@@ -49,7 +55,7 @@ func (e EKS) MarkAndSweep(opts Options, set *Set) error {
 			logger.Warningf("%s: skipping delete due to error deleting fargate profiles: %v", cluster.ARN(), fgpErr)
 			continue
 		}
-		if _, err := svc.DeleteCluster(&eks.DeleteClusterInput{Name: aws.String(cluster.name)}); err != nil {
+		if _, err := svc.DeleteCluster(context.TODO(), &eksv2.DeleteClusterInput{Name: aws2.String(cluster.name)}); err != nil {
 			logger.Warningf("%s: delete failed: %v", cluster.ARN(), err)
 		}
 	}
@@ -58,30 +64,32 @@ func (e EKS) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (e EKS) ListAll(opts Options) (*Set, error) {
-	svc := eks.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := eksv2.NewFromConfig(*opts.Config, func(opt *eksv2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
 	err := e.describeClusters(opts, set, svc, func(_ *eksCluster) {})
 	return set, err
 }
 
-func (EKS) describeClusters(opts Options, set *Set, svc *eks.EKS, deleteFunc func(*eksCluster)) error {
+func (EKS) describeClusters(opts Options, set *Set, svc *eksv2.Client, deleteFunc func(*eksCluster)) error {
 	logger := logrus.WithField("options", opts)
 
-	err := svc.ListClustersPages(&eks.ListClustersInput{},
-		func(page *eks.ListClustersOutput, _ bool) bool {
+	err := ListClustersPages(svc, &eksv2.ListClustersInput{},
+		func(page *eksv2.ListClustersOutput, _ bool) bool {
 			for _, clusterName := range page.Clusters {
-				out, describeErr := svc.DescribeCluster(&eks.DescribeClusterInput{Name: clusterName})
+				out, describeErr := svc.DescribeCluster(context.TODO(), &eksv2.DescribeClusterInput{Name: &clusterName})
 				if describeErr != nil || out == nil {
-					logger.Warningf("%s: failed to describe cluster: %v", aws.StringValue(clusterName), describeErr)
+					logger.Warningf("%s: failed to describe cluster: %v", clusterName, describeErr)
 					continue
 				}
 				cluster := eksCluster{
-					arn:  aws.StringValue(out.Cluster.Arn),
-					name: aws.StringValue(clusterName),
+					arn:  *out.Cluster.Arn,
+					name: clusterName,
 				}
 				tags := make(Tags, len(out.Cluster.Tags))
 				for k, v := range out.Cluster.Tags {
-					tags.Add(aws.String(k), v)
+					tags.Add(aws2.String(k), &v)
 				}
 				if !set.Mark(opts, cluster, out.Cluster.CreatedAt, tags) {
 					continue
@@ -98,15 +106,28 @@ func (EKS) describeClusters(opts Options, set *Set, svc *eks.EKS, deleteFunc fun
 	return nil
 }
 
-func (EKS) deleteNodegroupsForCluster(svc *eks.EKS, cluster *eksCluster, logger logrus.FieldLogger) error {
+func ListClustersPages(svc *eksv2.Client, input *eksv2.ListClustersInput, pageFunc func(page *eksv2.ListClustersOutput, _ bool) bool) error {
+	paginator := eksv2.NewListClustersPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (EKS) deleteNodegroupsForCluster(svc *eksv2.Client, cluster *eksCluster, logger logrus.FieldLogger) error {
 	var errs []error
-	listErr := svc.ListNodegroupsPages(&eks.ListNodegroupsInput{ClusterName: aws.String(cluster.name)},
-		func(page *eks.ListNodegroupsOutput, _ bool) bool {
+	listErr := ListNodegroupsPages(svc, &eksv2.ListNodegroupsInput{ClusterName: aws2.String(cluster.name)},
+		func(page *eksv2.ListNodegroupsOutput, _ bool) bool {
 			for _, nodeGroup := range page.Nodegroups {
-				if _, err := svc.DeleteNodegroup(&eks.DeleteNodegroupInput{
-					ClusterName:   aws.String(cluster.name),
-					NodegroupName: nodeGroup}); err != nil {
-					logger.Warningf("%s: failed to delete nodegroup %s: %v", cluster.ARN(), aws.StringValue(nodeGroup), err)
+				if _, err := svc.DeleteNodegroup(context.TODO(), &eksv2.DeleteNodegroupInput{
+					ClusterName:   aws2.String(cluster.name),
+					NodegroupName: &nodeGroup}); err != nil {
+					logger.Warningf("%s: failed to delete nodegroup %s: %v", cluster.ARN(), nodeGroup, err)
 					errs = append(errs, err)
 				}
 			}
@@ -120,15 +141,28 @@ func (EKS) deleteNodegroupsForCluster(svc *eks.EKS, cluster *eksCluster, logger 
 	return kerrors.NewAggregate(errs)
 }
 
-func (EKS) deleteFargateProfilesForCluster(svc *eks.EKS, cluster *eksCluster, logger logrus.FieldLogger) error {
+func ListNodegroupsPages(svc *eksv2.Client, input *eksv2.ListNodegroupsInput, pageFunc func(page *eksv2.ListNodegroupsOutput, _ bool) bool) error {
+	paginator := eksv2.NewListNodegroupsPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (EKS) deleteFargateProfilesForCluster(svc *eksv2.Client, cluster *eksCluster, logger logrus.FieldLogger) error {
 	var errs []error
-	listErr := svc.ListFargateProfilesPages(&eks.ListFargateProfilesInput{ClusterName: aws.String(cluster.name)},
-		func(page *eks.ListFargateProfilesOutput, _ bool) bool {
+	listErr := ListFargateProfilesPages(svc, &eksv2.ListFargateProfilesInput{ClusterName: aws2.String(cluster.name)},
+		func(page *eksv2.ListFargateProfilesOutput, _ bool) bool {
 			for _, fargateProfile := range page.FargateProfileNames {
-				if _, err := svc.DeleteFargateProfile(&eks.DeleteFargateProfileInput{
-					ClusterName:        aws.String(cluster.name),
-					FargateProfileName: fargateProfile}); err != nil {
-					logger.Warningf("%s: failed to delete fargate profile %s: %v", cluster.ARN(), aws.StringValue(fargateProfile), err)
+				if _, err := svc.DeleteFargateProfile(context.TODO(), &eksv2.DeleteFargateProfileInput{
+					ClusterName:        aws2.String(cluster.name),
+					FargateProfileName: &fargateProfile}); err != nil {
+					logger.Warningf("%s: failed to delete fargate profile %s: %v", cluster.ARN(), fargateProfile, err)
 					errs = append(errs, err)
 				}
 			}
@@ -140,6 +174,19 @@ func (EKS) deleteFargateProfilesForCluster(svc *eks.EKS, cluster *eksCluster, lo
 		errs = append(errs, listErr)
 	}
 	return kerrors.NewAggregate(errs)
+}
+
+func ListFargateProfilesPages(svc *eksv2.Client, input *eksv2.ListFargateProfilesInput, pageFunc func(page *eksv2.ListFargateProfilesOutput, _ bool) bool) error {
+	paginator := eksv2.NewListFargateProfilesPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type eksCluster struct {

@@ -17,13 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
+	configv2 "github.com/aws/aws-sdk-go-v2/config"
+	credentialsv2 "github.com/aws/aws-sdk-go-v2/credentials"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -178,12 +179,16 @@ func cleanResource(res *common.Resource) error {
 	if err != nil {
 		return errors.Wrapf(err, "Couldn't get AWS creds from %q", res.Name)
 	}
-	creds := credentials.NewStaticCredentialsFromCreds(val)
-	s, err := session.NewSession(aws.NewConfig().WithCredentials(creds))
-	if err != nil {
-		return errors.Wrapf(err, "Failed to create AWS session")
+	creds := credentialsv2.StaticCredentialsProvider{
+		Value: val,
 	}
-	acct, err := account.GetAccount(s, regions.Default)
+	config, err := configv2.LoadDefaultConfig(context.TODO(),
+		configv2.WithCredentialsProvider(creds),
+	)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to load AWS config")
+	}
+	acct, err := account.GetAccount(config, regions.Default)
 	if err != nil {
 		return errors.Wrap(err, "Failed retrieving account")
 	}
@@ -201,7 +206,7 @@ func cleanResource(res *common.Resource) error {
 		skipResourceRecordSetTypesSet[resourceRecordType] = true
 	}
 	opts := resources.Options{
-		Session:                    s,
+		Config:                     &config,
 		Account:                    acct,
 		DryRun:                     *dryRun,
 		ExcludeTags:                excludeTM,

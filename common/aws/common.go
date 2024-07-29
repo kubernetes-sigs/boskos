@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+
 	"sigs.k8s.io/boskos/common"
 )
 
@@ -34,8 +35,8 @@ const (
 )
 
 // GetAWSCreds tries to fetch AWS credentials from a resource
-func GetAWSCreds(r *common.Resource) (credentials.Value, error) {
-	val := credentials.Value{}
+func GetAWSCreds(r *common.Resource) (aws2.Credentials, error) {
+	val := aws2.Credentials{}
 
 	if !strings.HasSuffix(r.Type, "aws-account") {
 		return val, fmt.Errorf("invalid aws resource type %q", r.Type)

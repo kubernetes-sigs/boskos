@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -28,9 +29,9 @@ import (
 )
 
 // CleanAll cleans all of the resources for all of the regions visible to
-// the provided AWS session.
+// the provided AWS config.
 func CleanAll(opts Options, region string) error {
-	regionList, err := regions.ParseRegion(opts.Session, region)
+	regionList, err := regions.ParseRegion(opts.Config, region)
 	if err != nil {
 		return err
 	}

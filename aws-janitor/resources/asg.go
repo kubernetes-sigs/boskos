@@ -17,10 +17,11 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	autoscalingv2 "github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,15 +32,17 @@ type AutoScalingGroups struct{}
 
 func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := autoscalingv2.NewFromConfig(*opts.Config, func(opt *autoscalingv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*autoScalingGroup // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *autoscaling.DescribeAutoScalingGroupsOutput, _ bool) bool {
+	pageFunc := func(page *autoscalingv2.DescribeAutoScalingGroupsOutput, _ bool) bool {
 		for _, asg := range page.AutoScalingGroups {
 			a := &autoScalingGroup{
-				arn:  aws.StringValue(asg.AutoScalingGroupARN),
-				name: aws.StringValue(asg.AutoScalingGroupName),
+				arn:  *asg.AutoScalingGroupARN,
+				name: *asg.AutoScalingGroupName,
 			}
 			tags := make(Tags, len(asg.Tags))
 			for _, t := range asg.Tags {
@@ -57,17 +60,17 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeAutoScalingGroupsPages(&autoscaling.DescribeAutoScalingGroupsInput{}, pageFunc); err != nil {
+	if err := DescribeAutoScalingGroupsPages(svc, &autoscalingv2.DescribeAutoScalingGroupsInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	for _, asg := range toDelete {
-		deleteInput := &autoscaling.DeleteAutoScalingGroupInput{
-			AutoScalingGroupName: aws.String(asg.name),
-			ForceDelete:          aws.Bool(true),
+		deleteInput := &autoscalingv2.DeleteAutoScalingGroupInput{
+			AutoScalingGroupName: aws2.String(asg.name),
+			ForceDelete:          aws2.Bool(true),
 		}
 
-		if _, err := svc.DeleteAutoScalingGroup(deleteInput); err != nil {
+		if _, err := svc.DeleteAutoScalingGroup(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", asg.ARN(), err)
 		}
 	}
@@ -77,12 +80,10 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 	// prevents a second pass).
 	for _, asg := range toDelete {
 		logger.Warningf("%s: waiting for delete", asg.ARN())
-
-		describeInput := &autoscaling.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: []*string{aws.String(asg.name)},
-		}
-
-		if err := svc.WaitUntilGroupNotExists(describeInput); err != nil {
+		waiter := autoscalingv2.NewGroupNotExistsWaiter(svc)
+		if err := waiter.Wait(context.TODO(), &autoscalingv2.DescribeAutoScalingGroupsInput{
+			AutoScalingGroupNames: []string{asg.name},
+		}, 5*time.Minute); err != nil {
 			logger.Warningf("%s: wait failed: %v", asg.ARN(), err)
 		}
 	}
@@ -90,17 +91,33 @@ func (AutoScalingGroups) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
-	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	input := &autoscaling.DescribeAutoScalingGroupsInput{}
+func DescribeAutoScalingGroupsPages(svc *autoscalingv2.Client, input *autoscalingv2.DescribeAutoScalingGroupsInput, pageFunc func(page *autoscalingv2.DescribeAutoScalingGroupsOutput, _ bool) bool) error {
+	paginator := autoscalingv2.NewDescribeAutoScalingGroupsPaginator(svc, input)
 
-	err := c.DescribeAutoScalingGroupsPages(input, func(asgs *autoscaling.DescribeAutoScalingGroupsOutput, isLast bool) bool {
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (AutoScalingGroups) ListAll(opts Options) (*Set, error) {
+	svc := autoscalingv2.NewFromConfig(*opts.Config, func(opt *autoscalingv2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	input := &autoscalingv2.DescribeAutoScalingGroupsInput{}
+
+	err := DescribeAutoScalingGroupsPages(svc, input, func(asgs *autoscalingv2.DescribeAutoScalingGroupsOutput, isLast bool) bool {
 		now := time.Now()
 		for _, asg := range asgs.AutoScalingGroups {
 			arn := autoScalingGroup{
-				arn:  aws.StringValue(asg.AutoScalingGroupARN),
-				name: aws.StringValue(asg.AutoScalingGroupName),
+				arn:  *asg.AutoScalingGroupARN,
+				name: *asg.AutoScalingGroupName,
 			}.ARN()
 			set.firstSeen[arn] = now
 		}

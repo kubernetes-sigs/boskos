@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,9 +33,11 @@ type RouteTables struct{}
 
 func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	resp, err := svc.DescribeRouteTables(nil)
+	resp, err := svc.DescribeRouteTables(context.TODO(), nil)
 	if err != nil {
 		return err
 	}
@@ -66,20 +69,20 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 		for _, assoc := range rt.Associations {
 			logger.Infof("%s: disassociating from %s", r.ARN(), *assoc.SubnetId)
 
-			disReq := &ec2.DisassociateRouteTableInput{
+			disReq := &ec2v2.DisassociateRouteTableInput{
 				AssociationId: assoc.RouteTableAssociationId,
 			}
 
-			if _, err := svc.DisassociateRouteTable(disReq); err != nil {
+			if _, err := svc.DisassociateRouteTable(context.TODO(), disReq); err != nil {
 				logger.Warningf("%s: disassociation from subnet %s failed: %v", r.ARN(), *assoc.SubnetId, err)
 			}
 		}
 
-		deleteReq := &ec2.DeleteRouteTableInput{
+		deleteReq := &ec2v2.DeleteRouteTableInput{
 			RouteTableId: rt.RouteTableId,
 		}
 
-		if _, err := svc.DeleteRouteTable(deleteReq); err != nil {
+		if _, err := svc.DeleteRouteTable(context.TODO(), deleteReq); err != nil {
 			logger.Warningf("%s: delete failed: %v", r.ARN(), err)
 		}
 	}
@@ -88,11 +91,13 @@ func (RouteTables) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (RouteTables) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &ec2.DescribeRouteTablesInput{}
+	input := &ec2v2.DescribeRouteTablesInput{}
 
-	err := svc.DescribeRouteTablesPages(input, func(tables *ec2.DescribeRouteTablesOutput, _ bool) bool {
+	err := DescribeRouteTablesPages(svc, input, func(tables *ec2v2.DescribeRouteTablesOutput, _ bool) bool {
 		now := time.Now()
 		for _, table := range tables.RouteTables {
 			arn := routeTable{
@@ -107,6 +112,20 @@ func (RouteTables) ListAll(opts Options) (*Set, error) {
 	})
 
 	return set, errors.Wrapf(err, "couldn't describe route tables for %q in %q", opts.Account, opts.Region)
+}
+
+func DescribeRouteTablesPages(svc *ec2v2.Client, input *ec2v2.DescribeRouteTablesInput, pageFunc func(tables *ec2v2.DescribeRouteTablesOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeRouteTablesPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type routeTable struct {

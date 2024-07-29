@@ -17,12 +17,15 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/iam"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	iamv2 "github.com/aws/aws-sdk-go-v2/service/iam"
+	iamv2types "github.com/aws/aws-sdk-go-v2/service/iam/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,8 +35,8 @@ import (
 
 type IAMRoles struct{}
 
-func fetchRoleAndTags(svc *iam.IAM, roleName *string) (*iam.Role, Tags, error) {
-	getRoleOutput, err := svc.GetRole(&iam.GetRoleInput{RoleName: roleName})
+func fetchRoleAndTags(svc *iamv2.Client, roleName *string) (*iamv2types.Role, Tags, error) {
+	getRoleOutput, err := svc.GetRole(context.TODO(), &iamv2.GetRoleInput{RoleName: roleName})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,24 +62,26 @@ var builtinRoles = sets.NewString(
 // roleIsManaged checks if the role should be managed (and thus deleted) by us.
 // In particular, we want to avoid "system" AWS roles.
 // Note that this function does not consider tags.
-func roleIsManaged(role *iam.Role) bool {
+func roleIsManaged(role *iamv2types.Role) bool {
 	// Most AWS system roles are in a directory called `aws-service-role`
-	if strings.HasPrefix(aws.StringValue(role.Path), "/aws-service-role/") {
+	if strings.HasPrefix(*role.Path, "/aws-service-role/") {
 		return false
 	}
 
-	return !builtinRoles.Has(aws.StringValue(role.RoleName))
+	return !builtinRoles.Has(*role.RoleName)
 }
 
 func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := iamv2.NewFromConfig(*opts.Config, func(opt *iamv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*iamRole // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *iam.ListRolesOutput, _ bool) bool {
+	pageFunc := func(page *iamv2.ListRolesOutput, _ bool) bool {
 		for _, r := range page.Roles {
-			if !roleIsManaged(r) {
+			if !roleIsManaged(&r) {
 				continue
 			}
 			role, tags, err := fetchRoleAndTags(svc, r.RoleName)
@@ -84,7 +89,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 				logger.Warningf("failed fetching role and tags: %v", err)
 				continue
 			}
-			l := &iamRole{arn: aws.StringValue(r.Arn), roleID: aws.StringValue(role.RoleId), roleName: aws.StringValue(role.RoleName)}
+			l := &iamRole{arn: *r.Arn, roleID: *role.RoleId, roleName: *role.RoleName}
 			if set.Mark(opts, l, r.CreateDate, tags) {
 				if role.RoleLastUsed != nil && role.RoleLastUsed.LastUsedDate != nil && time.Since(*role.RoleLastUsed.LastUsedDate) < set.ttl {
 					logger.Debugf("%s: used too recently, skipping", l.ARN())
@@ -99,7 +104,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.ListRolesPages(&iam.ListRolesInput{}, pageFunc); err != nil {
+	if err := ListRolesPages(svc, &iamv2.ListRolesInput{}, pageFunc); err != nil {
 		return err
 	}
 
@@ -112,18 +117,33 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func (IAMRoles) ListAll(opts Options) (*Set, error) {
-	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	inp := &iam.ListRolesInput{}
+func ListRolesPages(svc *iamv2.Client, input *iamv2.ListRolesInput, pageFunc func(page *iamv2.ListRolesOutput, _ bool) bool) error {
+	paginator := iamv2.NewListRolesPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
 
-	err := svc.ListRolesPages(inp, func(roles *iam.ListRolesOutput, _ bool) bool {
+func (IAMRoles) ListAll(opts Options) (*Set, error) {
+	svc := iamv2.NewFromConfig(*opts.Config, func(opt *iamv2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	inp := &iamv2.ListRolesInput{}
+
+	err := ListRolesPages(svc, inp, func(roles *iamv2.ListRolesOutput, _ bool) bool {
 		now := time.Now()
 		for _, role := range roles.Roles {
 			arn := iamRole{
-				arn:      aws.StringValue(role.Arn),
-				roleID:   aws.StringValue(role.RoleId),
-				roleName: aws.StringValue(role.RoleName),
+				arn:      *role.Arn,
+				roleID:   *role.RoleId,
+				roleName: *role.RoleName,
 			}.ARN()
 
 			set.firstSeen[arn] = now
@@ -149,15 +169,15 @@ func (r iamRole) ResourceKey() string {
 	return r.roleID + "::" + r.ARN()
 }
 
-func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
+func (r iamRole) delete(svc *iamv2.Client, logger logrus.FieldLogger) error {
 	roleName := r.roleName
 
 	var policyNames []string
 
-	rolePoliciesReq := &iam.ListRolePoliciesInput{RoleName: aws.String(roleName)}
-	err := svc.ListRolePoliciesPages(rolePoliciesReq, func(page *iam.ListRolePoliciesOutput, lastPage bool) bool {
+	rolePoliciesReq := &iamv2.ListRolePoliciesInput{RoleName: aws2.String(roleName)}
+	err := ListRolePoliciesPages(svc, rolePoliciesReq, func(page *iamv2.ListRolePoliciesOutput, lastPage bool) bool {
 		for _, policyName := range page.PolicyNames {
-			policyNames = append(policyNames, aws.StringValue(policyName))
+			policyNames = append(policyNames, policyName)
 		}
 		return true
 	})
@@ -167,10 +187,10 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 	}
 
 	var attachedRolePolicyArns []string
-	attachedRolePoliciesReq := &iam.ListAttachedRolePoliciesInput{RoleName: aws.String(roleName)}
-	err = svc.ListAttachedRolePoliciesPages(attachedRolePoliciesReq, func(page *iam.ListAttachedRolePoliciesOutput, _ bool) bool {
+	attachedRolePoliciesReq := &iamv2.ListAttachedRolePoliciesInput{RoleName: aws2.String(roleName)}
+	err = ListAttachedRolePoliciesPages(svc, attachedRolePoliciesReq, func(page *iamv2.ListAttachedRolePoliciesOutput, _ bool) bool {
 		for _, attachedRolePolicy := range page.AttachedPolicies {
-			attachedRolePolicyArns = append(attachedRolePolicyArns, aws.StringValue(attachedRolePolicy.PolicyArn))
+			attachedRolePolicyArns = append(attachedRolePolicyArns, *attachedRolePolicy.PolicyArn)
 		}
 		return true
 	})
@@ -182,12 +202,12 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 	for _, policyName := range policyNames {
 		logger.Infof("Deleting IAM role policy %q %q", roleName, policyName)
 
-		deletePolicyReq := &iam.DeleteRolePolicyInput{
-			RoleName:   aws.String(roleName),
-			PolicyName: aws.String(policyName),
+		deletePolicyReq := &iamv2.DeleteRolePolicyInput{
+			RoleName:   aws2.String(roleName),
+			PolicyName: aws2.String(policyName),
 		}
 
-		if _, err := svc.DeleteRolePolicy(deletePolicyReq); err != nil {
+		if _, err := svc.DeleteRolePolicy(context.TODO(), deletePolicyReq); err != nil {
 			return errors.Wrapf(err, "error deleting IAM role policy %q %q", roleName, policyName)
 		}
 	}
@@ -195,25 +215,51 @@ func (r iamRole) delete(svc *iam.IAM, logger logrus.FieldLogger) error {
 	for _, attachedRolePolicyArn := range attachedRolePolicyArns {
 		logger.Infof("Detaching IAM attached role policy %q %q", roleName, attachedRolePolicyArn)
 
-		detachRolePolicyReq := &iam.DetachRolePolicyInput{
-			PolicyArn: aws.String(attachedRolePolicyArn),
-			RoleName:  aws.String(roleName),
+		detachRolePolicyReq := &iamv2.DetachRolePolicyInput{
+			PolicyArn: aws2.String(attachedRolePolicyArn),
+			RoleName:  aws2.String(roleName),
 		}
 
-		if _, err := svc.DetachRolePolicy(detachRolePolicyReq); err != nil {
+		if _, err := svc.DetachRolePolicy(context.TODO(), detachRolePolicyReq); err != nil {
 			return errors.Wrapf(err, "error detaching IAM role policy %q %q", roleName, attachedRolePolicyArn)
 		}
 	}
 
 	logger.Debugf("Deleting IAM role %q", roleName)
 
-	deleteReq := &iam.DeleteRoleInput{
-		RoleName: aws.String(roleName),
+	deleteReq := &iamv2.DeleteRoleInput{
+		RoleName: aws2.String(roleName),
 	}
 
-	if _, err := svc.DeleteRole(deleteReq); err != nil {
+	if _, err := svc.DeleteRole(context.TODO(), deleteReq); err != nil {
 		return errors.Wrapf(err, "error deleting IAM role %q", roleName)
 	}
 
+	return nil
+}
+
+func ListRolePoliciesPages(svc *iamv2.Client, input *iamv2.ListRolePoliciesInput, pageFunc func(page *iamv2.ListRolePoliciesOutput, lastPage bool) bool) error {
+	paginator := iamv2.NewListRolePoliciesPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func ListAttachedRolePoliciesPages(svc *iamv2.Client, input *iamv2.ListAttachedRolePoliciesInput, pageFunc func(page *iamv2.ListAttachedRolePoliciesOutput, lastPage bool) bool) error {
+	paginator := iamv2.NewListAttachedRolePoliciesPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
 	return nil
 }

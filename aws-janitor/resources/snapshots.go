@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,21 +33,23 @@ type Snapshots struct{}
 
 func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*snapshot // Paged call, defer deletion until we have the whole list.
 
-	describeInput := &ec2.DescribeSnapshotsInput{
+	describeInput := &ec2v2.DescribeSnapshotsInput{
 		// Exclude publicly-available snapshots from other owners.
-		OwnerIds: aws.StringSlice([]string{"self"}),
+		OwnerIds: []string{"self"},
 	}
 
-	pageFunc := func(page *ec2.DescribeSnapshotsOutput, _ bool) bool {
+	pageFunc := func(page *ec2v2.DescribeSnapshotsOutput, _ bool) bool {
 		for _, ss := range page.Snapshots {
 			s := &snapshot{
 				Account: opts.Account,
 				Region:  opts.Region,
-				ID:      aws.StringValue(ss.SnapshotId),
+				ID:      *ss.SnapshotId,
 			}
 			tags := fromEC2Tags(ss.Tags)
 			// StartTime is probably close enough to a creation timestamp
@@ -61,16 +64,16 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeSnapshotsPages(describeInput, pageFunc); err != nil {
+	if err := DescribeSnapshotsPages(svc, describeInput, pageFunc); err != nil {
 		return err
 	}
 
 	for _, ss := range toDelete {
-		deleteInput := &ec2.DeleteSnapshotInput{
-			SnapshotId: aws.String(ss.ID),
+		deleteInput := &ec2v2.DeleteSnapshotInput{
+			SnapshotId: &ss.ID,
 		}
 
-		if _, err := svc.DeleteSnapshot(deleteInput); err != nil {
+		if _, err := svc.DeleteSnapshot(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", ss.ARN(), err)
 		}
 	}
@@ -78,21 +81,37 @@ func (Snapshots) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
+func DescribeSnapshotsPages(svc *ec2v2.Client, input *ec2v2.DescribeSnapshotsInput, pageFunc func(page *ec2v2.DescribeSnapshotsOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeSnapshotsPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
 func (Snapshots) ListAll(opts Options) (*Set, error) {
-	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &ec2.DescribeSnapshotsInput{
+	input := &ec2v2.DescribeSnapshotsInput{
 		// Exclude publicly-available snapshots from other owners.
-		OwnerIds: aws.StringSlice([]string{"self"}),
+		OwnerIds: []string{"self"},
 	}
 
-	err := c.DescribeSnapshotsPages(input, func(page *ec2.DescribeSnapshotsOutput, isLast bool) bool {
+	err := DescribeSnapshotsPages(svc, input, func(page *ec2v2.DescribeSnapshotsOutput, isLast bool) bool {
 		now := time.Now()
 		for _, ss := range page.Snapshots {
 			arn := snapshot{
 				Account: opts.Account,
 				Region:  opts.Region,
-				ID:      aws.StringValue(ss.SnapshotId),
+				ID:      *ss.SnapshotId,
 			}.ARN()
 			set.firstSeen[arn] = now
 		}

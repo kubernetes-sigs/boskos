@@ -17,11 +17,13 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,11 +33,13 @@ type LaunchTemplates struct{}
 
 func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*launchTemplate // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *ec2.DescribeLaunchTemplatesOutput, _ bool) bool {
+	pageFunc := func(page *ec2v2.DescribeLaunchTemplatesOutput, _ bool) bool {
 		for _, lt := range page.LaunchTemplates {
 			l := &launchTemplate{
 				Account: opts.Account,
@@ -54,16 +58,16 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeLaunchTemplatesPages(&ec2.DescribeLaunchTemplatesInput{}, pageFunc); err != nil {
+	if err := DescribeLaunchTemplatesPages(svc, &ec2v2.DescribeLaunchTemplatesInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	for _, lt := range toDelete {
-		deleteReq := &ec2.DeleteLaunchTemplateInput{
-			LaunchTemplateId: aws.String(lt.ID),
+		deleteReq := &ec2v2.DeleteLaunchTemplateInput{
+			LaunchTemplateId: aws2.String(lt.ID),
 		}
 
-		if _, err := svc.DeleteLaunchTemplate(deleteReq); err != nil {
+		if _, err := svc.DeleteLaunchTemplate(context.TODO(), deleteReq); err != nil {
 			logger.Warningf("%s: delete failed: %v", lt.ARN(), err)
 		}
 	}
@@ -72,11 +76,13 @@ func (LaunchTemplates) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (LaunchTemplates) ListAll(opts Options) (*Set, error) {
-	c := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &ec2.DescribeLaunchTemplatesInput{}
+	input := &ec2v2.DescribeLaunchTemplatesInput{}
 
-	err := c.DescribeLaunchTemplatesPages(input, func(lts *ec2.DescribeLaunchTemplatesOutput, isLast bool) bool {
+	err := DescribeLaunchTemplatesPages(svc, input, func(lts *ec2v2.DescribeLaunchTemplatesOutput, isLast bool) bool {
 		now := time.Now()
 		for _, lt := range lts.LaunchTemplates {
 			arn := launchTemplate{
@@ -92,6 +98,20 @@ func (LaunchTemplates) ListAll(opts Options) (*Set, error) {
 	})
 
 	return set, errors.Wrapf(err, "couldn't list launch templates for %q in %q", opts.Account, opts.Region)
+}
+
+func DescribeLaunchTemplatesPages(svc *ec2v2.Client, input *ec2v2.DescribeLaunchTemplatesInput, pageFunc func(lts *ec2v2.DescribeLaunchTemplatesOutput, isLast bool) bool) error {
+	paginator := ec2v2.NewDescribeLaunchTemplatesPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type launchTemplate struct {

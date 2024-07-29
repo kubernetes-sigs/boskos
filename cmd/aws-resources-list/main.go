@@ -17,11 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws/session"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	configv2 "github.com/aws/aws-sdk-go-v2/config"
+
 	"sigs.k8s.io/boskos/aws-janitor/account"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 	"sigs.k8s.io/boskos/aws-janitor/resources"
@@ -37,11 +40,11 @@ var (
 	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
 )
 
-func listResources(res resources.Type, sess *session.Session, acct string, regions []string) {
+func listResources(res resources.Type, cfg aws2.Config, acct string, regions []string) {
 	fmt.Printf("==%T==\n", res)
 	for _, region := range regions {
 		set, err := res.ListAll(resources.Options{
-			Session:                    sess,
+			Config:                     &cfg,
 			Account:                    acct,
 			Region:                     region,
 			DryRun:                     true,
@@ -66,23 +69,23 @@ func listResources(res resources.Type, sess *session.Session, acct string, regio
 func main() {
 	flag.Parse()
 
-	session := session.Must(session.NewSession())
-	acct, err := account.GetAccount(session, *region)
+	cfg, err := configv2.LoadDefaultConfig(context.TODO())
+	acct, err := account.GetAccount(cfg, "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error retrieving account: %v\n", err)
 		os.Exit(1)
 	}
 
-	regionList, err := regions.ParseRegion(session, *region)
+	regionList, err := regions.ParseRegion(&cfg, *region)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing region: %v\n", err)
 		os.Exit(1)
 	}
 
 	for _, r := range resources.RegionalTypeList {
-		listResources(r, session, acct, regionList)
+		listResources(r, cfg, acct, regionList)
 	}
 	for _, r := range resources.GlobalTypeList {
-		listResources(r, session, acct, []string{""})
+		listResources(r, cfg, acct, []string{""})
 	}
 }

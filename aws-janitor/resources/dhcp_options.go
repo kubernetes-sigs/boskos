@@ -17,12 +17,15 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,17 +35,19 @@ type DHCPOptions struct{}
 
 func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	// This is a little gross, but I can't find an easier way to
 	// figure out the DhcpOptions associated with the default VPC.
 	defaultRefs := make(map[string]bool)
 	{
-		resp, err := svc.DescribeVpcs(&ec2.DescribeVpcsInput{
-			Filters: []*ec2.Filter{
+		resp, err := svc.DescribeVpcs(context.TODO(), &ec2v2.DescribeVpcsInput{
+			Filters: []ec2types.Filter{
 				{
-					Name:   aws.String("isDefault"),
-					Values: []*string{aws.String("true")},
+					Name:   aws2.String("isDefault"),
+					Values: []string{"true"},
 				},
 			},
 		})
@@ -55,7 +60,7 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 		}
 	}
 
-	resp, err := svc.DescribeDhcpOptions(nil)
+	resp, err := svc.DescribeDhcpOptions(context.TODO(), nil)
 	if err != nil {
 		return err
 	}
@@ -67,7 +72,7 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		// Separately, skip any "default looking" DHCP Option Sets. See comment below.
-		if defaultLookingDHCPOptions(dhcp, opts.Region) {
+		if defaultLookingDHCPOptions(&dhcp, opts.Region) {
 			defaults = append(defaults, *dhcp.DhcpOptionsId)
 			continue
 		}
@@ -83,7 +88,7 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		if _, err := svc.DeleteDhcpOptions(&ec2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
+		if _, err := svc.DeleteDhcpOptions(context.TODO(), &ec2v2.DeleteDhcpOptionsInput{DhcpOptionsId: dhcp.DhcpOptionsId}); err != nil {
 			logger.Warningf("%s: delete failed: %v", dh.ARN(), err)
 		}
 	}
@@ -96,11 +101,13 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (DHCPOptions) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	inp := &ec2.DescribeDhcpOptionsInput{}
+	inp := &ec2v2.DescribeDhcpOptionsInput{}
 
-	optsList, err := svc.DescribeDhcpOptions(inp)
+	optsList, err := svc.DescribeDhcpOptions(context.TODO(), inp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't describe DHCP Options for %q in %q", opts.Account, opts.Region)
 	}
@@ -129,7 +136,7 @@ func (DHCPOptions) ListAll(opts Options) (*Set, error) {
 // set returned is the default or was created along with the
 // VPC. Because of this, we just skip these during cleanup - there
 // will only ever be one default set per region.
-func defaultLookingDHCPOptions(dhcp *ec2.DhcpOptions, region string) bool {
+func defaultLookingDHCPOptions(dhcp *ec2types.DhcpOptions, region string) bool {
 	if len(dhcp.Tags) != 0 {
 		return false
 	}

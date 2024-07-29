@@ -17,14 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	configv2 "github.com/aws/aws-sdk-go-v2/config"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -114,8 +115,11 @@ func main() {
 	// in a really bad state, we may be contending with API rate
 	// limiting and fighting against the very resources we're trying
 	// to delete.
-	sess := session.Must(session.NewSessionWithOptions(session.Options{Config: aws.Config{MaxRetries: aws.Int(100)}}))
-	acct, err := account.GetAccount(sess, regions.Default)
+	config, err := configv2.LoadDefaultConfig(context.TODO(),
+		configv2.WithRegion(regions.Default),
+		configv2.WithRetryMaxAttempts(100),
+	)
+	acct, err := account.GetAccount(config, regions.Default)
 	if err != nil {
 		logrus.Errorf("Failed retrieving account: %v", err)
 		runtime.Goexit()
@@ -147,7 +151,7 @@ func main() {
 		skipResourceRecordSetTypesSet[resourceRecordType] = true
 	}
 	opts := resources.Options{
-		Session:                    sess,
+		Config:                     &config,
 		Account:                    acct,
 		DryRun:                     *dryRun,
 		ExcludeTags:                excludeTM,
@@ -176,7 +180,7 @@ func main() {
 }
 
 func markAndSweep(opts resources.Options, region string) error {
-	s3p, err := s3path.GetPath(opts.Session, *path)
+	s3p, err := s3path.GetPath(opts.Config, *path)
 	if err != nil {
 		return errors.Wrapf(err, "-path %q isn't a valid S3 path", *path)
 	}
@@ -191,13 +195,13 @@ func markAndSweep(opts resources.Options, region string) error {
 			return fmt.Errorf("state bucket %s, must be tagged with exclude-tags", s3p.Bucket)
 		}
 	}
-	regionList, err := regions.ParseRegion(opts.Session, region)
+	regionList, err := regions.ParseRegion(opts.Config, region)
 	if err != nil {
 		return err
 	}
 	logrus.Infof("Regions: %+v", regionList)
 
-	res, err := resources.LoadSet(opts.Session, s3p, *maxTTL)
+	res, err := resources.LoadSet(opts.Config, s3p, *maxTTL)
 	if err != nil {
 		return errors.Wrapf(err, "Error loading %q", *path)
 	}
@@ -219,7 +223,7 @@ func markAndSweep(opts resources.Options, region string) error {
 	}
 
 	sweepCount = res.MarkComplete()
-	if err := res.Save(opts.Session, s3p); err != nil {
+	if err := res.Save(opts.Config, s3p); err != nil {
 		return errors.Wrapf(err, "Error saving %q", *path)
 	}
 

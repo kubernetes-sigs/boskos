@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/elbv2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	elbv2v2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -33,16 +34,18 @@ type LoadBalancers struct{}
 
 func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := elbv2v2.NewFromConfig(*opts.Config, func(opt *elbv2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var loadBalancers []*loadBalancer
 	lbTags := make(map[string]Tags)
 
-	pageFunc := func(page *elbv2.DescribeLoadBalancersOutput, _ bool) bool {
+	pageFunc := func(page *elbv2v2.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancers {
 			a := &loadBalancer{
-				arn:         aws.StringValue(lb.LoadBalancerArn),
-				name:        aws.StringValue(lb.LoadBalancerName),
+				arn:         *lb.LoadBalancerArn,
+				name:        *lb.LoadBalancerName,
 				createdTime: lb.CreatedTime,
 			}
 			loadBalancers = append(loadBalancers, a)
@@ -51,19 +54,19 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeLoadBalancersPages(&elbv2.DescribeLoadBalancersInput{}, pageFunc); err != nil {
+	if err := DescribeLoadBalancersPagesv2(svc, &elbv2v2.DescribeLoadBalancersInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	fetchTagErr := incrementalFetchTags(lbTags, 20, func(lbArns []*string) error {
-		tagsResp, err := svc.DescribeTags(&elbv2.DescribeTagsInput{ResourceArns: lbArns})
+		tagsResp, err := svc.DescribeTags(context.TODO(), &elbv2v2.DescribeTagsInput{ResourceArns: aws2.ToStringSlice(lbArns)})
 		if err != nil {
 			return err
 		}
 
 		var errs []error
 		for _, tagDesc := range tagsResp.TagDescriptions {
-			arn := aws.StringValue(tagDesc.ResourceArn)
+			arn := *tagDesc.ResourceArn
 			_, ok := lbTags[arn]
 			if !ok {
 				errs = append(errs, fmt.Errorf("unknown load balancer ARN in tag response: %s", arn))
@@ -93,11 +96,11 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		deleteInput := &elbv2.DeleteLoadBalancerInput{
-			LoadBalancerArn: aws.String(lb.ARN()),
+		deleteInput := &elbv2v2.DeleteLoadBalancerInput{
+			LoadBalancerArn: aws2.String(lb.ARN()),
 		}
 
-		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
+		if _, err := svc.DeleteLoadBalancer(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", lb.ARN(), err)
 		}
 	}
@@ -105,12 +108,28 @@ func (LoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func (LoadBalancers) ListAll(opts Options) (*Set, error) {
-	c := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	input := &elbv2.DescribeLoadBalancersInput{}
+func DescribeLoadBalancersPagesv2(svc *elbv2v2.Client, input *elbv2v2.DescribeLoadBalancersInput, pageFunc func(page *elbv2v2.DescribeLoadBalancersOutput, _ bool) bool) error {
+	paginator := elbv2v2.NewDescribeLoadBalancersPaginator(svc, input)
 
-	err := c.DescribeLoadBalancersPages(input, func(lbs *elbv2.DescribeLoadBalancersOutput, isLast bool) bool {
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (LoadBalancers) ListAll(opts Options) (*Set, error) {
+	svc := elbv2v2.NewFromConfig(*opts.Config, func(opt *elbv2v2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	input := &elbv2v2.DescribeLoadBalancersInput{}
+
+	err := DescribeLoadBalancersPagesv2(svc, input, func(lbs *elbv2v2.DescribeLoadBalancersOutput, isLast bool) bool {
 		now := time.Now()
 		for _, lb := range lbs.LoadBalancers {
 			a := &loadBalancer{arn: *lb.LoadBalancerArn, name: *lb.LoadBalancerName}

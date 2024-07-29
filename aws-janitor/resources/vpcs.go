@@ -17,11 +17,14 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,13 +35,15 @@ type VPCs struct{}
 
 func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	resp, err := svc.DescribeVpcs(&ec2.DescribeVpcsInput{
-		Filters: []*ec2.Filter{
+	resp, err := svc.DescribeVpcs(context.TODO(), &ec2v2.DescribeVpcsInput{
+		Filters: []ec2types.Filter{
 			{
-				Name:   aws.String("isDefault"),
-				Values: []*string{aws.String("false")},
+				Name:   aws2.String("isDefault"),
+				Values: []string{"false"},
 			},
 		},
 	})
@@ -57,17 +62,17 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 		if vp.DhcpOptionsId != nil && *vp.DhcpOptionsId != "default" {
-			disReq := &ec2.AssociateDhcpOptionsInput{
+			disReq := &ec2v2.AssociateDhcpOptionsInput{
 				VpcId:         vp.VpcId,
-				DhcpOptionsId: aws.String("default"),
+				DhcpOptionsId: aws2.String("default"),
 			}
 
-			if _, err := svc.AssociateDhcpOptions(disReq); err != nil {
+			if _, err := svc.AssociateDhcpOptions(context.TODO(), disReq); err != nil {
 				logger.Warningf("%s: disassociating DHCP option set %s failed: %v", v.ARN(), *vp.DhcpOptionsId, err)
 			}
 		}
 
-		if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
+		if _, err := svc.DeleteVpc(context.TODO(), &ec2v2.DeleteVpcInput{VpcId: vp.VpcId}); err != nil {
 			logger.Warningf("%s: delete failed: %v", v.ARN(), err)
 		}
 	}
@@ -76,11 +81,13 @@ func (VPCs) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (VPCs) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	inp := &ec2.DescribeVpcsInput{}
+	inp := &ec2v2.DescribeVpcsInput{}
 
-	vpcs, err := svc.DescribeVpcs(inp)
+	vpcs, err := svc.DescribeVpcs(context.TODO(), inp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't describe VPCs for %q in %q", opts.Account, opts.Region)
 	}

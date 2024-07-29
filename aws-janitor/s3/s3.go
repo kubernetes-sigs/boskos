@@ -17,13 +17,12 @@ limitations under the License.
 package s3
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	s3v2 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"sigs.k8s.io/boskos/aws-janitor/regions"
 )
 
@@ -33,7 +32,7 @@ type Path struct {
 	Key    string
 }
 
-func GetPath(sess *session.Session, s string) (*Path, error) {
+func GetPath(cfg *aws2.Config, s string) (*Path, error) {
 	url, err := url.Parse(s)
 	if err != nil {
 		return nil, err
@@ -43,17 +42,16 @@ func GetPath(sess *session.Session, s string) (*Path, error) {
 		return nil, fmt.Errorf("Scheme %q != 's3'", url.Scheme)
 	}
 
-	svc := s3.New(sess, &aws.Config{Region: aws.String(regions.Default)})
+	svc := s3v2.NewFromConfig(*cfg, func(options *s3v2.Options) {
+		options.Region = regions.Default
+	})
 
-	resp, err := svc.GetBucketLocation(&s3.GetBucketLocationInput{Bucket: aws.String(url.Host)})
+	resp, err := svc.GetBucketLocation(context.TODO(), &s3v2.GetBucketLocationInput{Bucket: aws2.String(url.Host)})
 	if err != nil {
 		return nil, err
 	}
 
-	region := regions.Default
-	if resp.LocationConstraint != nil {
-		region = *resp.LocationConstraint
-	}
+	region := resp.LocationConstraint
 
-	return &Path{Region: region, Bucket: url.Host, Key: url.Path}, nil
+	return &Path{Region: string(region), Bucket: url.Host, Key: url.Path}, nil
 }
