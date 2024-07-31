@@ -72,7 +72,7 @@ func (DHCPOptions) MarkAndSweep(opts Options, set *Set) error {
 		}
 
 		// Separately, skip any "default looking" DHCP Option Sets. See comment below.
-		if defaultLookingDHCPOptions(&dhcp, opts.Region) {
+		if defaultLookingDHCPOptions(dhcp, opts.Region) {
 			defaults = append(defaults, *dhcp.DhcpOptionsId)
 			continue
 		}
@@ -136,7 +136,7 @@ func (DHCPOptions) ListAll(opts Options) (*Set, error) {
 // set returned is the default or was created along with the
 // VPC. Because of this, we just skip these during cleanup - there
 // will only ever be one default set per region.
-func defaultLookingDHCPOptions(dhcp *ec2types.DhcpOptions, region string) bool {
+func defaultLookingDHCPOptions(dhcp ec2types.DhcpOptions, region string) bool {
 	if len(dhcp.Tags) != 0 {
 		return false
 	}

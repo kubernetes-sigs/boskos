@@ -62,7 +62,7 @@ var builtinRoles = sets.NewString(
 // roleIsManaged checks if the role should be managed (and thus deleted) by us.
 // In particular, we want to avoid "system" AWS roles.
 // Note that this function does not consider tags.
-func roleIsManaged(role *iamv2types.Role) bool {
+func roleIsManaged(role iamv2types.Role) bool {
 	// Most AWS system roles are in a directory called `aws-service-role`
 	if strings.HasPrefix(*role.Path, "/aws-service-role/") {
 		return false
@@ -81,7 +81,7 @@ func (IAMRoles) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *iamv2.ListRolesOutput, _ bool) bool {
 		for _, r := range page.Roles {
-			if !roleIsManaged(&r) {
+			if !roleIsManaged(r) {
 				continue
 			}
 			role, tags, err := fetchRoleAndTags(svc, r.RoleName)

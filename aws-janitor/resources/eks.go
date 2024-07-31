@@ -78,7 +78,7 @@ func (EKS) describeClusters(opts Options, set *Set, svc *eksv2.Client, deleteFun
 	err := ListClustersPages(svc, &eksv2.ListClustersInput{},
 		func(page *eksv2.ListClustersOutput, _ bool) bool {
 			for _, clusterName := range page.Clusters {
-				out, describeErr := svc.DescribeCluster(context.TODO(), &eksv2.DescribeClusterInput{Name: &clusterName})
+				out, describeErr := svc.DescribeCluster(context.TODO(), &eksv2.DescribeClusterInput{Name: aws2.String(clusterName)})
 				if describeErr != nil || out == nil {
 					logger.Warningf("%s: failed to describe cluster: %v", clusterName, describeErr)
 					continue
@@ -89,7 +89,7 @@ func (EKS) describeClusters(opts Options, set *Set, svc *eksv2.Client, deleteFun
 				}
 				tags := make(Tags, len(out.Cluster.Tags))
 				for k, v := range out.Cluster.Tags {
-					tags.Add(aws2.String(k), &v)
+					tags.Add(aws2.String(k), aws2.String(v))
 				}
 				if !set.Mark(opts, cluster, out.Cluster.CreatedAt, tags) {
 					continue
@@ -126,7 +126,7 @@ func (EKS) deleteNodegroupsForCluster(svc *eksv2.Client, cluster *eksCluster, lo
 			for _, nodeGroup := range page.Nodegroups {
 				if _, err := svc.DeleteNodegroup(context.TODO(), &eksv2.DeleteNodegroupInput{
 					ClusterName:   aws2.String(cluster.name),
-					NodegroupName: &nodeGroup}); err != nil {
+					NodegroupName: aws2.String(nodeGroup)}); err != nil {
 					logger.Warningf("%s: failed to delete nodegroup %s: %v", cluster.ARN(), nodeGroup, err)
 					errs = append(errs, err)
 				}
@@ -161,7 +161,7 @@ func (EKS) deleteFargateProfilesForCluster(svc *eksv2.Client, cluster *eksCluste
 			for _, fargateProfile := range page.FargateProfileNames {
 				if _, err := svc.DeleteFargateProfile(context.TODO(), &eksv2.DeleteFargateProfileInput{
 					ClusterName:        aws2.String(cluster.name),
-					FargateProfileName: &fargateProfile}); err != nil {
+					FargateProfileName: aws2.String(fargateProfile)}); err != nil {
 					logger.Warningf("%s: failed to delete fargate profile %s: %v", cluster.ARN(), fargateProfile, err)
 					errs = append(errs, err)
 				}

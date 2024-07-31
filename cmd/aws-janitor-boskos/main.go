@@ -186,7 +186,7 @@ func cleanResource(res *common.Resource) error {
 		configv2.WithCredentialsProvider(creds),
 	)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to load AWS config")
+		return errors.Wrapf(err, "Failed to load default config")
 	}
 	acct, err := account.GetAccount(config, regions.Default)
 	if err != nil {

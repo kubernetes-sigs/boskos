@@ -39,7 +39,9 @@ type sgRef struct {
 
 func addRefs(refs map[string][]*sgRef, id string, account string, perms []ec2types.IpPermission) {
 	for _, perm := range perms {
+		perm := perm
 		for _, pair := range perm.UserIdGroupPairs {
+			pair := pair
 			// Ignore cross-account for now, and skip circular refs.
 			if *pair.UserId == account && *pair.GroupId != id {
 				refs[*pair.GroupId] = append(refs[*pair.GroupId], &sgRef{id: id, perm: &perm})

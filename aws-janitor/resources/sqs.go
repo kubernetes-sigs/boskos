@@ -47,6 +47,7 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 
 	pageFunc := func(page *sqsv2.ListQueuesOutput, _ bool) bool {
 		for _, url := range page.QueueUrls {
+			url := url
 			attrInput := &sqsv2.GetQueueAttributesInput{
 				AttributeNames: []sqsv2types.QueueAttributeName{sqsv2types.QueueAttributeNameAll},
 				QueueUrl:       &url,
@@ -72,7 +73,7 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 			}
 			tags := make(Tags, len(tagResp.Tags))
 			for k, v := range tagResp.Tags {
-				tags.Add(aws2.String(k), &v)
+				tags.Add(aws2.String(k), aws2.String(v))
 			}
 			if !set.Mark(opts, q, &creationTime, tags) {
 				continue
@@ -95,8 +96,8 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 				logger.Warningf("listing rules by target failed: %s", err.Error())
 			}
 
-			for _, rule := range rules.RuleNames {
-				deleteEventBridgeRule(&rule, svcRules, logger)
+			for i := range rules.RuleNames {
+				deleteEventBridgeRule(&rules.RuleNames[i], svcRules, logger)
 			}
 
 		}
@@ -173,6 +174,7 @@ func (SQSQueues) ListAll(opts Options) (*Set, error) {
 
 	err := ListQueuesPages(svc, input, func(queues *sqsv2.ListQueuesOutput, _ bool) bool {
 		for _, url := range queues.QueueUrls {
+			url := url
 			attrInput := &sqsv2.GetQueueAttributesInput{
 				AttributeNames: []sqsv2types.QueueAttributeName{sqsv2types.QueueAttributeNameAll},
 				QueueUrl:       &url,

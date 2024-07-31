@@ -70,6 +70,11 @@ func main() {
 	flag.Parse()
 
 	cfg, err := configv2.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error loading default config: %v\n", err)
+		os.Exit(1)
+	}
+
 	acct, err := account.GetAccount(cfg, "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error retrieving account: %v\n", err)

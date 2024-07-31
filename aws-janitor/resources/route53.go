@@ -66,7 +66,7 @@ var managedNameRegexes = []*regexp.Regexp{
 
 // resourceRecordSetIsManaged checks if the resource record should be managed (and thus deleted) by us
 func resourceRecordSetIsManaged(rrs *route53v2types.ResourceRecordSet) bool {
-	if "A" != rrs.Type {
+	if rrs.Type != "A" {
 		return false
 	}
 
@@ -87,12 +87,12 @@ func route53ResourceRecordSetsForZone(opts Options, logger logrus.FieldLogger, s
 	var toDelete []*route53ResourceRecordSet
 
 	recordsPageFunc := func(records *route53v2.ListResourceRecordSetsOutput, _ bool) bool {
-		for _, rrs := range records.ResourceRecordSets {
-			if !opts.SkipRoute53ManagementCheck && !resourceRecordSetIsManaged(&rrs) {
+		for i, rrs := range records.ResourceRecordSets {
+			if !opts.SkipRoute53ManagementCheck && !resourceRecordSetIsManaged(&records.ResourceRecordSets[i]) {
 				continue
 			}
 
-			o := &route53ResourceRecordSet{zone: zone, obj: &rrs}
+			o := &route53ResourceRecordSet{zone: zone, obj: &records.ResourceRecordSets[i]}
 			// no tags for ResourceRecordSets, so use zone tags instead
 			if !set.Mark(opts, o, nil, zoneTags) {
 				continue
@@ -139,15 +139,15 @@ func (rrs Route53ResourceRecordSets) MarkAndSweep(opts Options, set *Set) error 
 
 	pageFunc := func(zs *route53v2.ListHostedZonesOutput, _ bool) bool {
 		// Because route53 has such low rate limits, we collect the changes per-zone, to minimize API calls
-		for _, z := range zs.HostedZones {
-			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(&z) {
+		for i, z := range zs.HostedZones {
+			if !opts.SkipRoute53ManagementCheck && !zoneIsManaged(&zs.HostedZones[i]) {
 				continue
 			}
 
 			// ListHostedZones returns "/hostedzone/ABCDEF12345678" but other Route53 endpoints expect "ABCDEF12345678"
 			z.Id = aws2.String(strings.TrimPrefix(*z.Id, "/hostedzone/"))
 
-			zones = append(zones, &z)
+			zones = append(zones, &zs.HostedZones[i])
 			zoneTags[*z.Id] = nil
 		}
 
@@ -234,12 +234,12 @@ func (Route53ResourceRecordSets) ListAll(opts Options) (*Set, error) {
 			inp := &route53v2.ListResourceRecordSetsInput{HostedZoneId: z.Id}
 			err := ListResourceRecordSetsPages(svc, inp, func(recordSets *route53v2.ListResourceRecordSetsOutput, _ bool) bool {
 				now := time.Now()
-				for _, recordSet := range recordSets.ResourceRecordSets {
+				for i := range recordSets.ResourceRecordSets {
 					arn := route53ResourceRecordSet{
 						account: opts.Account,
 						region:  opts.Region,
 						zone:    &zone,
-						obj:     &recordSet,
+						obj:     &recordSets.ResourceRecordSets[i],
 					}.ARN()
 					set.firstSeen[arn] = now
 				}

@@ -39,7 +39,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 	var toDelete []*iamInstanceProfile // Paged call, defer deletion until we have the whole list.
 
 	pageFunc := func(page *iamv2.ListInstanceProfilesOutput, _ bool) bool {
-		for _, p := range page.InstanceProfiles {
+		for i, p := range page.InstanceProfiles {
 			// We treat an instance profile as managed if all its roles are
 			managed := true
 			if len(p.Roles) == 0 {
@@ -49,7 +49,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 
 			var lastUsed time.Time
 			for _, r := range p.Roles {
-				if !roleIsManaged(&r) {
+				if !roleIsManaged(r) {
 					managed = false
 					break
 				}
@@ -73,7 +73,7 @@ func (IAMInstanceProfiles) MarkAndSweep(opts Options, set *Set) error {
 				continue
 			}
 
-			o := &iamInstanceProfile{profile: &p}
+			o := &iamInstanceProfile{profile: &page.InstanceProfiles[i]}
 			// No tags for instance profiles
 			if set.Mark(opts, o, p.CreateDate, nil) {
 				if time.Since(lastUsed) < set.ttl {
@@ -123,9 +123,9 @@ func (IAMInstanceProfiles) ListAll(opts Options) (*Set, error) {
 
 	err := ListInstanceProfilesPages(svc, inp, func(profiles *iamv2.ListInstanceProfilesOutput, _ bool) bool {
 		now := time.Now()
-		for _, profile := range profiles.InstanceProfiles {
+		for i := range profiles.InstanceProfiles {
 			arn := iamInstanceProfile{
-				profile: &profile,
+				profile: &profiles.InstanceProfiles[i],
 			}.ARN()
 
 			set.firstSeen[arn] = now

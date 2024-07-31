@@ -119,6 +119,11 @@ func main() {
 		configv2.WithRegion(regions.Default),
 		configv2.WithRetryMaxAttempts(100),
 	)
+	if err != nil {
+		logrus.Errorf("Failed loading default config: %v", err)
+		runtime.Goexit()
+	}
+
 	acct, err := account.GetAccount(config, regions.Default)
 	if err != nil {
 		logrus.Errorf("Failed retrieving account: %v", err)
