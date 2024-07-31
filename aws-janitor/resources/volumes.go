@@ -17,11 +17,13 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,11 +33,13 @@ type Volumes struct{}
 
 func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*volume // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *ec2.DescribeVolumesOutput, _ bool) bool {
+	pageFunc := func(page *ec2v2.DescribeVolumesOutput, _ bool) bool {
 		for _, vol := range page.Volumes {
 			v := &volume{Account: opts.Account, Region: opts.Region, ID: *vol.VolumeId}
 			tags := fromEC2Tags(vol.Tags)
@@ -56,16 +60,23 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeVolumesPages(nil, pageFunc); err != nil {
-		return err
+	paginator := ec2v2.NewDescribeVolumesPaginator(svc, &ec2v2.DescribeVolumesInput{})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
 	}
 
 	for _, vol := range toDelete {
-		deleteReq := &ec2.DeleteVolumeInput{
-			VolumeId: aws.String(vol.ID),
+		deleteReq := &ec2v2.DeleteVolumeInput{
+			VolumeId: aws2.String(vol.ID),
 		}
 
-		if _, err := svc.DeleteVolume(deleteReq); err != nil {
+		if _, err := svc.DeleteVolume(context.TODO(), deleteReq); err != nil {
 			logger.Warningf("%s: delete failed: %v", vol.ARN(), err)
 		}
 	}
@@ -74,11 +85,13 @@ func (Volumes) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (Volumes) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	inp := &ec2.DescribeVolumesInput{}
+	inp := &ec2v2.DescribeVolumesInput{}
 
-	err := svc.DescribeVolumesPages(inp, func(vols *ec2.DescribeVolumesOutput, _ bool) bool {
+	err := DescribeVolumesPages(svc, inp, func(vols *ec2v2.DescribeVolumesOutput, _ bool) bool {
 		now := time.Now()
 		for _, vol := range vols.Volumes {
 			arn := volume{
@@ -94,6 +107,20 @@ func (Volumes) ListAll(opts Options) (*Set, error) {
 	})
 
 	return set, errors.Wrapf(err, "couldn't describe volumes for %q in %q", opts.Account, opts.Region)
+}
+
+func DescribeVolumesPages(svc *ec2v2.Client, input *ec2v2.DescribeVolumesInput, pageFunc func(vols *ec2v2.DescribeVolumesOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeVolumesPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type volume struct {

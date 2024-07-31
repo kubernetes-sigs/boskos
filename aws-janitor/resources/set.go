@@ -18,14 +18,17 @@ package resources
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"sort"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	s3v2 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3v2types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+
 	"github.com/sirupsen/logrus"
 
 	s3path "sigs.k8s.io/boskos/aws-janitor/s3"
@@ -60,14 +63,22 @@ func (s *Set) GetARNs() []string {
 	return slice
 }
 
-func LoadSet(sess *session.Session, p *s3path.Path, ttl time.Duration) (*Set, error) {
+func LoadSet(config *aws2.Config, p *s3path.Path, ttl time.Duration) (*Set, error) {
 	s := NewSet(ttl)
-	svc := s3.New(sess, aws.NewConfig().WithRegion(p.Region))
+	svc := s3v2.NewFromConfig(*config, func(opt *s3v2.Options) {
+		opt.Region = p.Region
+	})
 
-	resp, err := svc.GetObject(&s3.GetObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(p.Key)})
+	resp, err := svc.GetObject(context.TODO(), &s3v2.GetObjectInput{Bucket: aws2.String(p.Bucket), Key: aws2.String(p.Key)})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "NoSuchKey" {
+		var noSuchKey *s3v2types.NoSuchKey
+		var apiErr smithy.APIError
+		if errors.As(err, &noSuchKey) {
 			return s, nil
+		} else if errors.As(err, &apiErr) {
+			if apiErr.ErrorCode() == "NoSuchKey" {
+				return s, nil
+			}
 		}
 		return nil, err
 	}
@@ -81,20 +92,23 @@ func LoadSet(sess *session.Session, p *s3path.Path, ttl time.Duration) (*Set, er
 	return s, nil
 }
 
-func (s *Set) Save(sess *session.Session, p *s3path.Path) error {
+func (s *Set) Save(config *aws2.Config, p *s3path.Path) error {
 	b, err := json.MarshalIndent(s.firstSeen, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	svc := s3.New(sess, aws.NewConfig().WithRegion(p.Region))
-
-	_, err = svc.PutObject(&s3.PutObjectInput{
-		Bucket:       aws.String(p.Bucket),
-		Key:          aws.String(p.Key),
-		Body:         bytes.NewReader(b),
-		CacheControl: aws.String("max-age=0"),
+	svc := s3v2.NewFromConfig(*config, func(opt *s3v2.Options) {
+		opt.Region = p.Region
 	})
+
+	_, err = svc.PutObject(context.TODO(),
+		&s3v2.PutObjectInput{
+			Bucket:       aws2.String(p.Bucket),
+			Key:          aws2.String(p.Key),
+			Body:         bytes.NewReader(b),
+			CacheControl: aws2.String("max-age=0"),
+		})
 
 	return err
 }

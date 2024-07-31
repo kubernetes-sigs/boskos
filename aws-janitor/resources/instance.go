@@ -17,12 +17,15 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -33,20 +36,22 @@ type Instances struct{}
 
 func (Instances) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	inp := &ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
+	inp := &ec2v2.DescribeInstancesInput{
+		Filters: []ec2types.Filter{
 			{
-				Name:   aws.String("instance-state-name"),
-				Values: []*string{aws.String("running"), aws.String("pending")},
+				Name:   aws2.String("instance-state-name"),
+				Values: []string{"running", "pending"},
 			},
 		},
 	}
 
-	var toDelete []*string // Paged call, defer deletion until we have the whole list.
+	var toDelete []string // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *ec2.DescribeInstancesOutput, _ bool) bool {
+	pageFunc := func(page *ec2v2.DescribeInstancesOutput, _ bool) bool {
 		for _, res := range page.Reservations {
 			for _, inst := range res.Instances {
 				i := &instance{
@@ -62,34 +67,50 @@ func (Instances) MarkAndSweep(opts Options, set *Set) error {
 
 				logger.Warningf("%s: deleting %T: %s (%s)", i.ARN(), inst, i.InstanceID, tags[NameTagKey])
 				if !opts.DryRun {
-					toDelete = append(toDelete, inst.InstanceId)
+					toDelete = append(toDelete, *inst.InstanceId)
 				}
 			}
 		}
 		return true
 	}
 
-	if err := svc.DescribeInstancesPages(inp, pageFunc); err != nil {
+	if err := DescribeInstancesPages(svc, inp, pageFunc); err != nil {
 		return err
 	}
 
 	if len(toDelete) > 0 {
 		// TODO(zmerlynn): In theory this should be split up into
 		// blocks of 1000, but burn that bridge if it ever happens...
-		if _, err := svc.TerminateInstances(&ec2.TerminateInstancesInput{InstanceIds: toDelete}); err != nil {
-			logger.Warningf("Termination failed for instances: %s : %v", strings.Join(aws.StringValueSlice(toDelete), ", "), err)
+		if _, err := svc.TerminateInstances(context.TODO(), &ec2v2.TerminateInstancesInput{InstanceIds: toDelete}); err != nil {
+			logger.Warningf("Termination failed for instances: %s : %v", strings.Join(toDelete, ", "), err)
 		}
 	}
 
 	return nil
 }
 
-func (Instances) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	inp := &ec2.DescribeInstancesInput{}
+func DescribeInstancesPages(svc *ec2v2.Client, inp *ec2v2.DescribeInstancesInput, pageFunc func(page *ec2v2.DescribeInstancesOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeInstancesPaginator(svc, inp)
 
-	err := svc.DescribeInstancesPages(inp, func(instances *ec2.DescribeInstancesOutput, _ bool) bool {
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (Instances) ListAll(opts Options) (*Set, error) {
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	inp := &ec2v2.DescribeInstancesInput{}
+
+	err := DescribeInstancesPages(svc, inp, func(instances *ec2v2.DescribeInstancesOutput, _ bool) bool {
 		for _, res := range instances.Reservations {
 			for _, inst := range res.Instances {
 				now := time.Now()

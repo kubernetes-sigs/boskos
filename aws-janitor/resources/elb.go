@@ -17,11 +17,13 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/elb"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -33,18 +35,20 @@ type ClassicLoadBalancers struct{}
 
 func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := elbv2.NewFromConfig(*opts.Config, func(opt *elbv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var loadBalancers []*classicLoadBalancer
 	lbTags := make(map[string]Tags)
 
-	pageFunc := func(page *elb.DescribeLoadBalancersOutput, _ bool) bool {
+	pageFunc := func(page *elbv2.DescribeLoadBalancersOutput, _ bool) bool {
 		for _, lb := range page.LoadBalancerDescriptions {
 			clb := &classicLoadBalancer{
 				region:      opts.Region,
 				account:     opts.Account,
-				name:        aws.StringValue(lb.LoadBalancerName),
-				dnsName:     aws.StringValue(lb.DNSName),
+				name:        *lb.LoadBalancerName,
+				dnsName:     *lb.DNSName,
 				createdTime: lb.CreatedTime,
 			}
 			loadBalancers = append(loadBalancers, clb)
@@ -53,18 +57,18 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeLoadBalancersPages(&elb.DescribeLoadBalancersInput{}, pageFunc); err != nil {
+	if err := DescribeLoadBalancersPages(svc, &elbv2.DescribeLoadBalancersInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	fetchTagErr := incrementalFetchTags(lbTags, 20, func(lbNames []*string) error {
-		tagsResp, err := svc.DescribeTags(&elb.DescribeTagsInput{LoadBalancerNames: lbNames})
+		tagsResp, err := svc.DescribeTags(context.TODO(), &elbv2.DescribeTagsInput{LoadBalancerNames: aws2.ToStringSlice(lbNames)})
 		if err != nil {
 			return err
 		}
 		var errs []error
 		for _, tagDesc := range tagsResp.TagDescriptions {
-			lbName := aws.StringValue(tagDesc.LoadBalancerName)
+			lbName := *tagDesc.LoadBalancerName
 			_, ok := lbTags[lbName]
 			if !ok {
 				errs = append(errs, fmt.Errorf("unknown load balancer in tag response: %s", lbName))
@@ -94,11 +98,11 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		deleteInput := &elb.DeleteLoadBalancerInput{
-			LoadBalancerName: aws.String(clb.name),
+		deleteInput := &elbv2.DeleteLoadBalancerInput{
+			LoadBalancerName: &clb.name,
 		}
 
-		if _, err := svc.DeleteLoadBalancer(deleteInput); err != nil {
+		if _, err := svc.DeleteLoadBalancer(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", clb.ARN(), err)
 		}
 	}
@@ -107,18 +111,20 @@ func (ClassicLoadBalancers) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
-	c := elb.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := elbv2.NewFromConfig(*opts.Config, func(opt *elbv2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &elb.DescribeLoadBalancersInput{}
+	input := &elbv2.DescribeLoadBalancersInput{}
 
-	err := c.DescribeLoadBalancersPages(input, func(lbs *elb.DescribeLoadBalancersOutput, isLast bool) bool {
+	err := DescribeLoadBalancersPages(svc, input, func(lbs *elbv2.DescribeLoadBalancersOutput, isLast bool) bool {
 		now := time.Now()
 		for _, lb := range lbs.LoadBalancerDescriptions {
 			arn := classicLoadBalancer{
 				region:  opts.Region,
 				account: opts.Account,
-				name:    aws.StringValue(lb.LoadBalancerName),
-				dnsName: aws.StringValue(lb.DNSName),
+				name:    *lb.LoadBalancerName,
+				dnsName: *lb.DNSName,
 			}.ARN()
 			set.firstSeen[arn] = now
 		}
@@ -127,6 +133,20 @@ func (ClassicLoadBalancers) ListAll(opts Options) (*Set, error) {
 	})
 
 	return set, errors.Wrapf(err, "couldn't describe classic load balancers for %q in %q", opts.Account, opts.Region)
+}
+
+func DescribeLoadBalancersPages(svc *elbv2.Client, input *elbv2.DescribeLoadBalancersInput, pageFunc func(lbs *elbv2.DescribeLoadBalancersOutput, isLast bool) bool) error {
+	paginator := elbv2.NewDescribeLoadBalancersPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type classicLoadBalancer struct {

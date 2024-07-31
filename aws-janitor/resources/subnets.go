@@ -17,11 +17,14 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -31,18 +34,20 @@ type Subnets struct{}
 
 func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	descReq := &ec2.DescribeSubnetsInput{
-		Filters: []*ec2.Filter{
+	descReq := &ec2v2.DescribeSubnetsInput{
+		Filters: []ec2types.Filter{
 			{
-				Name:   aws.String("defaultForAz"),
-				Values: []*string{aws.String("false")},
+				Name:   aws2.String("defaultForAz"),
+				Values: []string{"false"},
 			},
 		},
 	}
 
-	resp, err := svc.DescribeSubnets(descReq)
+	resp, err := svc.DescribeSubnets(context.TODO(), descReq)
 	if err != nil {
 		return err
 	}
@@ -58,7 +63,7 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 		if opts.DryRun {
 			continue
 		}
-		if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
+		if _, err := svc.DeleteSubnet(context.TODO(), &ec2v2.DeleteSubnetInput{SubnetId: sub.SubnetId}); err != nil {
 			logger.Warningf("%s: delete failed: %v", s.ARN(), err)
 		}
 	}
@@ -67,12 +72,14 @@ func (Subnets) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (Subnets) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &ec2.DescribeSubnetsInput{}
+	input := &ec2v2.DescribeSubnetsInput{}
 
 	// Subnets not paginated
-	subnets, err := svc.DescribeSubnets(input)
+	subnets, err := svc.DescribeSubnets(context.TODO(), input)
 	now := time.Now()
 	for _, sn := range subnets.Subnets {
 		arn := subnet{

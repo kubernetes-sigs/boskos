@@ -17,18 +17,22 @@ limitations under the License.
 package account
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/sts"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	iamv2 "github.com/aws/aws-sdk-go-v2/service/iam"
+	stsv2 "github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-func GetAccount(sess *session.Session, region string) (string, error) {
-	svc := iam.New(sess, &aws.Config{Region: aws.String(region)})
-	resp, err := svc.GetUser(nil)
+func GetAccount(cfg aws2.Config, region string) (string, error) {
+	svc := iamv2.NewFromConfig(cfg, func(option *iamv2.Options) {
+		if region != "" {
+			option.Region = region
+		}
+	})
+	resp, err := svc.GetUser(context.TODO(), nil)
 	if err == nil {
 		arn, err := parseARN(*resp.User.Arn)
 		if err != nil {
@@ -36,9 +40,9 @@ func GetAccount(sess *session.Session, region string) (string, error) {
 		}
 		return arn.account, nil
 	}
-	svc2 := sts.New(sess)
-	input := &sts.GetCallerIdentityInput{}
-	result, err := svc2.GetCallerIdentity(input)
+	svc2 := stsv2.NewFromConfig(cfg)
+	input := &stsv2.GetCallerIdentityInput{}
+	result, err := svc2.GetCallerIdentity(context.TODO(), input)
 	if err != nil {
 		return "", err
 	}

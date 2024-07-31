@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -37,9 +38,11 @@ func (KeyPairs) MarkAndSweep(opts Options, set *Set) error {
 		logger.Info("Disable key pairs clean")
 		return nil
 	}
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	resp, err := svc.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{})
+	resp, err := svc.DescribeKeyPairs(context.TODO(), &ec2v2.DescribeKeyPairsInput{})
 	if err != nil {
 		return err
 	}
@@ -60,7 +63,8 @@ func (KeyPairs) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		if _, err := svc.DeleteKeyPair(&ec2.DeleteKeyPairInput{KeyName: kp.KeyName, KeyPairId: kp.KeyPairId}); err != nil {
+		if _, err := svc.DeleteKeyPair(context.TODO(),
+			&ec2v2.DeleteKeyPairInput{KeyName: kp.KeyName, KeyPairId: kp.KeyPairId}); err != nil {
 			logger.Warningf("%s: delete failed: %v", k.ARN(), err)
 		}
 	}
@@ -73,10 +77,12 @@ func (KeyPairs) ListAll(opts Options) (*Set, error) {
 	if !opts.EnableKeyPairsClean {
 		return set, nil
 	}
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	input := &ec2.DescribeKeyPairsInput{}
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
+	input := &ec2v2.DescribeKeyPairsInput{}
 
-	resp, err := svc.DescribeKeyPairs(input)
+	resp, err := svc.DescribeKeyPairs(context.TODO(), input)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't describe KeyPairs for %q in %q", opts.Account, opts.Region)
 	}

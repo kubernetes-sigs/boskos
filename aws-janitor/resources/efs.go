@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/efs"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	efsv2 "github.com/aws/aws-sdk-go-v2/service/efs"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -37,7 +38,9 @@ type ElasticFileSystems struct{}
 
 func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := efs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := efsv2.NewFromConfig(*opts.Config, func(opt *efsv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	// Paged calls, defer deletion until we have the whole list.
 	var (
@@ -46,11 +49,11 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	)
 
 	// Mark and sweep file systems for deletion.
-	fsPageFunc := func(page *efs.DescribeFileSystemsOutput, _ bool) bool {
+	fsPageFunc := func(page *efsv2.DescribeFileSystemsOutput, _ bool) bool {
 		for _, fs := range page.FileSystems {
 			f := &elasticFileSystem{
-				id:  aws.StringValue(fs.FileSystemId),
-				arn: aws.StringValue(fs.FileSystemArn),
+				id:  *fs.FileSystemId,
+				arn: *fs.FileSystemArn,
 			}
 			tags := make(Tags, len(fs.Tags))
 			for _, t := range fs.Tags {
@@ -60,23 +63,23 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 				continue
 			}
 
-			logger.Warningf("%s: deleting %T: %s (%s)", f.ARN(), fs, aws.StringValue(fs.FileSystemId), aws.StringValue(fs.Name))
+			logger.Warningf("%s: deleting %T: %s (%s)", f.ARN(), fs, *fs.FileSystemId, *fs.Name)
 			if !opts.DryRun {
 				fileSystemsToDelete = append(fileSystemsToDelete, f)
 			}
 		}
 		return true
 	}
-	if err := svc.DescribeFileSystemsPages(&efs.DescribeFileSystemsInput{}, fsPageFunc); err != nil {
+	if err := DescribeFileSystemsPages(svc, &efsv2.DescribeFileSystemsInput{}, fsPageFunc); err != nil {
 		return err
 	}
 
 	// Collect mount targets for deletion.
 	// These must be deleted before associated file systems can be deleted.
-	mtPageFunc := func(page *efs.DescribeMountTargetsOutput, _ bool) bool {
+	mtPageFunc := func(page *efsv2.DescribeMountTargetsOutput, _ bool) bool {
 		for _, mt := range page.MountTargets {
 			m := &mountTarget{
-				ID: aws.StringValue(mt.MountTargetId),
+				ID: *mt.MountTargetId,
 			}
 			logger.Warningf("%s: deleting %T", m.ID, mt)
 			mountTargetsToDelete = append(mountTargetsToDelete, m)
@@ -84,10 +87,10 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 	for _, fs := range fileSystemsToDelete {
-		describeInput := &efs.DescribeMountTargetsInput{
-			FileSystemId: aws.String(fs.id),
+		describeInput := &efsv2.DescribeMountTargetsInput{
+			FileSystemId: aws2.String(fs.id),
 		}
-		if err := describeMountTargetsPages(svc, describeInput, mtPageFunc); err != nil {
+		if err := DescribeMountTargetsPages(svc, describeInput, mtPageFunc); err != nil {
 			return err
 		}
 	}
@@ -99,10 +102,10 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 
 	// Delete marked file systems.
 	for _, fs := range fileSystemsToDelete {
-		deleteInput := &efs.DeleteFileSystemInput{
-			FileSystemId: aws.String(fs.id),
+		deleteInput := &efsv2.DeleteFileSystemInput{
+			FileSystemId: aws2.String(fs.id),
 		}
-		if _, err := svc.DeleteFileSystem(deleteInput); err != nil {
+		if _, err := svc.DeleteFileSystem(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", fs.id, err)
 		}
 	}
@@ -110,17 +113,32 @@ func (ElasticFileSystems) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
-	svc := efs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	input := &efs.DescribeFileSystemsInput{}
+func DescribeMountTargetsPages(svc *efsv2.Client, input *efsv2.DescribeMountTargetsInput, pageFunc func(page *efsv2.DescribeMountTargetsOutput, _ bool) bool) error {
+	paginator := efsv2.NewDescribeMountTargetsPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
 
-	err := svc.DescribeFileSystemsPages(input, func(page *efs.DescribeFileSystemsOutput, _ bool) bool {
+func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
+	svc := efsv2.NewFromConfig(*opts.Config, func(opt *efsv2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	input := &efsv2.DescribeFileSystemsInput{}
+
+	err := DescribeFileSystemsPages(svc, input, func(page *efsv2.DescribeFileSystemsOutput, _ bool) bool {
 		now := time.Now()
 		for _, fs := range page.FileSystems {
 			efs := elasticFileSystem{
-				arn: aws.StringValue(fs.FileSystemArn),
-				id:  aws.StringValue(fs.FileSystemId),
+				arn: *fs.FileSystemArn,
+				id:  *fs.FileSystemId,
 			}.ARN()
 			set.firstSeen[efs] = now
 		}
@@ -128,6 +146,19 @@ func (ElasticFileSystems) ListAll(opts Options) (*Set, error) {
 	})
 
 	return set, errors.Wrapf(err, "couldn't describe auto scaling groups for %q in %q", opts.Account, opts.Region)
+}
+
+func DescribeFileSystemsPages(svc *efsv2.Client, input *efsv2.DescribeFileSystemsInput, pageFunc func(page *efsv2.DescribeFileSystemsOutput, _ bool) bool) error {
+	paginator := efsv2.NewDescribeFileSystemsPaginator(svc, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
 }
 
 type elasticFileSystem struct {
@@ -147,24 +178,24 @@ type mountTarget struct {
 	ID string
 }
 
-func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileSystem, mountTargetsToDelete []*mountTarget, logger *logrus.Entry) error {
+func deleteMountTargetsAndWait(svc *efsv2.Client, fileSystemsToDelete []*elasticFileSystem, mountTargetsToDelete []*mountTarget, logger *logrus.Entry) error {
 	for _, mt := range mountTargetsToDelete {
-		deleteInput := &efs.DeleteMountTargetInput{
-			MountTargetId: aws.String(mt.ID),
+		deleteInput := &efsv2.DeleteMountTargetInput{
+			MountTargetId: aws2.String(mt.ID),
 		}
-		if _, err := svc.DeleteMountTarget(deleteInput); err != nil {
+		if _, err := svc.DeleteMountTarget(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", mt.ID, err)
 		}
 	}
 
 	logger.Debug("waiting for mount targets to be deleted")
 	for _, fs := range fileSystemsToDelete {
-		describeInput := &efs.DescribeFileSystemsInput{
-			FileSystemId: aws.String(fs.id),
+		describeInput := &efsv2.DescribeFileSystemsInput{
+			FileSystemId: aws2.String(fs.id),
 		}
 		i := 0
 		for ; i < maxRetries; i++ {
-			describeOutput, err := svc.DescribeFileSystems(describeInput)
+			describeOutput, err := svc.DescribeFileSystems(context.TODO(), describeInput)
 			if err != nil {
 				return err
 			}
@@ -172,7 +203,7 @@ func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileS
 				logger.Warningf("%s: no filesystem found", fs.id)
 				break
 			}
-			if *describeOutput.FileSystems[0].NumberOfMountTargets == 0 {
+			if describeOutput.FileSystems[0].NumberOfMountTargets == 0 {
 				break
 			}
 			time.Sleep(pollInterval)
@@ -183,44 +214,4 @@ func deleteMountTargetsAndWait(svc *efs.EFS, fileSystemsToDelete []*elasticFileS
 	}
 
 	return nil
-}
-
-// Provides pagination-handling for reading EFS mount targets.
-// Implementation borrowed from the AWS SDK.
-func describeMountTargetsPages(
-	client *efs.EFS,
-	input *efs.DescribeMountTargetsInput,
-	fn func(*efs.DescribeMountTargetsOutput, bool) bool,
-) error {
-	return describeMountTargetsPagesWithContext(client, aws.BackgroundContext(), input, fn)
-}
-
-func describeMountTargetsPagesWithContext(
-	client *efs.EFS,
-	ctx aws.Context,
-	input *efs.DescribeMountTargetsInput,
-	fn func(*efs.DescribeMountTargetsOutput, bool) bool,
-	opts ...request.Option,
-) error {
-	p := request.Pagination{
-		NewRequest: func() (*request.Request, error) {
-			var inCpy *efs.DescribeMountTargetsInput
-			if input != nil {
-				tmp := *input
-				inCpy = &tmp
-			}
-			req, _ := client.DescribeMountTargetsRequest(inCpy)
-			req.SetContext(ctx)
-			req.ApplyOptions(opts...)
-			return req, nil
-		},
-	}
-
-	for p.Next() {
-		if !fn(p.Page().(*efs.DescribeMountTargetsOutput), !p.HasNextPage()) {
-			break
-		}
-	}
-
-	return p.Err()
 }

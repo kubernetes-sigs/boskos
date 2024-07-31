@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -36,10 +37,12 @@ func (VPCEndpoints) MarkAndSweep(opts Options, set *Set) error {
 		logger.Info("Disable vpc endpoints clean")
 		return nil
 	}
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var vpcEndPointsToDelete []*vpcEndpoint
-	pageFunc := func(page *ec2.DescribeVpcEndpointsOutput, _ bool) bool {
+	pageFunc := func(page *ec2v2.DescribeVpcEndpointsOutput, _ bool) bool {
 		for _, vpce := range page.VpcEndpoints {
 			v := &vpcEndpoint{
 				Account: opts.Account,
@@ -59,16 +62,30 @@ func (VPCEndpoints) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeVpcEndpointsPages(&ec2.DescribeVpcEndpointsInput{}, pageFunc); err != nil {
+	if err := DescribeVpcEndpointsPages(svc, &ec2v2.DescribeVpcEndpointsInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	for _, v := range vpcEndPointsToDelete {
-		if _, err := svc.DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{VpcEndpointIds: []*string{&v.ID}}); err != nil {
+		if _, err := svc.DeleteVpcEndpoints(context.TODO(), &ec2v2.DeleteVpcEndpointsInput{VpcEndpointIds: []string{v.ID}}); err != nil {
 			logger.Warningf("%s: delete failed: %v", v.ARN(), err)
 		}
 	}
 
+	return nil
+}
+
+func DescribeVpcEndpointsPages(svc *ec2v2.Client, input *ec2v2.DescribeVpcEndpointsInput, pageFunc func(page *ec2v2.DescribeVpcEndpointsOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeVpcEndpointsPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
 	return nil
 }
 
@@ -77,9 +94,13 @@ func (VPCEndpoints) ListAll(opts Options) (*Set, error) {
 	if !opts.EnableVPCEndpointsClean {
 		return set, nil
 	}
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	input := &ec2.DescribeVpcEndpointsInput{}
-	err := svc.DescribeVpcEndpointsPages(input, func(page *ec2.DescribeVpcEndpointsOutput, _ bool) bool {
+
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
+
+	input := &ec2v2.DescribeVpcEndpointsInput{}
+	err := DescribeVpcEndpointsPages(svc, input, func(page *ec2v2.DescribeVpcEndpointsOutput, _ bool) bool {
 		now := time.Now()
 		for _, vpce := range page.VpcEndpoints {
 			arn := vpcEndpoint{

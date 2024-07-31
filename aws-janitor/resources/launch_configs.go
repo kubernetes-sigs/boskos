@@ -17,10 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	autoscalingv2 "github.com/aws/aws-sdk-go-v2/service/autoscaling"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -30,15 +32,17 @@ type LaunchConfigurations struct{}
 
 func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := autoscalingv2.NewFromConfig(*opts.Config, func(opt *autoscalingv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*launchConfiguration // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *autoscaling.DescribeLaunchConfigurationsOutput, _ bool) bool {
+	pageFunc := func(page *autoscalingv2.DescribeLaunchConfigurationsOutput, _ bool) bool {
 		for _, lc := range page.LaunchConfigurations {
 			l := &launchConfiguration{
-				arn:  aws.StringValue(lc.LaunchConfigurationARN),
-				name: aws.StringValue(lc.LaunchConfigurationName),
+				arn:  *lc.LaunchConfigurationARN,
+				name: *lc.LaunchConfigurationName,
 			}
 			// No tags?
 			if set.Mark(opts, l, lc.CreatedTime, nil) {
@@ -51,16 +55,16 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeLaunchConfigurationsPages(&autoscaling.DescribeLaunchConfigurationsInput{}, pageFunc); err != nil {
+	if err := DescribeLaunchConfigurationsPages(svc, &autoscalingv2.DescribeLaunchConfigurationsInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	for _, lc := range toDelete {
-		deleteReq := &autoscaling.DeleteLaunchConfigurationInput{
-			LaunchConfigurationName: aws.String(lc.name),
+		deleteReq := &autoscalingv2.DeleteLaunchConfigurationInput{
+			LaunchConfigurationName: aws2.String(lc.name),
 		}
 
-		if _, err := svc.DeleteLaunchConfiguration(deleteReq); err != nil {
+		if _, err := svc.DeleteLaunchConfiguration(context.TODO(), deleteReq); err != nil {
 			logger.Warningf("%s: delete failed: %v", lc.ARN(), err)
 		}
 	}
@@ -68,17 +72,33 @@ func (LaunchConfigurations) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
-	c := autoscaling.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	set := NewSet(0)
-	input := &autoscaling.DescribeLaunchConfigurationsInput{}
+func DescribeLaunchConfigurationsPages(svc *autoscalingv2.Client, input *autoscalingv2.DescribeLaunchConfigurationsInput, pageFunc func(page *autoscalingv2.DescribeLaunchConfigurationsOutput, _ bool) bool) error {
+	paginator := autoscalingv2.NewDescribeLaunchConfigurationsPaginator(svc, input)
 
-	err := c.DescribeLaunchConfigurationsPages(input, func(lcs *autoscaling.DescribeLaunchConfigurationsOutput, isLast bool) bool {
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func (LaunchConfigurations) ListAll(opts Options) (*Set, error) {
+	svc := autoscalingv2.NewFromConfig(*opts.Config, func(opt *autoscalingv2.Options) {
+		opt.Region = opts.Region
+	})
+	set := NewSet(0)
+	input := &autoscalingv2.DescribeLaunchConfigurationsInput{}
+
+	err := DescribeLaunchConfigurationsPages(svc, input, func(lcs *autoscalingv2.DescribeLaunchConfigurationsOutput, isLast bool) bool {
 		now := time.Now()
 		for _, lc := range lcs.LaunchConfigurations {
 			arn := launchConfiguration{
-				arn:  aws.StringValue(lc.LaunchConfigurationARN),
-				name: aws.StringValue(lc.LaunchConfigurationName),
+				arn:  *lc.LaunchConfigurationARN,
+				name: *lc.LaunchConfigurationName,
 			}.ARN()
 			set.firstSeen[arn] = now
 		}

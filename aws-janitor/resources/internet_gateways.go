@@ -17,11 +17,14 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -32,18 +35,20 @@ type InternetGateways struct{}
 
 func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	resp, err := svc.DescribeInternetGateways(nil)
+	resp, err := svc.DescribeInternetGateways(context.TODO(), nil)
 	if err != nil {
 		return err
 	}
 
-	vpcResp, err := svc.DescribeVpcs(&ec2.DescribeVpcsInput{
-		Filters: []*ec2.Filter{
+	vpcResp, err := svc.DescribeVpcs(context.TODO(), &ec2v2.DescribeVpcsInput{
+		Filters: []ec2types.Filter{
 			{
-				Name:   aws.String("isDefault"),
-				Values: []*string{aws.String("true")},
+				Name:   aws2.String("isDefault"),
+				Values: []string{"true"},
 			},
 		},
 	})
@@ -56,7 +61,7 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 	// (shouldn't happen) as well as no default VPC (not uncommon)
 	defaultVPC := make(map[string]bool)
 	for _, vpc := range vpcResp.Vpcs {
-		defaultVPC[aws.StringValue(vpc.VpcId)] = true
+		defaultVPC[*vpc.VpcId] = true
 	}
 
 	for _, ig := range resp.InternetGateways {
@@ -72,17 +77,17 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 
 		isDefault := false
 		for _, att := range ig.Attachments {
-			if defaultVPC[aws.StringValue(att.VpcId)] {
+			if defaultVPC[*att.VpcId] {
 				isDefault = true
 				break
 			}
 
-			detachReq := &ec2.DetachInternetGatewayInput{
+			detachReq := &ec2v2.DetachInternetGatewayInput{
 				InternetGatewayId: ig.InternetGatewayId,
 				VpcId:             att.VpcId,
 			}
 
-			if _, err := svc.DetachInternetGateway(detachReq); err != nil {
+			if _, err := svc.DetachInternetGateway(context.TODO(), detachReq); err != nil {
 				logger.Warningf("%s: detach from %s failed: %v", i.ARN(), *att.VpcId, err)
 			}
 		}
@@ -92,11 +97,11 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		deleteReq := &ec2.DeleteInternetGatewayInput{
+		deleteReq := &ec2v2.DeleteInternetGatewayInput{
 			InternetGatewayId: ig.InternetGatewayId,
 		}
 
-		if _, err := svc.DeleteInternetGateway(deleteReq); err != nil {
+		if _, err := svc.DeleteInternetGateway(context.TODO(), deleteReq); err != nil {
 			logger.Warningf("%s: delete failed: %v", i.ARN(), err)
 		}
 	}
@@ -105,11 +110,13 @@ func (InternetGateways) MarkAndSweep(opts Options, set *Set) error {
 }
 
 func (InternetGateways) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &ec2.DescribeInternetGatewaysInput{}
+	input := &ec2v2.DescribeInternetGatewaysInput{}
 
-	gateways, err := svc.DescribeInternetGateways(input)
+	gateways, err := svc.DescribeInternetGateways(context.TODO(), input)
 	if err != nil {
 		return set, errors.Wrapf(err, "couldn't describe internet gateways for %q in %q", opts.Account, opts.Region)
 	}

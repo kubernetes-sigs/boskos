@@ -17,12 +17,12 @@ limitations under the License.
 package resources
 
 import (
-	"github.com/aws/aws-sdk-go/aws/session"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // Options holds parameters for resource functions.
 type Options struct {
-	Session *session.Session `json:"-"`
+	Config  *aws2.Config `json:"-"`
 	Account string
 	Region  string
 

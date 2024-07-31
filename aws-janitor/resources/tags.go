@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/s3"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -33,7 +34,7 @@ const (
 type Tags map[string]string
 
 func (tags Tags) Add(key *string, value *string) {
-	tags[aws.StringValue(key)] = aws.StringValue(value)
+	tags[*key] = *value
 }
 
 // TagMatcher maps keys to valid values. An empty set of values will result in matching tags with any value.
@@ -88,7 +89,7 @@ func (opts Options) ManagedPerTags(tags Tags) bool {
 	return included == len(opts.IncludeTags)
 }
 
-func fromEC2Tags(ec2tags []*ec2.Tag) Tags {
+func fromEC2Tags(ec2tags []ec2types.Tag) Tags {
 	tags := make(Tags, len(ec2tags))
 	for _, ec2t := range ec2tags {
 		tags.Add(ec2t.Key, ec2t.Value)
@@ -96,7 +97,7 @@ func fromEC2Tags(ec2tags []*ec2.Tag) Tags {
 	return tags
 }
 
-func fromS3Tags(s3Tags []*s3.Tag) Tags {
+func fromS3Tags(s3Tags []s3types.Tag) Tags {
 	tags := make(Tags, len(s3Tags))
 	for _, s3tag := range s3Tags {
 		tags.Add(s3tag.Key, s3tag.Value)
@@ -111,7 +112,7 @@ func fromS3Tags(s3Tags []*s3.Tag) Tags {
 func incrementalFetchTags(tagsMap map[string]Tags, inc int, f func([]*string) error) error {
 	ids := make([]*string, 0, len(tagsMap))
 	for id := range tagsMap {
-		ids = append(ids, aws.String(id))
+		ids = append(ids, aws2.String(id))
 	}
 
 	for start := 0; start < len(ids); start += inc {

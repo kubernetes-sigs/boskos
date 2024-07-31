@@ -22,8 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/iam"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	iamv2 "github.com/aws/aws-sdk-go-v2/service/iam"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,24 +32,24 @@ import (
 
 type IAMOIDCProviders struct{}
 
-func fetchOIDCProviderAndTags(ctx context.Context, svc *iam.IAM, arn string) (*iam.GetOpenIDConnectProviderOutput, Tags, error) {
-	oidcProvider, err := svc.GetOpenIDConnectProviderWithContext(ctx, &iam.GetOpenIDConnectProviderInput{OpenIDConnectProviderArn: &arn})
+func fetchOIDCProviderAndTags(ctx context.Context, svc *iamv2.Client, arn string) (*iamv2.GetOpenIDConnectProviderOutput, Tags, error) {
+	oidcProvider, err := svc.GetOpenIDConnectProvider(ctx, &iamv2.GetOpenIDConnectProviderInput{OpenIDConnectProviderArn: &arn})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error from GetOpenIDConnectProvider: %w", err)
 	}
 
 	// Fetch the tags (with pagination)
 	tags := make(Tags)
-	tagsRequest := &iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: &arn}
+	tagsRequest := &iamv2.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: &arn}
 	for {
-		response, err := svc.ListOpenIDConnectProviderTagsWithContext(ctx, tagsRequest)
+		response, err := svc.ListOpenIDConnectProviderTags(ctx, tagsRequest)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error from ListOpenIDConnectProviderTags: %w", err)
 		}
 		for _, t := range response.Tags {
 			tags.Add(t.Key, t.Value)
 		}
-		if !aws.BoolValue(response.IsTruncated) {
+		if !response.IsTruncated {
 			break
 		}
 		tagsRequest.Marker = response.Marker
@@ -58,7 +59,7 @@ func fetchOIDCProviderAndTags(ctx context.Context, svc *iam.IAM, arn string) (*i
 }
 
 // oidcProviderIsManaged checks if the OIDC provider should be managed (and thus deleted) by us.
-func oidcProviderIsManaged(_oidcProvider *iam.GetOpenIDConnectProviderOutput, tags Tags) bool {
+func oidcProviderIsManaged(_oidcProvider *iamv2.GetOpenIDConnectProviderOutput, tags Tags) bool {
 	// Look for one of the kubernetes cluster ownership tags
 	for k := range tags {
 		if strings.HasPrefix(k, "kubernetes.io/cluster/") ||
@@ -74,17 +75,19 @@ func (IAMOIDCProviders) MarkAndSweep(opts Options, set *Set) error {
 	ctx := context.TODO()
 
 	logger := logrus.WithField("options", opts)
-	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := iamv2.NewFromConfig(*opts.Config, func(opt *iamv2.Options) {
+		opt.Region = opts.Region
+	})
 
 	var toDelete []*iamOIDCProvider
 
-	providers, err := svc.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	providers, err := svc.ListOpenIDConnectProviders(ctx, &iamv2.ListOpenIDConnectProvidersInput{})
 	if err != nil {
 		return fmt.Errorf("error from ListOpenIDConnectProviders: %w", err)
 	}
 
 	for _, oidcProvider := range providers.OpenIDConnectProviderList {
-		arn := aws.StringValue(oidcProvider.Arn)
+		arn := *oidcProvider.Arn
 		oidcProvider, tags, err := fetchOIDCProviderAndTags(ctx, svc, arn)
 		if err != nil {
 			logger.Warningf("failed fetching oidcProvider and tags: %v", err)
@@ -96,7 +99,7 @@ func (IAMOIDCProviders) MarkAndSweep(opts Options, set *Set) error {
 		}
 		l := &iamOIDCProvider{arn: arn}
 		if set.Mark(opts, l, oidcProvider.CreateDate, tags) {
-			logger.Warningf("%s: deleting url=%s", arn, aws.StringValue(oidcProvider.Url))
+			logger.Warningf("%s: deleting url=%s", arn, *oidcProvider.Url)
 			if !opts.DryRun {
 				toDelete = append(toDelete, l)
 			}
@@ -115,10 +118,12 @@ func (IAMOIDCProviders) MarkAndSweep(opts Options, set *Set) error {
 func (IAMOIDCProviders) ListAll(opts Options) (*Set, error) {
 	ctx := context.TODO()
 
-	svc := iam.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := iamv2.NewFromConfig(*opts.Config, func(opt *iamv2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
 
-	providers, err := svc.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	providers, err := svc.ListOpenIDConnectProviders(ctx, &iamv2.ListOpenIDConnectProvidersInput{})
 	if err != nil {
 		return nil, fmt.Errorf("error from ListOpenIDConnectProvidersWithContext: %w", err)
 	}
@@ -126,7 +131,7 @@ func (IAMOIDCProviders) ListAll(opts Options) (*Set, error) {
 	now := time.Now()
 	for _, oidcProvider := range providers.OpenIDConnectProviderList {
 		arn := iamOIDCProvider{
-			arn: aws.StringValue(oidcProvider.Arn),
+			arn: *oidcProvider.Arn,
 		}.ARN()
 
 		set.firstSeen[arn] = now
@@ -147,13 +152,13 @@ func (r iamOIDCProvider) ResourceKey() string {
 	return r.ARN()
 }
 
-func (r iamOIDCProvider) delete(ctx context.Context, svc *iam.IAM, logger logrus.FieldLogger) error {
+func (r iamOIDCProvider) delete(ctx context.Context, svc *iamv2.Client, logger logrus.FieldLogger) error {
 	logger.Debugf("deleting OIDC Provider %q", r.arn)
 
-	req := &iam.DeleteOpenIDConnectProviderInput{
-		OpenIDConnectProviderArn: aws.String(r.arn),
+	req := &iamv2.DeleteOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: aws2.String(r.arn),
 	}
-	if _, err := svc.DeleteOpenIDConnectProviderWithContext(ctx, req); err != nil {
+	if _, err := svc.DeleteOpenIDConnectProvider(ctx, req); err != nil {
 		return fmt.Errorf("error from DeleteOpenIDConnectProvider: %w", err)
 	}
 

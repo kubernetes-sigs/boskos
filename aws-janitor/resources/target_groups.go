@@ -17,11 +17,13 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/elbv2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	elbv2v2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -37,14 +39,16 @@ func (TargetGroups) MarkAndSweep(opts Options, set *Set) error {
 		logger.Info("Disable target group clean")
 		return nil
 	}
-	svc := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := elbv2v2.NewFromConfig(*opts.Config, func(opt *elbv2v2.Options) {
+		opt.Region = opts.Region
+	})
 	var targetGroups []*targetGroup
 	tgTags := make(map[string]Tags)
 
-	pageFunc := func(page *elbv2.DescribeTargetGroupsOutput, _ bool) bool {
+	pageFunc := func(page *elbv2v2.DescribeTargetGroupsOutput, _ bool) bool {
 		for _, tg := range page.TargetGroups {
 			a := &targetGroup{
-				arn: aws.StringValue(tg.TargetGroupArn),
+				arn: *tg.TargetGroupArn,
 			}
 			targetGroups = append(targetGroups, a)
 			tgTags[a.ARN()] = nil
@@ -52,19 +56,19 @@ func (TargetGroups) MarkAndSweep(opts Options, set *Set) error {
 		return true
 	}
 
-	if err := svc.DescribeTargetGroupsPages(&elbv2.DescribeTargetGroupsInput{}, pageFunc); err != nil {
+	if err := DescribeTargetGroupsPages(svc, &elbv2v2.DescribeTargetGroupsInput{}, pageFunc); err != nil {
 		return err
 	}
 
 	fetchTagErr := incrementalFetchTags(tgTags, 20, func(tgArns []*string) error {
-		tagsResp, err := svc.DescribeTags(&elbv2.DescribeTagsInput{ResourceArns: tgArns})
+		tagsResp, err := svc.DescribeTags(context.TODO(), &elbv2v2.DescribeTagsInput{ResourceArns: aws2.ToStringSlice(tgArns)})
 		if err != nil {
 			return err
 		}
 
 		var errs []error
 		for _, tagDesc := range tagsResp.TagDescriptions {
-			arn := aws.StringValue(tagDesc.ResourceArn)
+			arn := *tagDesc.ResourceArn
 			_, ok := tgTags[arn]
 			if !ok {
 				errs = append(errs, fmt.Errorf("unknown target group ARN in tag response: %s", arn))
@@ -94,15 +98,29 @@ func (TargetGroups) MarkAndSweep(opts Options, set *Set) error {
 			continue
 		}
 
-		deleteInput := &elbv2.DeleteTargetGroupInput{
-			TargetGroupArn: aws.String(tg.ARN()),
+		deleteInput := &elbv2v2.DeleteTargetGroupInput{
+			TargetGroupArn: aws2.String(tg.ARN()),
 		}
 
-		if _, err := svc.DeleteTargetGroup(deleteInput); err != nil {
+		if _, err := svc.DeleteTargetGroup(context.TODO(), deleteInput); err != nil {
 			logger.Warningf("%s: delete failed: %v", tg.ARN(), err)
 		}
 	}
 
+	return nil
+}
+
+func DescribeTargetGroupsPages(svc *elbv2v2.Client, input *elbv2v2.DescribeTargetGroupsInput, pageFunc func(page *elbv2v2.DescribeTargetGroupsOutput, _ bool) bool) error {
+	paginator := elbv2v2.NewDescribeTargetGroupsPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
 	return nil
 }
 
@@ -111,10 +129,12 @@ func (TargetGroups) ListAll(opts Options) (*Set, error) {
 	if !opts.EnableTargetGroupClean {
 		return set, nil
 	}
-	c := elbv2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
-	input := &elbv2.DescribeTargetGroupsInput{}
+	svc := elbv2v2.NewFromConfig(*opts.Config, func(opt *elbv2v2.Options) {
+		opt.Region = opts.Region
+	})
+	input := &elbv2v2.DescribeTargetGroupsInput{}
 
-	err := c.DescribeTargetGroupsPages(input, func(tgs *elbv2.DescribeTargetGroupsOutput, isLast bool) bool {
+	err := DescribeTargetGroupsPages(svc, input, func(tgs *elbv2v2.DescribeTargetGroupsOutput, isLast bool) bool {
 		now := time.Now()
 		for _, tg := range tgs.TargetGroups {
 			a := &targetGroup{arn: *tg.TargetGroupArn}

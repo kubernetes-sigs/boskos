@@ -19,54 +19,54 @@ package resources
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	route53v2types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
 func TestManagedNames(t *testing.T) {
 	grid := []struct {
-		rrs      *route53.ResourceRecordSet
+		rrs      *route53v2types.ResourceRecordSet
 		expected bool
 	}{
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("api.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("api.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("api.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("api.internal.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("main.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("main.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("events.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("events.etcd.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: true,
 		},
 		{
 			// Ignores non-A records
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("CNAME"), Name: aws.String("api.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "CNAME", Name: aws2.String("api.e2e-71149fffac-dba53.test-cncf-aws.k8s.io.")},
 			expected: false,
 		},
 		{
 			// Must ignore the hosted zone system records
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("NS"), Name: aws.String("test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "NS", Name: aws2.String("test-cncf-aws.k8s.io.")},
 			expected: false,
 		},
 		{
 			// Must ignore the hosted zone system records
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("SOA"), Name: aws.String("test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "SOA", Name: aws2.String("test-cncf-aws.k8s.io.")},
 			expected: false,
 		},
 		{
 			// Ignore names that are from tests that reuse cluster names
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("api.e2e-e2e-kops-aws.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("api.e2e-e2e-kops-aws.test-cncf-aws.k8s.io.")},
 			expected: false,
 		},
 		{
 			// Ignore arbitrary name
-			rrs:      &route53.ResourceRecordSet{Type: aws.String("A"), Name: aws.String("website.test-cncf-aws.k8s.io.")},
+			rrs:      &route53v2types.ResourceRecordSet{Type: "A", Name: aws2.String("website.test-cncf-aws.k8s.io.")},
 			expected: false,
 		},
 	}

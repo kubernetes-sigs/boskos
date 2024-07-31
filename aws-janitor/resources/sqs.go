@@ -17,14 +17,16 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/eventbridge"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	eventbridgev2 "github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	sqsv2 "github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqsv2types "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -35,19 +37,22 @@ type SQSQueues struct{}
 
 func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := sqs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := sqsv2.NewFromConfig(*opts.Config, func(opt *sqsv2.Options) {
+		opt.Region = opts.Region
+	})
 
-	input := &sqs.ListQueuesInput{}
+	input := &sqsv2.ListQueuesInput{}
 
 	var toDelete []*sqsQueue // Paged call, defer deletion until we have the whole list.
 
-	pageFunc := func(page *sqs.ListQueuesOutput, _ bool) bool {
+	pageFunc := func(page *sqsv2.ListQueuesOutput, _ bool) bool {
 		for _, url := range page.QueueUrls {
-			attrInput := &sqs.GetQueueAttributesInput{
-				AttributeNames: []*string{aws.String(sqs.QueueAttributeNameAll)},
-				QueueUrl:       url,
+			url := url
+			attrInput := &sqsv2.GetQueueAttributesInput{
+				AttributeNames: []sqsv2types.QueueAttributeName{sqsv2types.QueueAttributeNameAll},
+				QueueUrl:       &url,
 			}
-			attr, err := svc.GetQueueAttributes(attrInput)
+			attr, err := svc.GetQueueAttributes(context.TODO(), attrInput)
 			if err != nil {
 				return false
 			}
@@ -55,20 +60,20 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 			q := &sqsQueue{
 				Account:  opts.Account,
 				Region:   opts.Region,
-				Name:     *attr.Attributes[sqs.QueueAttributeNameQueueArn],
-				QueueURL: *url,
+				Name:     attr.Attributes[string(sqsv2types.QueueAttributeNameQueueArn)],
+				QueueURL: url,
 			}
-			unixTimestamp, _ := strconv.ParseInt(*attr.Attributes[sqs.QueueAttributeNameCreatedTimestamp], 10, 64)
+			unixTimestamp, _ := strconv.ParseInt(attr.Attributes[string(sqsv2types.QueueAttributeNameCreatedTimestamp)], 10, 64)
 			creationTime := time.Unix(unixTimestamp, 0)
 
-			tagResp, err := svc.ListQueueTags(&sqs.ListQueueTagsInput{QueueUrl: url})
+			tagResp, err := svc.ListQueueTags(context.TODO(), &sqsv2.ListQueueTagsInput{QueueUrl: &url})
 			if err != nil {
 				logger.Warningf("%s: failed listing tags: %v", q.ARN(), err)
 				return false
 			}
 			tags := make(Tags, len(tagResp.Tags))
 			for k, v := range tagResp.Tags {
-				tags.Add(aws.String(k), v)
+				tags.Add(aws2.String(k), aws2.String(v))
 			}
 			if !set.Mark(opts, q, &creationTime, tags) {
 				continue
@@ -79,34 +84,35 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 				toDelete = append(toDelete, q)
 			}
 
-			svcRules := eventbridge.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+			svcRules := eventbridgev2.NewFromConfig(*opts.Config, func(opt *eventbridgev2.Options) {
+				opt.Region = opts.Region
+			})
 
 			// Only delete rules that uses SQS queue as target. There are default rules that should not be deleted.
-			rules, err := svcRules.ListRuleNamesByTarget(&eventbridge.ListRuleNamesByTargetInput{
-				TargetArn: attr.Attributes[sqs.QueueAttributeNameQueueArn],
+			rules, err := svcRules.ListRuleNamesByTarget(context.TODO(), &eventbridgev2.ListRuleNamesByTargetInput{
+				TargetArn: aws2.String(attr.Attributes[string(sqsv2types.QueueAttributeNameQueueArn)]),
 			})
 			if err != nil {
 				logger.Warningf("listing rules by target failed: %s", err.Error())
 			}
 
-			for _, rule := range rules.RuleNames {
-				deleteEventBridgeRule(rule, svcRules, logger)
+			for i := range rules.RuleNames {
+				deleteEventBridgeRule(&rules.RuleNames[i], svcRules, logger)
 			}
 
 		}
 		return true
 	}
 
-	if err := svc.ListQueuesPages(input, pageFunc); err != nil {
+	if err := ListQueuesPages(svc, input, pageFunc); err != nil {
 		return err
 	}
 	for _, q := range toDelete {
-		_, err := svc.DeleteQueue(&sqs.DeleteQueueInput{QueueUrl: aws.String(q.QueueURL)})
+		_, err := svc.DeleteQueue(context.TODO(), &sqsv2.DeleteQueueInput{QueueUrl: aws2.String(q.QueueURL)})
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				if aerr.Code() == sqs.ErrCodeQueueDoesNotExist {
-					continue
-				}
+			var doesNotExistError sqsv2types.QueueDoesNotExist
+			if errors.As(err, &doesNotExistError) {
+				continue
 			}
 			logger.Warningf("%s: delete failed: %v", q.ARN(), err)
 		}
@@ -114,21 +120,35 @@ func (SQSQueues) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
-func deleteEventBridgeRule(rule *string, svcRules *eventbridge.EventBridge, logger *logrus.Entry) {
+func ListQueuesPages(svc *sqsv2.Client, input *sqsv2.ListQueuesInput, pageFunc func(page *sqsv2.ListQueuesOutput, _ bool) bool) error {
+	paginator := sqsv2.NewListQueuesPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
+func deleteEventBridgeRule(rule *string, svcRules *eventbridgev2.Client, logger *logrus.Entry) {
 	// Before removing a rule, all the target must be removed from the rule.
 	// For removing the targets, target ids must be provided.
-	targets, err := svcRules.ListTargetsByRule(&eventbridge.ListTargetsByRuleInput{
+	targets, err := svcRules.ListTargetsByRule(context.TODO(), &eventbridgev2.ListTargetsByRuleInput{
 		Rule: rule,
 	})
 	if err != nil {
 		logger.Warningf("%s: listing targets failed: %v", *rule, err)
 	}
-	targetStr := make([]*string, 0)
+	targetStr := make([]string, 0)
 	for _, t := range targets.Targets {
-		targetStr = append(targetStr, t.Id)
+		targetStr = append(targetStr, *t.Id)
 	}
 
-	_, err = svcRules.RemoveTargets(&eventbridge.RemoveTargetsInput{
+	_, err = svcRules.RemoveTargets(context.TODO(), &eventbridgev2.RemoveTargetsInput{
 		Rule: rule,
 		Ids:  targetStr,
 	})
@@ -136,27 +156,30 @@ func deleteEventBridgeRule(rule *string, svcRules *eventbridge.EventBridge, logg
 		logger.Warningf("%s: removing targets failed: %v", *rule, err)
 	}
 
-	deleteInput := &eventbridge.DeleteRuleInput{
+	deleteInput := &eventbridgev2.DeleteRuleInput{
 		Name:  rule,
-		Force: aws.Bool(true),
+		Force: true,
 	}
-	if _, err := svcRules.DeleteRule(deleteInput); err != nil {
+	if _, err := svcRules.DeleteRule(context.TODO(), deleteInput); err != nil {
 		logger.Warningf("%s: delete failed: %v", *rule, err)
 	}
 }
 
 func (SQSQueues) ListAll(opts Options) (*Set, error) {
-	svc := sqs.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := sqsv2.NewFromConfig(*opts.Config, func(opt *sqsv2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	input := &sqs.ListQueuesInput{}
+	input := &sqsv2.ListQueuesInput{}
 
-	err := svc.ListQueuesPages(input, func(queues *sqs.ListQueuesOutput, _ bool) bool {
+	err := ListQueuesPages(svc, input, func(queues *sqsv2.ListQueuesOutput, _ bool) bool {
 		for _, url := range queues.QueueUrls {
-			attrInput := &sqs.GetQueueAttributesInput{
-				AttributeNames: []*string{aws.String(sqs.QueueAttributeNameAll)},
-				QueueUrl:       url,
+			url := url
+			attrInput := &sqsv2.GetQueueAttributesInput{
+				AttributeNames: []sqsv2types.QueueAttributeName{sqsv2types.QueueAttributeNameAll},
+				QueueUrl:       &url,
 			}
-			attr, err := svc.GetQueueAttributes(attrInput)
+			attr, err := svc.GetQueueAttributes(context.TODO(), attrInput)
 			if err != nil {
 				return false
 			}
@@ -164,8 +187,8 @@ func (SQSQueues) ListAll(opts Options) (*Set, error) {
 			arn := sqsQueue{
 				Account:  opts.Account,
 				Region:   opts.Region,
-				Name:     *attr.Attributes[sqs.QueueAttributeNameQueueArn],
-				QueueURL: *url,
+				Name:     attr.Attributes[string(sqsv2types.QueueAttributeNameQueueArn)],
+				QueueURL: url,
 			}.ARN()
 			set.firstSeen[arn] = now
 		}

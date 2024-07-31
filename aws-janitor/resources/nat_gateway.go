@@ -17,11 +17,12 @@ limitations under the License.
 package resources
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,10 +35,12 @@ type NATGateway struct{}
 // MarkAndSweep looks at the provided set, and removes resources older than its TTL that have been previously tagged.
 func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 	logger := logrus.WithField("options", opts)
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 
-	inp := &ec2.DescribeNatGatewaysInput{}
-	if err := svc.DescribeNatGatewaysPages(inp, func(page *ec2.DescribeNatGatewaysOutput, _ bool) bool {
+	inp := &ec2v2.DescribeNatGatewaysInput{}
+	if err := DescribeNatGatewaysPages(svc, inp, func(page *ec2v2.DescribeNatGatewaysOutput, _ bool) bool {
 		for _, gw := range page.NatGateways {
 			g := &natGateway{
 				Account: opts.Account,
@@ -53,8 +56,8 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 			if opts.DryRun {
 				continue
 			}
-			inp := &ec2.DeleteNatGatewayInput{NatGatewayId: gw.NatGatewayId}
-			if _, err := svc.DeleteNatGateway(inp); err != nil {
+			inp := &ec2v2.DeleteNatGatewayInput{NatGatewayId: gw.NatGatewayId}
+			if _, err := svc.DeleteNatGateway(context.TODO(), inp); err != nil {
 				logger.Warningf("%s: delete failed: %v", g.ARN(), err)
 			}
 		}
@@ -66,13 +69,29 @@ func (NATGateway) MarkAndSweep(opts Options, set *Set) error {
 	return nil
 }
 
+func DescribeNatGatewaysPages(svc *ec2v2.Client, input *ec2v2.DescribeNatGatewaysInput, pageFunc func(page *ec2v2.DescribeNatGatewaysOutput, _ bool) bool) error {
+	paginator := ec2v2.NewDescribeNatGatewaysPaginator(svc, input)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			logrus.Warningf("failed to get page, %v", err)
+		} else {
+			pageFunc(page, false)
+		}
+	}
+	return nil
+}
+
 // ListAll populates a set will all available NATGateway resources.
 func (NATGateway) ListAll(opts Options) (*Set, error) {
-	svc := ec2.New(opts.Session, aws.NewConfig().WithRegion(opts.Region))
+	svc := ec2v2.NewFromConfig(*opts.Config, func(opt *ec2v2.Options) {
+		opt.Region = opts.Region
+	})
 	set := NewSet(0)
-	inp := &ec2.DescribeNatGatewaysInput{}
+	inp := &ec2v2.DescribeNatGatewaysInput{}
 
-	err := svc.DescribeNatGatewaysPages(inp, func(page *ec2.DescribeNatGatewaysOutput, _ bool) bool {
+	err := DescribeNatGatewaysPages(svc, inp, func(page *ec2v2.DescribeNatGatewaysOutput, _ bool) bool {
 		for _, gw := range page.NatGateways {
 			now := time.Now()
 			arn := natGateway{

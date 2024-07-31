@@ -17,12 +17,13 @@ limitations under the License.
 package regions
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
+	ec2v2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -37,10 +38,12 @@ func init() {
 }
 
 // GetAll retrieves all regions from the AWS API
-func GetAll(sess *session.Session) ([]string, error) {
+func GetAll(cfg *aws2.Config) ([]string, error) {
 	var regions []string
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(Default)})
-	resp, err := svc.DescribeRegions(nil)
+	svc := ec2v2.NewFromConfig(*cfg, func(options *ec2v2.Options) {
+		options.Region = Default
+	})
+	resp, err := svc.DescribeRegions(context.TODO(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +54,8 @@ func GetAll(sess *session.Session) ([]string, error) {
 }
 
 // ParseRegion checks whether the provided region is valid. If an empty region is provided, returns all valid regions.
-func ParseRegion(sess *session.Session, region string) ([]string, error) {
-	all, err := GetAll(sess)
+func ParseRegion(cfg *aws2.Config, region string) ([]string, error) {
+	all, err := GetAll(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed retrieving list of regions")
 	}

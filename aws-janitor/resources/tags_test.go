@@ -19,7 +19,7 @@ package resources
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
+	aws2 "github.com/aws/aws-sdk-go-v2/aws"
 )
 
 func TestMatchesTag(t *testing.T) {
@@ -222,7 +222,7 @@ func TestIncrementalFetchTags(t *testing.T) {
 		}
 		for _, id := range ids {
 			processedIDs++
-			name := aws.StringValue(id)
+			name := *id
 			if _, ok := tagsMap[name]; !ok {
 				t.Errorf("id not in tag map: %v", id)
 				continue
@@ -230,7 +230,7 @@ func TestIncrementalFetchTags(t *testing.T) {
 			if tagsMap[name] == nil {
 				tagsMap[name] = make(Tags)
 			}
-			tagsMap[name].Add(aws.String("seen"), aws.String("true"))
+			tagsMap[name].Add(aws2.String("seen"), aws2.String("true"))
 		}
 		return nil
 	})
