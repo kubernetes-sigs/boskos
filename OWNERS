@@ -5,6 +5,7 @@ approvers:
 - krzyzacy
 - stevekuznetsov
 - test-infra-oncall
+- sig-k8s-infra-oncall
 
 labels:
 - sig/testing
