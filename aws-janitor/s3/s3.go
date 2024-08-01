@@ -51,7 +51,10 @@ func GetPath(cfg *aws2.Config, s string) (*Path, error) {
 		return nil, err
 	}
 
-	region := resp.LocationConstraint
+	region := regions.Default
+	if resp.LocationConstraint != "" {
+		region = string(resp.LocationConstraint)
+	}
 
 	return &Path{Region: string(region), Bucket: url.Host, Key: url.Path}, nil
 }
