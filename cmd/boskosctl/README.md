@@ -28,7 +28,7 @@ resource="$( boskosctlwrapper acquire --type things --state new --target-state o
 # release the resource when the script exits
 function release() {
     local resource_name; resource_name="$( jq .name <<<"${resource}" )"
-    boskosctlwrapper release --name "${resource_name}" --target-state used
+    boskosctlwrapper release --name "${resource_name}" --target-state dirty
 }
 trap release EXIT
 
