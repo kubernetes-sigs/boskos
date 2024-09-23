@@ -661,7 +661,9 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
 
     # try to clean leaked secondary ip ranges.
     try:
-        clean_secondary_ip_ranges(project, age, filt)
+        # We do not want to add filter here because we want to
+        # find all secondary ip ranges on all existing subnets.
+        clean_secondary_ip_ranges(project, age, "")
     except ValueError:
         print('Fail to clean up secondary ip ranges from project %r' % project, file=sys.stderr)
  
