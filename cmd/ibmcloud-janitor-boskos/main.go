@@ -38,6 +38,7 @@ var (
 	passwordFile = flag.String("password-file", "", "The path to password file used to access the Boskos server")
 	logLevel     = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	debug        = flag.Bool("debug", false, "Setting it to true allows logs for PowerVS client")
+	ignoreAPIKey = flag.Bool("ignore-api-key", false, "Setting it to true will skip clean up and rotation of API keys")
 )
 
 const (
@@ -60,8 +61,9 @@ func run(boskos *boskosClient.Client) error {
 				return errors.Wrap(err, "Couldn't retrieve resources from Boskos")
 			} else {
 				options := &resources.CleanupOptions{
-					Resource: res,
-					Debug:    *debug,
+					Resource:     res,
+					Debug:        *debug,
+					IgnoreAPIKey: *ignoreAPIKey,
 				}
 				if err := resources.CleanAll(options); err != nil {
 					return errors.Wrapf(err, "Couldn't clean resource %q", res.Name)
