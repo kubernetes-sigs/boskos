@@ -18,18 +18,23 @@ package resources
 
 import (
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func CleanAll(options *CleanupOptions) error {
 	list, err := listResources(options.Resource.Type)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to fetch the list of resources of type %q", options.Resource.Name)
+		return errors.Wrapf(err, "Failed to fetch the list of resources of type %q", options.Resource.Type)
 	}
 	for _, resource := range list {
 		err = resource.cleanup(options)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to clean the resources of type %q", options.Resource.Type)
+			return errors.Wrapf(err, "Failed to clean the resource %q of type %q", options.Resource.Name, options.Resource.Type)
 		}
+	}
+	if options.IgnoreAPIKey {
+		logrus.Infof("Skipping cleanup and rotation of API keys for resource %s of type %s", options.Resource.Name, options.Resource.Type)
+		return nil
 	}
 
 	for _, resource := range CommonResources {

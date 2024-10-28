@@ -34,8 +34,9 @@ type Resource interface {
 }
 
 type CleanupOptions struct {
-	Resource *common.Resource
-	Debug    bool
+	Resource     *common.Resource
+	Debug        bool
+	IgnoreAPIKey bool
 }
 
 var PowervsResources = []Resource{
