@@ -617,7 +617,7 @@ def clean_secrets(project, age, filt):
         created = datetime.datetime.strptime(
             item['createTime'][:19], '%Y-%m-%dT%H:%M:%S')
         if created < age:
-            log('Found stale gke cluster %r, created time = %r' %
+            log('Found stale secret %r, created time = %r' %
                 (item['name'], item['createTime']))
             delete = [
                 'gcloud', 'secrets', '-q', 'delete',
