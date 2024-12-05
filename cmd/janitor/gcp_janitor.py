@@ -591,6 +591,9 @@ def clean_gke_cluster(project, age, filt):
 def clean_secrets(project, age, filt):
     """Clean up secrets from Google secret manager"""
     os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_SECRETMANAGER'] = 'https://secretmanager.googleapis.com/'
+    if not api_enabled(project, 'secretmanager.googleapis.com'):
+        log('Secret Manager API is not enabled, skipping secret clean-up')
+        return 0
     cmd = [
             'gcloud', 'secrets', 'list',
             '--project=%s' % project,
