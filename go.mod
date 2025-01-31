@@ -1,6 +1,6 @@
 module sigs.k8s.io/boskos
 
-go 1.22.3
+go 1.23
 
 require (
 	github.com/IBM-Cloud/power-go-client v1.8.1
