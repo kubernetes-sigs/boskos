@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -47,8 +47,11 @@ func CleanAll(opts Options, region string) error {
 			set, err := typ.ListAll(opts)
 			if err != nil {
 				// ignore errors for resources we do not have permissions to list
-				if reqerr, ok := errors.Cause(err).(awserr.RequestFailure); ok {
-					if reqerr.StatusCode() == http.StatusForbidden {
+				if resperr, ok := errors.Cause(err).(*awshttp.ResponseError); ok {
+					var responseError interface {
+						HTTPStatusCode() int
+					}
+					if resperr.As(&responseError) && responseError.HTTPStatusCode() == http.StatusForbidden {
 						logger.Debugf("Skipping resources of type %T, account does not have permission to list", typ)
 						continue
 					}
