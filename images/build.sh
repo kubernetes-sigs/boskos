@@ -20,6 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+multi_arch_platforms="linux/amd64,linux/ppc64le"
+
 if [[ -z "${DOCKER_REPO:-}" ]]; then
     echo "DOCKER_REPO must be set!" >&2
     exit 1
@@ -41,16 +43,35 @@ if [[ -z "${CONTAINER_ENGINE:-}" ]]; then
     fi
 fi
 
+ensure_buildx() {
+    ${CONTAINER_ENGINE} buildx rm multiarch || true
+    ${CONTAINER_ENGINE} buildx create --use --name=multiarch --bootstrap --platform=${multi_arch_platforms}
+}
+
 image_build() {
     local cmd=$1
     local image_dir
+    local enable_buildx=${2:-}
+    local container_engine_build="${CONTAINER_ENGINE} build"
     if [[ -d ./images/"${cmd}" ]]; then
         image_dir="${cmd}"
     else
         image_dir="default"
     fi
+
+    if [[ "${enable_buildx}" == 1 ]]; then
+        if [[ "${CONTAINER_ENGINE}" == "podman" ]]; then
+            echo "Podman is not preferred when ENABLE_BUILDX is set, terminating the build!"
+            exit 1 
+        else
+            ensure_buildx
+            echo "ENABLE_BUILDX is set! Building multi-arch image for '${cmd}' for platforms '${multi_arch_platforms}'" >&2
+            container_engine_build="${CONTAINER_ENGINE} buildx build --builder multiarch --platform=${multi_arch_platforms} --output type=registry"
+        fi
+    fi
+
     # We need to set DOCKER_TAG in the container because git metadata isn't available
-    $CONTAINER_ENGINE build --pull \
+    ${container_engine_build} --pull \
         --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
         --build-arg "go_version=${GO_VERSION}" \
         --build-arg "cmd=${cmd}" \
