@@ -38,7 +38,10 @@ CONTROLLER_GEN_VER := v0.14.0
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
 
+CONTAINER_ENGINE := $(if $(shell which docker),docker,$(if $(shell which podman),podman,))
+
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
+MULTI_ARCH_PLATFORMS = linux/amd64,linux/arm64,linux/ppc64le
 
 export GO_VERSION=1.23.4
 export GO111MODULE=on
@@ -74,8 +77,15 @@ test: $(GOTESTSUM)
 images: $(patsubst %,%-image,$(CMDS))
 
 .PHONY: %-image
-%-image:
-	./images/build.sh $*
+%-image: ensure-buildx
+	./images/build.sh $* $(CONTAINER_ENGINE)
+
+.PHONY: ensure-buildx
+ensure-buildx:
+	$(if $(filter podman,$(CONTAINER_ENGINE)),\
+		$(error "Podman is not preferred for multi-arch builds using buildx, terminating the build!"),)
+	$(CONTAINER_ENGINE) buildx rm multiarch || true
+	$(CONTAINER_ENGINE) buildx create --use --name=multiarch --bootstrap --platform=$(MULTI_ARCH_PLATFORMS)
 
 .PHONY: clean
 clean:
