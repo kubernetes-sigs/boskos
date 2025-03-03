@@ -30,7 +30,18 @@ if [[ -z "${DOCKER_TAG:-}" ]]; then
     exit 1
 fi
 
-docker_build() {
+if [[ -z "${CONTAINER_ENGINE:-}" ]]; then
+    if  [[ -x `which docker` ]]; then
+        CONTAINER_ENGINE=docker
+    elif [[ -x `which podman` ]]; then
+        CONTAINER_ENGINE=podman
+    else
+        echo "CONTAINER_ENGINE must be set!" >&2
+        exit 1
+    fi
+fi
+
+image_build() {
     local cmd=$1
     local image_dir
     if [[ -d ./images/"${cmd}" ]]; then
@@ -39,7 +50,7 @@ docker_build() {
         image_dir="default"
     fi
     # We need to set DOCKER_TAG in the container because git metadata isn't available
-    docker build --pull \
+    $CONTAINER_ENGINE build --pull \
         --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
         --build-arg "go_version=${GO_VERSION}" \
         --build-arg "cmd=${cmd}" \
@@ -48,4 +59,4 @@ docker_build() {
         -f "./images/${image_dir}/Dockerfile" .
 }
 
-docker_build $@
+image_build $@
