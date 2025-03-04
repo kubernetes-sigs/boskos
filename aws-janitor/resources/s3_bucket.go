@@ -52,8 +52,8 @@ func (S3Bucket) MarkAndSweep(opts Options, set *Set) error {
 		opt.Region = opts.Region
 	})
 
-	// ListBucket lists all buckets owned by the authenticated sender of the request
-	// https://pkg.go.dev/github.com/aws/aws-sdk-go/service/s3#S3.ListBuckets
+	// ListBuckets lists all buckets owned by the authenticated sender of the request
+	// https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3#Client.ListBuckets
 	// regardless the region configured in client.
 	resp, err := svc.ListBuckets(context.TODO(), &s3v2.ListBucketsInput{})
 	if err != nil {
@@ -130,8 +130,8 @@ func (S3Bucket) ListAll(opts Options) (*Set, error) {
 		opt.Region = opts.Region
 	})
 
-	// ListBucket lists all buckets owned by the authenticated sender of the request
-	// https://pkg.go.dev/github.com/aws/aws-sdk-go/service/s3#S3.ListBuckets
+	// ListBuckets lists all buckets owned by the authenticated sender of the request
+	// https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3#Client.ListBuckets
 	// regardless the region configured in client.
 	resp, err := svc.ListBuckets(context.TODO(), &s3v2.ListBucketsInput{})
 	if err != nil {
