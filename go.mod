@@ -7,7 +7,6 @@ require (
 	github.com/IBM/go-sdk-core/v5 v5.17.5
 	github.com/IBM/platform-services-go-sdk v0.69.1
 	github.com/IBM/vpc-go-sdk v0.58.0
-	github.com/aws/aws-sdk-go v1.44.72
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
@@ -57,6 +56,7 @@ require (
 	github.com/GoogleCloudPlatform/testgrid v0.0.123 // indirect
 	github.com/andygrunwald/go-jira v1.14.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/aws/aws-sdk-go v1.44.72 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.3 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.15 // indirect
