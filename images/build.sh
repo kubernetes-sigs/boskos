@@ -20,6 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+multi_arch_platforms="linux/amd64,linux/arm64,linux/ppc64le"
+
 if [[ -z "${DOCKER_REPO:-}" ]]; then
     echo "DOCKER_REPO must be set!" >&2
     exit 1
@@ -30,27 +32,25 @@ if [[ -z "${DOCKER_TAG:-}" ]]; then
     exit 1
 fi
 
-if [[ -z "${CONTAINER_ENGINE:-}" ]]; then
-    if  [[ -x `which docker` ]]; then
-        CONTAINER_ENGINE=docker
-    elif [[ -x `which podman` ]]; then
-        CONTAINER_ENGINE=podman
-    else
-        echo "CONTAINER_ENGINE must be set!" >&2
-        exit 1
-    fi
-fi
-
 image_build() {
     local cmd=$1
     local image_dir
+    local container_engine=$2
     if [[ -d ./images/"${cmd}" ]]; then
         image_dir="${cmd}"
     else
         image_dir="default"
     fi
+
+    if [[ -z "${container_engine}" ]]; then
+        echo "CONTAINER_ENGINE must be set!" >&2
+        exit 1
+    fi
+
     # We need to set DOCKER_TAG in the container because git metadata isn't available
-    $CONTAINER_ENGINE build --pull \
+    ${container_engine} buildx build --builder multiarch \
+        --platform=${multi_arch_platforms} \
+        --output type=registry --pull \
         --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
         --build-arg "go_version=${GO_VERSION}" \
         --build-arg "cmd=${cmd}" \
