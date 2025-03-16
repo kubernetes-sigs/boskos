@@ -21,11 +21,11 @@ timeout: 1500s
 # or any new substitutions added in the future.
 options:
   substitution_option: ALLOW_LOOSE
+  machineType: E2_HIGHCPU_32
 steps:
-  - name: "gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20210917-12df099d55"
+  - name: "gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:latest"
     entrypoint: make
     env:
-      - DOCKER_CLI_EXPERIMENTAL=enabled
       - DOCKER_TAG=$_GIT_TAG
       - DOCKER_REPO=gcr.io/$PROJECT_ID
     args:
