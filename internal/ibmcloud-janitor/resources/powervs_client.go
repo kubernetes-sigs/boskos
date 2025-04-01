@@ -68,6 +68,7 @@ func (p *IBMPowerVSClient) DeletePort(networkID, portID string) error {
 
 // Returns a new PowerVS client
 func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
+	var accountID *string
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	pclient := &IBMPowerVSClient{}
 	powervsData, err := ibmcloud.GetPowerVSResourceData(options.Resource)
@@ -85,16 +86,20 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 		return nil, errors.Wrap(err, "failed to create serviceID client")
 	}
 
-	account, err := sclient.GetAccount()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the account")
+	if options.AccountID != nil {
+		accountID = options.AccountID
+	} else {
+		accountID, err = sclient.GetAccount()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get the account ID")
+		}
 	}
 
 	clientOptions := &ibmpisession.IBMPIOptions{
 		Debug:         options.Debug,
 		Authenticator: auth,
 		Zone:          powervsData.Zone,
-		UserAccount:   *account,
+		UserAccount:   *accountID,
 	}
 	pclient.session, err = ibmpisession.NewIBMPISession(clientOptions)
 	if err != nil {
