@@ -39,6 +39,7 @@ var (
 	logLevel     = flag.String("log-level", "info", fmt.Sprintf("Log level is one of %v.", logrus.AllLevels))
 	debug        = flag.Bool("debug", false, "Setting it to true allows logs for PowerVS client")
 	ignoreAPIKey = flag.Bool("ignore-api-key", false, "Setting it to true will skip clean up and rotation of API keys")
+	accountID    = flag.String("accound-id", "", "ID of the IBM Cloud account")
 )
 
 const (
@@ -64,6 +65,9 @@ func run(boskos *boskosClient.Client) error {
 					Resource:     res,
 					Debug:        *debug,
 					IgnoreAPIKey: *ignoreAPIKey,
+				}
+				if accountID != nil {
+					options.AccountID = accountID
 				}
 				if err := resources.CleanAll(options); err != nil {
 					return errors.Wrapf(err, "Couldn't clean resource %q", res.Name)

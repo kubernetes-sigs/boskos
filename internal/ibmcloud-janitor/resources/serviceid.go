@@ -40,9 +40,9 @@ func getAPIkeyName() string {
 }
 
 // Lists and returns the target service ID
-func (s *ServiceID) fetchServiceID(account *string) (*identityv1.ServiceID, error) {
+func (s *ServiceID) fetchServiceID(accountID *string) (*identityv1.ServiceID, error) {
 	options := &identityv1.ListServiceIdsOptions{
-		AccountID: account,
+		AccountID: accountID,
 		Name:      &s.key.serviceIDName,
 	}
 
@@ -96,6 +96,7 @@ func (s *ServiceID) resetKeys(serviceID *identityv1.ServiceID) (*identityv1.APIK
 }
 
 func (k APIKey) cleanup(options *CleanupOptions) error {
+	var accountID *string
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the API key of resource")
 
@@ -109,12 +110,16 @@ func (k APIKey) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "failed to create serviceID client")
 	}
 
-	account, err := sclient.GetAccount()
-	if err != nil {
-		return errors.Wrap(err, "failed to get the account ID")
+	if options.AccountID != nil {
+		accountID = options.AccountID
+	} else {
+		accountID, err = sclient.GetAccount()
+		if err != nil {
+			return errors.Wrap(err, "failed to get the account ID")
+		}
 	}
 
-	serviceID, err := sclient.fetchServiceID(account)
+	serviceID, err := sclient.fetchServiceID(accountID)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch Service ID")
 	}
