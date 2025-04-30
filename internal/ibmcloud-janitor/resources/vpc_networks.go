@@ -37,9 +37,15 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "couldn't create VPC client")
 	}
 
-	subnetList, _, err := client.ListSubnets(&vpcv1.ListSubnetsOptions{
+	listSubnetOpts := &vpcv1.ListSubnetsOptions{
 		ResourceGroupID: &client.ResourceGroupID,
-	})
+	}
+	// List subnets with optional VPC filter
+	if client.VPCID != "" {
+		listSubnetOpts.VPCID = &client.VPCID
+	}
+
+	subnetList, _, err := client.ListSubnets(listSubnetOpts)
 	if err != nil {
 		return errors.Wrap(err, "failed to list the subnets")
 	}
@@ -78,6 +84,10 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "failed to list the floating IPs")
 	}
 	for _, fip := range fips.FloatingIps {
+		if client.VPCID != "" && fip.Target != nil {
+			// Skip bound FIPs if VPC ID is specified
+			continue
+		}
 		_, err = client.DeleteFloatingIP(&vpcv1.DeleteFloatingIPOptions{
 			ID: fip.ID,
 		})
@@ -87,6 +97,6 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 		resourceLogger.WithFields(logrus.Fields{"name": fip.Name}).Info("Successfully deleted the floating IP")
 	}
 
-	resourceLogger.Info("Successfully deleted the subnets")
+	resourceLogger.Info("Successfully deleted subnets and floating IPs")
 	return nil
 }

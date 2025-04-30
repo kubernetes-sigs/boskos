@@ -34,9 +34,15 @@ func (VPCInstance) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "couldn't create VPC client")
 	}
 
-	instanceList, _, err := client.ListInstances(&vpcv1.ListInstancesOptions{
+	// List instances with optional VPC filter
+	listInstanceOpts := &vpcv1.ListInstancesOptions{
 		ResourceGroupID: &client.ResourceGroupID,
-	})
+	}
+	if client.VPCID != "" {
+		listInstanceOpts.VPCID = &client.VPCID
+	}
+
+	instanceList, _, err := client.ListInstances(listInstanceOpts)
 	if err != nil {
 		return errors.Wrap(err, "failed to list the instances")
 	}

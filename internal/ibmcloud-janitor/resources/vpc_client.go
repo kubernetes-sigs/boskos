@@ -31,6 +31,7 @@ import (
 type IBMVPCClient struct {
 	vpcService      *vpcv1.VpcV1
 	ResourceGroupID string
+	VPCID           string
 	Resource        *common.Resource
 }
 
@@ -90,6 +91,10 @@ func (c *IBMVPCClient) GetLoadBalancer(options *vpcv1.GetLoadBalancerOptions) (r
 	return c.vpcService.GetLoadBalancer(options)
 }
 
+func (c *IBMVPCClient) GetSubnet(options *vpcv1.GetSubnetOptions) (*vpcv1.Subnet, *core.DetailedResponse, error) {
+	return c.vpcService.GetSubnet(options)
+}
+
 // Creates a new VPC Client
 func NewVPCClient(options *CleanupOptions) (*IBMVPCClient, error) {
 	client := &IBMVPCClient{}
@@ -100,6 +105,7 @@ func NewVPCClient(options *CleanupOptions) (*IBMVPCClient, error) {
 	}
 
 	client.ResourceGroupID = vpcData.ResourceGroup
+	client.VPCID = vpcData.VPCID
 	client.Resource = options.Resource
 	url := "https://" + vpcData.Region + ".iaas.cloud.ibm.com/v1"
 	auth, err := account.GetAuthenticator()

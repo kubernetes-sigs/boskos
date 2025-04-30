@@ -34,6 +34,12 @@ func (VPCs) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "couldn't create VPC client")
 	}
 
+	// Skip VPC deletion if specific VPC ID is provided
+	if client.VPCID != "" {
+		resourceLogger.Info("Skipping VPC deletion as VPC ID is passed in user-data")
+		return nil
+	}
+
 	vpcList, _, err := client.ListVpcs(&vpcv1.ListVpcsOptions{
 		ResourceGroupID: &client.ResourceGroupID,
 	})
