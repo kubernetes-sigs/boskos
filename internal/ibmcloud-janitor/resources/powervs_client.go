@@ -31,9 +31,10 @@ import (
 type IBMPowerVSClient struct {
 	session *ibmpisession.IBMPISession
 
-	instance *PowerVSInstance
-	network  *PowerVSNetwork
-	resource *common.Resource
+	instance  *PowerVSInstance
+	network   *PowerVSNetwork
+	workspace *PowerVSWorksapce
+	resource  *common.Resource
 }
 
 // Returns the virtual server instances in the PowerVS service instance
@@ -66,6 +67,11 @@ func (p *IBMPowerVSClient) DeletePort(networkID, portID string) error {
 	return p.network.networkClient.DeletePort(networkID, portID)
 }
 
+// Returns the details of the PowerVS workspace
+func (p *IBMPowerVSClient) GetWorkspaceDetails() (*models.Workspace, error) {
+	return p.workspace.workspaceClient.Get(p.workspace.serviceInstanceID)
+}
+
 // Returns a new PowerVS client
 func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 	var accountID *string
@@ -93,6 +99,7 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get the account ID")
 		}
+		options.AccountID = accountID
 	}
 
 	clientOptions := &ibmpisession.IBMPIOptions{
@@ -109,6 +116,7 @@ func NewPowerVSClient(options *CleanupOptions) (*IBMPowerVSClient, error) {
 
 	pclient.instance = NewInstanceClient(pclient.session, powervsData.ServiceInstanceID)
 	pclient.network = NewNetworkClient(pclient.session, powervsData.ServiceInstanceID)
+	pclient.workspace = NewWorkspaceClient(pclient.session, powervsData.ServiceInstanceID)
 	pclient.resource = options.Resource
 
 	return pclient, nil
