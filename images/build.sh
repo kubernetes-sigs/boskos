@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-multi_arch_platforms="linux/amd64,linux/arm64,linux/ppc64le"
+multi_arch_platforms="linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
 
 if [[ -z "${DOCKER_REPO:-}" ]]; then
     echo "DOCKER_REPO must be set!" >&2
