@@ -17,9 +17,14 @@ limitations under the License.
 package resources
 
 import (
+	"strings"
+
+	"github.com/IBM/platform-services-go-sdk/globaltaggingv1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+const scheduleTag = "no-schedule"
 
 func CleanAll(options *CleanupOptions) error {
 	list, err := listResources(options.Resource.Type)
@@ -44,4 +49,45 @@ func CleanAll(options *CleanupOptions) error {
 		}
 	}
 	return nil
+}
+
+func CheckResource(options *CleanupOptions) (bool, error) {
+	if !strings.Contains(options.Resource.Type, "powervs") {
+		logrus.Infof("Skipping the check for schedule eligibility for type %s as it is only supported for type 'powervs'", options.Resource.Type)
+		return false, nil
+	}
+
+	client, err := NewPowerVSClient(options)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to create powervs client")
+	}
+
+	workspaceDetails, err := client.GetWorkspaceDetails()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to fetch workspace details")
+	}
+
+	taggingClient, err := NewTaggingClient()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to create tagging client")
+	}
+
+	listOptions := taggingClient.NewListTagsOptions()
+	listOptions.SetTagType(globaltaggingv1.AttachTagOptionsTagTypeUserConst)
+	listOptions.SetAccountID(*options.AccountID)
+	listOptions.SetAttachedTo(*workspaceDetails.Details.Crn)
+
+	tagList, _, err := taggingClient.ListTags(listOptions)
+
+	if err != nil {
+		return false, errors.Wrap(err, "failed to list tags")
+	}
+
+	for _, tag := range tagList.Items {
+		if tag.Name != nil && *tag.Name == scheduleTag {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

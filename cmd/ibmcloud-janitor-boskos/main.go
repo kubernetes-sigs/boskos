@@ -75,6 +75,18 @@ func run(boskos *boskosClient.Client) error {
 				if err := boskos.UpdateOne(res.Name, common.Cleaning, res.UserData); err != nil {
 					return errors.Wrapf(err, "Failed to update resource %q", res.Name)
 				}
+				// Check if resource should be set to dirty to avoid scheduling it by Boskos
+				skip, err := resources.CheckResource(options)
+				if err != nil {
+					return errors.Wrapf(err, "Failed to check schedule eligibility for resource %s", res.Name)
+				}
+				if skip {
+					if err := boskos.ReleaseOne(res.Name, common.Dirty); err != nil {
+						return errors.Wrapf(err, "Failed to release resource %s", res.Name)
+					}
+					logrus.WithField("name", res.Name).Info("Set resource state to dirty to avoid scheduling it by Boskos")
+					continue
+				}
 				if err := boskos.ReleaseOne(res.Name, common.Free); err != nil {
 					return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
 				}
