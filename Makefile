@@ -41,7 +41,7 @@ CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER)
 CONTAINER_ENGINE := $(if $(shell which docker),docker,$(if $(shell which podman),podman,))
 
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
-MULTI_ARCH_PLATFORMS = linux/amd64,linux/arm64,linux/ppc64le
+MULTI_ARCH_PLATFORMS = linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
 
 export GO_VERSION=1.23.4
 export GO111MODULE=on
