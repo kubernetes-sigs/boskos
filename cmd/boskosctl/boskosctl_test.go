@@ -19,7 +19,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -52,7 +52,7 @@ type response struct {
 
 func TestCommand(t *testing.T) {
 
-	file, err := ioutil.TempFile("", "test")
+	file, err := os.CreateTemp("", "test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestCommand(t *testing.T) {
 			t.Fatalf("Failed to remove temp file: %v", err)
 		}
 	}()
-	if err := ioutil.WriteFile(file.Name(), []byte("secret"), 0755); err != nil {
+	if err := os.WriteFile(file.Name(), []byte("secret"), 0600); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)
 	}
 
@@ -416,7 +416,7 @@ failed to send heartbeat for resource "87527b0c-eac2-4f83-9a03-791b2239e093": st
 
 			var recordedCalls []request
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("failed to read request body in test server: %v", err)
 				}
