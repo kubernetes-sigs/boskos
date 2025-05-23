@@ -17,7 +17,7 @@ limitations under the License.
 package common
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -48,7 +48,7 @@ func TestParseResourceTypesFromConfig(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			f, err := ioutil.TempFile(tmp, "boskos-config*.yaml")
+			f, err := os.CreateTemp(tmp, "boskos-config*.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}

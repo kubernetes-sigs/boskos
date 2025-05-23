@@ -19,7 +19,7 @@ package handlers
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -50,11 +50,11 @@ type testMuxWrapper struct {
 
 func (tmw *testMuxWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tmw.requstCount++
-	requestBody, err := ioutil.ReadAll(r.Body)
+	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		tmw.t.Fatalf("failed to read request body: %v", err)
 	}
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
+	r.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 	if err := compareWithFixture(fmt.Sprintf("%s-request-%d", tmw.t.Name(), tmw.requstCount), requestBody); err != nil {
 		tmw.t.Errorf("data differs from fixture: %v", err)
 	}
