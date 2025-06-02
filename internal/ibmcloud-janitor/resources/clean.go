@@ -51,7 +51,10 @@ func CleanAll(options *CleanupOptions) error {
 	return nil
 }
 
-func CheckResource(options *CleanupOptions) (bool, error) {
+// CheckForNoScehduleTag checks if the resource type is of PowerVS
+// and if the resource has a tag `no-schedule`. If tag is present,
+// return true.
+func CheckForNoScehduleTag(options *CleanupOptions) (bool, error) {
 	if !strings.Contains(options.Resource.Type, "powervs") {
 		logrus.Infof("Skipping the check for schedule eligibility for type %s as it is only supported for type 'powervs'", options.Resource.Type)
 		return false, nil
@@ -66,6 +69,7 @@ func CheckResource(options *CleanupOptions) (bool, error) {
 	if err != nil {
 		return false, errors.Wrap(err, "failed to fetch workspace details")
 	}
+	logrus.WithField("name", options.Resource.Name).Info("Fetched workspace details to check for tags")
 
 	taggingClient, err := NewTaggingClient()
 	if err != nil {
@@ -85,6 +89,7 @@ func CheckResource(options *CleanupOptions) (bool, error) {
 
 	for _, tag := range tagList.Items {
 		if tag.Name != nil && *tag.Name == scheduleTag {
+			logrus.WithField("name", options.Resource.Name).Infof("Resource is tagged with %s", scheduleTag)
 			return true, nil
 		}
 	}
