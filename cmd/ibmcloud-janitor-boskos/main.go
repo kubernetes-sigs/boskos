@@ -43,57 +43,107 @@ var (
 )
 
 const (
-	sleepTime = time.Minute
+	sleepTime       = time.Minute
+	noScheduleState = "noSchedule"
 )
 
 func init() {
 	flag.Var(&rTypes, "resource-type", "comma-separated list of resources need to be cleaned up")
 }
 
-//nolint:nestif
 func run(boskos *boskosClient.Client) error {
+	options := &resources.CleanupOptions{
+		Debug:        *debug,
+		IgnoreAPIKey: *ignoreAPIKey,
+	}
+	if *accountID != "" {
+		options.AccountID = accountID
+	}
+
+	go monitorNoScheduleResources(boskos, options)
+
 	for {
 		for _, resourceType := range rTypes {
-			if res, err := boskos.Acquire(resourceType, common.Dirty, common.Cleaning); errors.Cause(err) == boskosClient.ErrNotFound {
-				logrus.Info("no resource acquired. Sleeping.")
+			res, err := boskos.Acquire(resourceType, common.Dirty, common.Cleaning)
+			if errors.Cause(err) == boskosClient.ErrNotFound {
+				logrus.Infof("No resource of type %s acquired in state %s. Sleeping.", resourceType, common.Dirty)
 				time.Sleep(sleepTime)
 				continue
 			} else if err != nil {
-				return errors.Wrap(err, "Couldn't retrieve resources from Boskos")
-			} else {
-				options := &resources.CleanupOptions{
-					Resource:     res,
-					Debug:        *debug,
-					IgnoreAPIKey: *ignoreAPIKey,
-				}
-				if *accountID != "" {
-					options.AccountID = accountID
-				}
-				if err := resources.CleanAll(options); err != nil {
-					return errors.Wrapf(err, "Couldn't clean resource %q", res.Name)
-				}
-				if err := boskos.UpdateOne(res.Name, common.Cleaning, res.UserData); err != nil {
-					return errors.Wrapf(err, "Failed to update resource %q", res.Name)
-				}
-				// Check if resource should be set to dirty to avoid scheduling it by Boskos
-				skip, err := resources.CheckResource(options)
-				if err != nil {
-					return errors.Wrapf(err, "Failed to check schedule eligibility for resource %s", res.Name)
-				}
-				if skip {
-					if err := boskos.ReleaseOne(res.Name, common.Dirty); err != nil {
-						return errors.Wrapf(err, "Failed to release resource %s", res.Name)
-					}
-					logrus.WithField("name", res.Name).Info("Set resource state to dirty to avoid scheduling it by Boskos")
-					continue
-				}
-				if err := boskos.ReleaseOne(res.Name, common.Free); err != nil {
-					return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
-				}
-				logrus.WithField("name", res.Name).Info("Released resource")
+				return errors.Wrapf(err, "Failed to acquire resource of state %s", common.Dirty)
 			}
+			options.Resource = res
+			if err := resources.CleanAll(options); err != nil {
+				return errors.Wrapf(err, "Failed to clean resource %q", res.Name)
+			}
+			if err := boskos.UpdateOne(res.Name, common.Cleaning, res.UserData); err != nil {
+				return errors.Wrapf(err, "Failed to update resource %q", res.Name)
+			}
+			// Check if resource should be set to state noSchedule to avoid scheduling it by Boskos
+			isTagPresent, err := resources.CheckForNoScehduleTag(options)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to check schedule eligibility for resource %s", res.Name)
+			}
+			if isTagPresent {
+				if err := boskos.ReleaseOne(res.Name, noScheduleState); err != nil {
+					return errors.Wrapf(err, "Failed to release resource %s to state %s", res.Name, noScheduleState)
+				}
+				logrus.WithField("name", res.Name).Infof("Set resource state to %s to avoid scheduling it by Boskos", noScheduleState)
+				continue
+			}
+
+			if err := boskos.ReleaseOne(res.Name, common.Free); err != nil {
+				return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
+			}
+			logrus.WithField("name", res.Name).Infof("Released resource to state %s", common.Free)
 		}
 	}
+}
+
+// monitorNoScheduleResources monitors if the resources in state noSchedule are eligible for
+// cleanup and scheduling by Boskos. If yes, it sets the state of the resource to dirty.
+func monitorNoScheduleResources(boskos *boskosClient.Client, options *resources.CleanupOptions) {
+	ticker := time.NewTicker(time.Hour)
+
+	for {
+		for _, resourceType := range rTypes {
+			if err := handleNoScheduleResource(boskos, options, resourceType); err != nil {
+				logrus.Error(err)
+			}
+		}
+		logrus.Println("Sleep for an hour before checking for noSchedule tag on resources")
+		<-ticker.C
+	}
+}
+
+func handleNoScheduleResource(boskos *boskosClient.Client, options *resources.CleanupOptions, resourceType string) error {
+	res, err := boskos.Acquire(resourceType, noScheduleState, common.Cleaning)
+	if errors.Cause(err) == boskosClient.ErrNotFound {
+		logrus.Infof("No resource of type %s acquired in state %s. Sleeping.", resourceType, noScheduleState)
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "Failed to retrieve resource of state %s from Boskos", noScheduleState)
+	}
+
+	options.Resource = res
+	isTagPresent, err := resources.CheckForNoScehduleTag(options)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to check schedule eligibility for resource %s", res.Name)
+	}
+
+	if !isTagPresent {
+		if err := boskos.ReleaseOne(res.Name, common.Dirty); err != nil {
+			return errors.Wrapf(err, "Failed to release resoures %q", res.Name)
+		}
+		logrus.WithField("name", res.Name).Infof("Released resource from state %s to %s for cleaning", noScheduleState, common.Dirty)
+		return nil
+	}
+
+	if err := boskos.ReleaseOne(res.Name, noScheduleState); err != nil {
+		return errors.Wrapf(err, "Failed to release resoure %q to state %s", res.Name, noScheduleState)
+	}
+
+	return nil
 }
 
 func main() {
