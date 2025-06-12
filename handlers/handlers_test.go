@@ -23,10 +23,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -856,9 +856,11 @@ func TestDefault(t *testing.T) {
 func compareWithFixture(testName string, actualData []byte) error {
 	goldenFile := fmt.Sprintf("testdata/%s.golden", strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(testName, " ", "_"), "/", "-")))
 	if *update {
-		ioutil.WriteFile(goldenFile, actualData, 0644)
+		if err := os.WriteFile(goldenFile, actualData, 0600); err != nil {
+			return fmt.Errorf("error writing to fixture %q: %v", goldenFile, err)
+		}
 	}
-	expected, err := ioutil.ReadFile(goldenFile)
+	expected, err := os.ReadFile(goldenFile)
 	if err != nil {
 		return fmt.Errorf("error reading fixture %q: %v", goldenFile, err)
 	}
