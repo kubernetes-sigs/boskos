@@ -104,6 +104,7 @@ var RegionalTypeList = []Type{
 	TargetGroups{},
 	KeyPairs{},
 	S3Bucket{},
+	DedicatedHosts{},
 }
 
 // Non-regional AWS resource types, in dependency order
