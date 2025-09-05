@@ -66,7 +66,7 @@ func main() {
 		logrus.Fatalf("Invalid options: %v", err)
 	}
 
-	boskos, err := client.NewClient("Metrics", boskosURL, username, passwordFile)
+	boskos, err := client.NewClient("Metrics", boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}

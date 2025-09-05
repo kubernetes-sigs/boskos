@@ -138,7 +138,7 @@ func main() {
 		logrus.Fatalf("Error parsing --include-tags: %v", err)
 	}
 
-	boskos, err := client.NewClient("AWSJanitor", *boskosURL, *username, *passwordFile)
+	boskos, err := client.NewClient("AWSJanitor", *boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}

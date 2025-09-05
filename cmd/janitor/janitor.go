@@ -63,7 +63,7 @@ func main() {
 	}
 	logrus.SetLevel(level)
 
-	boskos, err := client.NewClient("Janitor", *boskosURL, *username, *passwordFile)
+	boskos, err := client.NewClient("Janitor", *boskosURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to create a Boskos client")
 	}
