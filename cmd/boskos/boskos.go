@@ -156,7 +156,7 @@ func main() {
 	// Viper defaults the configfile name to `config` and `SetConfigFile` only
 	// has an effect when the configfile name is not an empty string, so we
 	// just disable it entirely if there is no config.
-	configChangeEventChan := make(chan event.GenericEvent)
+	configChangeEventChan := make(chan event.TypedGenericEvent[ctrlruntimeclient.Object])
 	if *configPath != "" {
 		v := viper.New()
 		v.SetConfigFile(*configPath)
@@ -164,7 +164,7 @@ func main() {
 		v.WatchConfig()
 		v.OnConfigChange(func(in fsnotify.Event) {
 			logrus.Info("Boskos config file changed, updating config.")
-			configChangeEventChan <- event.GenericEvent{}
+			configChangeEventChan <- event.TypedGenericEvent[ctrlruntimeclient.Object]{}
 		})
 	}
 
@@ -204,7 +204,7 @@ func (r *configSyncReconciler) Reconcile(_ context.Context, _ reconcile.Request)
 	return reconcile.Result{}, err
 }
 
-func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() error, configChangeEvent <-chan event.GenericEvent) error {
+func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() error, configChangeEvent <-chan event.TypedGenericEvent[ctrlruntimeclient.Object]) error {
 	ctrl, err := controller.New("bokos_config_reconciler", mgr, controller.Options{
 		// We reconcile the whole config, hence this is not safe to run concurrently
 		MaxConcurrentReconciles: 1,
@@ -216,22 +216,22 @@ func addConfigSyncReconcilerToManager(mgr manager.Manager, configSync func() err
 		return fmt.Errorf("failed to construct controller: %w", err)
 	}
 
-	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.ResourceObject{}), constHandler(), resourceUpdatePredicate()); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.ResourceObject{}, constHandler[*crds.ResourceObject](), resourceUpdatePredicate())); err != nil {
 		return fmt.Errorf("failed to watch boskos resources: %w", err)
 	}
-	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.DRLCObject{}), constHandler()); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &crds.DRLCObject{}, constHandler[*crds.DRLCObject]())); err != nil {
 		return fmt.Errorf("failed to watch boskos dynamic resources: %w", err)
 	}
-	if err := ctrl.Watch(&source.Channel{Source: configChangeEvent}, constHandler()); err != nil {
+	if err := ctrl.Watch(source.Channel(configChangeEvent, constHandler[ctrlruntimeclient.Object]())); err != nil {
 		return fmt.Errorf("failed to create source channel for config change event: %w", err)
 	}
 
 	return nil
 }
 
-func constHandler() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(
-		func(_ context.Context, object ctrlruntimeclient.Object) []reconcile.Request {
+func constHandler[T ctrlruntimeclient.Object]() handler.TypedEventHandler[T, reconcile.Request] {
+	return handler.TypedEnqueueRequestsFromMapFunc(
+		func(_ context.Context, object T) []reconcile.Request {
 			return []reconcile.Request{{}}
 		})
 }
@@ -241,18 +241,14 @@ func constHandler() handler.EventHandler {
 //   - The new status is tombstone, because then we have to delete is
 //   - The new owner is empty, because then we have to delete it if it got deleted from the config but
 //     was not deleted from the api to let the current owner finish its work.
-func resourceUpdatePredicate() predicate.Predicate {
-	return predicate.Funcs{
-		CreateFunc: func(_ event.CreateEvent) bool { return true },
-		DeleteFunc: func(_ event.DeleteEvent) bool { return true },
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			resource, ok := e.ObjectNew.(*crds.ResourceObject)
-			if !ok {
-				panic(fmt.Sprintf("BUG: expected *crds.ResourceObject, got %T", e.ObjectNew))
-			}
-
+func resourceUpdatePredicate() predicate.TypedPredicate[*crds.ResourceObject] {
+	return predicate.TypedFuncs[*crds.ResourceObject]{
+		CreateFunc: func(_ event.TypedCreateEvent[*crds.ResourceObject]) bool { return true },
+		DeleteFunc: func(_ event.TypedDeleteEvent[*crds.ResourceObject]) bool { return true },
+		UpdateFunc: func(e event.TypedUpdateEvent[*crds.ResourceObject]) bool {
+			resource := e.ObjectNew
 			return resource.Status.State == common.Tombstone || resource.Status.Owner == ""
 		},
-		GenericFunc: func(_ event.GenericEvent) bool { return true },
+		GenericFunc: func(_ event.TypedGenericEvent[*crds.ResourceObject]) bool { return true },
 	}
 }
