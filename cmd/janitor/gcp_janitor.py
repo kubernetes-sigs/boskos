@@ -21,9 +21,14 @@ import collections
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
+
+# Lustre CSI Constants
+LUSTRE_REGEX = 'lustre-.*'
+LUSTRE_MULTINIC_SUBNET = 'multinic-subnet'
 
 # A resource that need to be cleared.
 # Any names in preserved_names will never be deleted.
@@ -46,7 +51,7 @@ RESOURCES_BY_API = {
     # compute resources
     'compute.googleapis.com': [
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
-        Resource('', 'compute', 'addresses', None, 'global', None, False, True, None),
+        Resource('', 'compute', 'addresses', None, 'global', None, False, True, [LUSTRE_REGEX]),
         Resource('', 'compute', 'addresses', None, 'region', None, False, True, None),
         Resource('', 'compute', 'disks', None, 'zone', None, False, True, None),
         Resource('', 'compute', 'disks', None, 'region', None, False, True, None),
@@ -82,8 +87,8 @@ RESOURCES_BY_API = {
         Resource('', 'compute', 'network-endpoint-groups', None, 'zone', None, False, False, None),
         Resource('', 'compute', 'routes', None, None, None, False, True, None),
         Resource('', 'compute', 'routers', None, 'region', None, False, True, None),
-        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, None),
-        Resource('', 'compute', 'networks', None, None, None, False, True, None),
+        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, [LUSTRE_MULTINIC_SUBNET]),
+        Resource('', 'compute', 'networks', None, None, None, False, True, [LUSTRE_REGEX]),
         Resource('', 'network-connectivity', 'internal-ranges', None, None, None, False, False, None),
     ],
 
@@ -247,8 +252,10 @@ def validate_item(item, age, resource, clear_all):
         ValueError if json result from gcloud is invalid.
     """
 
-    if resource.preserved_names and item['name'] in resource.preserved_names:
-        return False
+    if resource.preserved_names:
+        for preserved_name in resource.preserved_names:
+            if re.fullmatch(preserved_name, item['name']):
+                return False
 
     if resource.managed:
         if 'isManaged' not in item:
@@ -472,6 +479,9 @@ def clean_secondary_ip_ranges(project, age, filt):
 
     # List secondary address rangeds
     for subnet in subnets:
+        if subnet.name in [LUSTRE_MULTINIC_SUBNET]:
+            log('Skip default subnet %s in region %s' % (subnet.name, subnet.region))
+            continue
         log('Describing subnets')
         cmd = [
             'gcloud', 'compute', 'networks', 'subnets', 'describe',
