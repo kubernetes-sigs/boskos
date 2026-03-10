@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	configv2 "github.com/aws/aws-sdk-go-v2/config"
@@ -132,6 +133,19 @@ func main() {
 		runtime.Goexit()
 	}
 	logrus.Debugf("account: %s", acct)
+
+	// Always exclude resources tagged with "preserve" as a safety mechanism
+	preserveTagFound := false
+	for _, tag := range excludeTags {
+		if tag == "preserve" || strings.HasPrefix(tag, "preserve=") {
+			preserveTagFound = true
+			break
+		}
+	}
+	if !preserveTagFound {
+		excludeTags = append(excludeTags, "preserve")
+		logrus.Info("Automatically excluding resources with 'preserve' tag")
+	}
 
 	excludeTM, err := resources.TagMatcherForTags(excludeTags)
 	if err != nil {
