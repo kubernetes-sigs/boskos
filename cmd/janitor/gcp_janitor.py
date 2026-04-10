@@ -29,6 +29,7 @@ import threading
 # Lustre CSI Constants
 LUSTRE_REGEX = 'lustre-.*'
 LUSTRE_MULTINIC_SUBNET = 'multinic-subnet'
+LUSTRE_SUBNET = "lustre-network"
 
 # A resource that need to be cleared.
 # Any names in preserved_names will never be deleted.
@@ -479,7 +480,7 @@ def clean_secondary_ip_ranges(project, age, filt):
 
     # List secondary address rangeds
     for subnet in subnets:
-        if subnet.name in [LUSTRE_MULTINIC_SUBNET]:
+        if subnet.name in [LUSTRE_MULTINIC_SUBNET, LUSTRE_SUBNET]:
             log('Skip default subnet %s in region %s' % (subnet.name, subnet.region))
             continue
         log('Describing subnets')
