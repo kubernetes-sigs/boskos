@@ -267,6 +267,14 @@ def validate_item(item, age, resource, clear_all):
     # clears everything without checking creationTimestamp
     if clear_all:
         return True
+    
+    if resource.name in ['subnets', 'routes'] and 'network' in item:
+        # The network field is a URL like: 
+        # https://www.googleapis.com/compute/v1/projects/my-proj/global/networks/my-network
+        network_name = item['network'].rsplit('/', 1)[-1]
+        if network_name in [LUSTRE_SUBNET]:
+            log('Skipping subnet %s because it belongs to protected network %s' % (item['name'], network_name))
+            return False
 
     creationTimestamp = item.get('creationTimestamp', item.get('createTime'))
     if creationTimestamp is None:
@@ -310,7 +318,7 @@ def collect(project, zones, age, resource, filt, clear_all):
     cmd = base_command(resource)
     cmd.extend([
         'list',
-        '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged)',
+        '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged,network)',
         '--project=%s' % project])
     if (resource.condition == 'zone'
             and resource.name != 'sole-tenancy'
