@@ -88,7 +88,7 @@ RESOURCES_BY_API = {
         Resource('', 'compute', 'network-endpoint-groups', None, 'zone', None, False, False, None),
         Resource('', 'compute', 'routes', None, None, None, False, True, None),
         Resource('', 'compute', 'routers', None, 'region', None, False, True, None),
-        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, [LUSTRE_MULTINIC_SUBNET]),
+        Resource('', 'compute', 'networks', 'subnets', 'region', None, True, True, [LUSTRE_MULTINIC_SUBNET, LUSTRE_REGEX]),
         Resource('', 'compute', 'networks', None, None, None, False, True, [LUSTRE_REGEX]),
         Resource('', 'network-connectivity', 'internal-ranges', None, None, None, False, False, None),
     ],
