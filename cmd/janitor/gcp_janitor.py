@@ -239,14 +239,14 @@ def base_command(resource):
     return base
 
 
-def validate_item(item, age, resource, clear_all):
+def validate_item(item, age, resource, skip_age_check):
     """ Validate if an item need to be cleaned.
 
     Args:
         item: a gcloud resource item from json format.
         age: Time cutoff from the creation of a resource.
         resource: Definition of a type of gcloud resource.
-        clear_all: If need to clean regardless of timestamp.
+        skip_age_check: If need to clean regardless of timestamp.
     Returns:
         True if object need to be cleaned, False otherwise.
     Raises:
@@ -264,10 +264,6 @@ def validate_item(item, age, resource, clear_all):
         if resource.managed != item['isManaged']:
             return False
 
-    # clears everything without checking creationTimestamp
-    if clear_all:
-        return True
-    
     if resource.name in ['subnets', 'routes'] and 'network' in item:
         # The network field is a URL like: 
         # https://www.googleapis.com/compute/v1/projects/my-proj/global/networks/my-network
@@ -275,6 +271,16 @@ def validate_item(item, age, resource, clear_all):
         if network_name in [LUSTRE_SUBNET]:
             log('Skipping subnet %s because it belongs to protected network %s' % (item['name'], network_name))
             return False
+
+        # Skip auto-generated peering routes. They are managed by the peering itself
+        # and cannot be deleted individually. Presence of 'nextHopPeering' indicates it's a peering route.
+        if resource.name == 'routes' and ('nextHopPeering' in item and item['nextHopPeering']):
+            log('Skipping peering route %s' % item['name'])
+            return False
+
+    # clears everything without checking creationTimestamp
+    if skip_age_check:
+        return True
 
     creationTimestamp = item.get('creationTimestamp', item.get('createTime'))
     if creationTimestamp is None:
@@ -291,7 +297,7 @@ def validate_item(item, age, resource, clear_all):
     return False
 
 
-def collect(project, zones, age, resource, filt, clear_all):
+def collect(project, zones, age, resource, filt, skip_age_check):
     """ Collect a list of resources for each condition (zone or region).
 
     Args:
@@ -300,7 +306,7 @@ def collect(project, zones, age, resource, filt, clear_all):
         age: Time cutoff from the creation of a resource.
         resource: Definition of a type of gcloud resource.
         filt: Filter clause for gcloud list command.
-        clear_all: If need to clean regardless of timestamp.
+        skip_age_check: If need to clean regardless of timestamp.
     Returns:
         A dict of condition : list of gcloud resource object.
     Raises:
@@ -311,14 +317,14 @@ def collect(project, zones, age, resource, filt, clear_all):
     col = collections.defaultdict(list)
 
     # TODO(krzyzacy): logging sink does not have timestamp
-    #                 don't even bother listing it if not clear_all
-    if resource.name == 'sinks' and not clear_all:
+    # don't even bother listing it if not skip_age_check
+    if resource.name == 'sinks' and not skip_age_check:
         return col
 
     cmd = base_command(resource)
     cmd.extend([
         'list',
-        '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged,network)',
+        '--format=json(name,creationTimestamp.date(tz=UTC),createTime.date(tz=UTC),zone,region,isManaged,network,nextHopPeering)',
         '--project=%s' % project])
     if (resource.condition == 'zone'
             and resource.name != 'sole-tenancy'
@@ -372,7 +378,7 @@ def collect(project, zones, age, resource, filt, clear_all):
                 # This item doesn't match the condition, so don't include it.
                 continue
 
-        if validate_item(item, age, resource, clear_all):
+        if validate_item(item, age, resource, skip_age_check):
             col[colname].append(item['name'])
     return col
 
@@ -531,6 +537,88 @@ def clean_secondary_ip_ranges(project, age, filt):
             # expected error
             log('Cannot delete secondary ip ranges with %r, continue' %  (exc))
             continue
+
+
+def clean_network_peerings(project, age, filt, skip_age_check):
+    """Clean up network peerings to avoid route deletion errors."""
+    preserved_networks = [LUSTRE_REGEX]
+
+    cmd = [
+        'gcloud', 'compute', 'networks', 'list',
+        '--project=%s' % project,
+        '--filter=%s' % filt,
+        '--format=json(name,creationTimestamp)'
+    ]
+    log('running %s' % cmd)
+
+    try:
+        output = subprocess.check_output(cmd)
+    except subprocess.CalledProcessError as exc:
+        log('Cannot list networks: %r' % exc)
+        return
+
+    networks = json.loads(output)
+
+    for net in networks:
+        net_name = net['name']
+
+        # Check preserved names
+        preserved = False
+        for pattern in preserved_networks:
+            if re.fullmatch(pattern, net_name):
+                log('Skipping peerings for preserved network %s' % net_name)
+                preserved = True
+                break
+        if preserved:
+            continue
+
+        # Check age
+        if not skip_age_check:
+            creationTimestamp = net.get('creationTimestamp')
+            if creationTimestamp:
+                created = datetime.datetime.strptime(creationTimestamp, '%Y-%m-%dT%H:%M:%S')
+                if created >= age:
+                    log('Skipping peerings for network %s (not old enough)' % net_name)
+                    continue
+            else:
+                log('Missing creationTimestamp for network %s, skipping' % net_name)
+                continue
+
+        # List peerings
+        peering_cmd = [
+            'gcloud', 'compute', 'networks', 'peerings', 'list',
+            '--project=%s' % project,
+            '--network=%s' % net_name,
+            '--format=json'
+        ]
+        log('running %s' % peering_cmd)
+
+        try:
+            peering_output = subprocess.check_output(peering_cmd)
+        except subprocess.CalledProcessError as exc:
+            log('Cannot list peerings for network %s: %r' % (net_name, exc))
+            continue
+
+        peerings = json.loads(peering_output)
+        for peering in peerings:
+            peering_name = peering['name']
+            log('Found peering %s on network %s' % (peering_name, net_name))
+
+            # Delete peering
+            delete_cmd = [
+                'gcloud', 'compute', '-q', 'networks', 'peerings', 'delete',
+                peering_name,
+                '--network=%s' % net_name,
+                '--project=%s' % project
+            ]
+            log('%sCall %r' % ('[DRYRUN] ' if ARGS.dryrun else '', delete_cmd))
+            if ARGS.dryrun:
+                continue
+            try:
+                subprocess.check_call(delete_cmd)
+                log('Successfully deleted peering %s' % peering_name)
+            except subprocess.CalledProcessError as exc:
+                log('Failed to delete peering %s: %r' % (peering_name, exc))
 
 
 def clean_gke_cluster(project, age, filt):
@@ -781,7 +869,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
     print('[=== Start Janitor on project %r ===]' % project)
     err = 0
     age = datetime.datetime.utcnow() - datetime.timedelta(days=days, hours=hours)
-    clear_all = (days == 0 and hours == 0)
+    skip_age_check = (days == 0 and hours == 0)
 
     if service_account:
         err |= activate_service_account(service_account)
@@ -825,6 +913,13 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
         err |= 1  # keep cleaning the other resource
         print('Fail to clean up IAM service-account keys from project %r' % project, file=sys.stderr)
 
+    # try to clean network peerings.
+    try:
+        clean_network_peerings(project, age, filt, skip_age_check)
+    except Exception:
+        err |= 1  # keep cleaning the other resource
+        print('Fail to clean up network peerings from project %r' % project, file=sys.stderr)
+
     zones = BASE_ZONES + additional_zones
     gkehub_apis = {'gkehub.googleapis.com', 'staging-gkehub.sandbox.googleapis.com', 'autopush-gkehub.sandbox.googleapis.com'}
     for api, resources in RESOURCES_BY_API.items():
@@ -836,7 +931,7 @@ def main(project, days, hours, filt, rate_limit, service_account, additional_zon
             log('Try to search for %r with condition %r, managed %r' % (
                 res.name, res.condition, res.managed))
             try:
-                col = collect(project, zones, age, res, filt, clear_all)
+                col = collect(project, zones, age, res, filt, skip_age_check)
                 if col:
                     err |= clear_resources(project, col, res, rate_limit)
             except (subprocess.CalledProcessError, ValueError) as exc:
