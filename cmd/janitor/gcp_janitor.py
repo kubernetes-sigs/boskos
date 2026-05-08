@@ -49,6 +49,17 @@ RESOURCES_BY_API = {
         Resource('alpha', 'parallelstore', 'instances', None, 'location', None, False, False, None),
     ],
 
+    # lustre resources
+    'lustre.googleapis.com': [
+        Resource('', 'lustre', 'instances', None, 'location', None, False, False, None),
+    ],
+    'staging-lustre.sandbox.googleapis.com': [
+        Resource('', 'lustre', 'instances', None, 'location', None, False, False, None),
+    ],
+    'autopush-lustre.sandbox.googleapis.com': [
+        Resource('', 'lustre', 'instances', None, 'location', None, False, False, None),
+    ],
+
     # compute resources
     'compute.googleapis.com': [
         Resource('', 'compute', 'instances', None, 'zone', None, False, True, None),
@@ -333,7 +344,7 @@ def collect(project, zones, age, resource, filt, skip_age_check):
         cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(zones)))
     else:
         cmd.append('--filter=%s' % filt)
-    if (resource.group == 'parallelstore'):
+    if resource.group in ('parallelstore', 'lustre'):
         cmd.append('--location=-')
     log('%r' % cmd)
 
@@ -370,8 +381,8 @@ def collect(project, zones, age, resource, filt, skip_age_check):
                 # Filestore instances don't have 'zone' field, but require
                 # --zone flag for deletion.
                 colname = item['name'].split('/')[3]
-            elif resource.group == 'parallelstore':
-                # Parallelstore instances don't have 'location' field, but require
+            elif resource.group in ('parallelstore', 'lustre'):
+                # Parallelstore/Lustre instances don't have 'location' field, but require
                 # --location flag for deletion.
                 colname = item['name'].split('/')[3]
             else:
