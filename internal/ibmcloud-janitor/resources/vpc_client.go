@@ -39,8 +39,24 @@ func (c *IBMVPCClient) DeleteInstance(options *vpcv1.DeleteInstanceOptions) (*co
 	return c.vpcService.DeleteInstance(options)
 }
 
+func (c *IBMVPCClient) GetInstance(options *vpcv1.GetInstanceOptions) (*vpcv1.Instance, *core.DetailedResponse, error) {
+	return c.vpcService.GetInstance(options)
+}
+
 func (c *IBMVPCClient) ListInstances(options *vpcv1.ListInstancesOptions) (*vpcv1.InstanceCollection, *core.DetailedResponse, error) {
 	return c.vpcService.ListInstances(options)
+}
+
+func (c *IBMVPCClient) ListInstanceNetworkInterfaces(options *vpcv1.ListInstanceNetworkInterfacesOptions) (*vpcv1.NetworkInterfaceUnpaginatedCollection, *core.DetailedResponse, error) {
+	return c.vpcService.ListInstanceNetworkInterfaces(options)
+}
+
+func (c *IBMVPCClient) DeleteInstanceTemplate(options *vpcv1.DeleteInstanceTemplateOptions) (*core.DetailedResponse, error) {
+	return c.vpcService.DeleteInstanceTemplate(options)
+}
+
+func (c *IBMVPCClient) ListInstanceTemplates(options *vpcv1.ListInstanceTemplatesOptions) (*vpcv1.InstanceTemplateCollection, *core.DetailedResponse, error) {
+	return c.vpcService.ListInstanceTemplates(options)
 }
 
 func (c *IBMVPCClient) DeleteVPC(options *vpcv1.DeleteVPCOptions) (*core.DetailedResponse, error) {
@@ -53,6 +69,10 @@ func (c *IBMVPCClient) ListVpcs(options *vpcv1.ListVpcsOptions) (*vpcv1.VPCColle
 
 func (c *IBMVPCClient) DeleteFloatingIP(options *vpcv1.DeleteFloatingIPOptions) (*core.DetailedResponse, error) {
 	return c.vpcService.DeleteFloatingIP(options)
+}
+
+func (c *IBMVPCClient) GetFloatingIP(options *vpcv1.GetFloatingIPOptions) (*vpcv1.FloatingIP, *core.DetailedResponse, error) {
+	return c.vpcService.GetFloatingIP(options)
 }
 
 func (c *IBMVPCClient) ListFloatingIps(options *vpcv1.ListFloatingIpsOptions) (*vpcv1.FloatingIPCollection, *core.DetailedResponse, error) {
@@ -73,6 +93,10 @@ func (c *IBMVPCClient) GetSubnetPublicGateway(options *vpcv1.GetSubnetPublicGate
 
 func (c *IBMVPCClient) DeletePublicGateway(options *vpcv1.DeletePublicGatewayOptions) (*core.DetailedResponse, error) {
 	return c.vpcService.DeletePublicGateway(options)
+}
+
+func (c *IBMVPCClient) ListPublicGateways(options *vpcv1.ListPublicGatewaysOptions) (*vpcv1.PublicGatewayCollection, *core.DetailedResponse, error) {
+	return c.vpcService.ListPublicGateways(options)
 }
 
 func (c *IBMVPCClient) UnsetSubnetPublicGateway(options *vpcv1.UnsetSubnetPublicGatewayOptions) (*core.DetailedResponse, error) {
@@ -117,11 +141,14 @@ func NewVPCClient(options *CleanupOptions) (*IBMVPCClient, error) {
 		Authenticator: auth,
 		URL:           url,
 	})
+	if err != nil {
+		return nil, err
+	}
 	resourceLogger.Info("successfully created VPC client")
 
 	if options.Debug {
 		core.SetLoggingLevel(core.LevelDebug)
 	}
 
-	return client, err
+	return client, nil
 }

@@ -53,6 +53,11 @@ Every resource of type `vpc-service` stores the following user data.
 | `api-key` | API Key of mapped Service ID         |
 | `region` | VPC region  |
 | `resource-group` | Resource group of the cloud instances |
+| `vpc-id` | Optional ID of a pre-created VPC to retain and clean for reuse |
+
+When `vpc-id` is specified, cleanup is scoped to resources attached to that
+VPC and the VPC itself is retained. Without `vpc-id`, the existing
+resource-group cleanup behavior is used, including VPC deletion.
 
 You can use `/update` to update the resource. Owner needs to match current owner.
 

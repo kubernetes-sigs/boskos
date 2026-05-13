@@ -30,6 +30,7 @@ const (
 	Region            = "region"
 	Zone              = "zone"
 	ResourceGroup     = "resource-group"
+	VPCID             = "vpc-id"
 )
 
 type PowerVSResourceData struct {
@@ -85,7 +86,7 @@ func GetVPCResourceData(r *common.Resource) (*VPCResourceData, error) {
 	}
 
 	// Optional VPC ID
-	if vpcID, ok := r.UserData.Map.Load("vpc-id"); ok {
+	if vpcID, ok := r.UserData.Map.Load(VPCID); ok {
 		data.VPCID = vpcID.(string)
 	}
 

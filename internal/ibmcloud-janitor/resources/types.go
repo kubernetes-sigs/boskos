@@ -47,6 +47,7 @@ var PowervsResources = []Resource{
 
 var VpcResources = []Resource{
 	VPCInstance{},
+	VPCInstanceTemplate{},
 	VPCLoadBalancer{},
 	VPCNetwork{},
 	VPCs{},
@@ -67,15 +68,21 @@ type PowerVS interface {
 
 type VPC interface {
 	DeleteInstance(options *vpcv1.DeleteInstanceOptions) (*core.DetailedResponse, error)
+	GetInstance(options *vpcv1.GetInstanceOptions) (*vpcv1.Instance, *core.DetailedResponse, error)
 	ListInstances(options *vpcv1.ListInstancesOptions) (*vpcv1.InstanceCollection, *core.DetailedResponse, error)
+	ListInstanceNetworkInterfaces(options *vpcv1.ListInstanceNetworkInterfacesOptions) (*vpcv1.NetworkInterfaceUnpaginatedCollection, *core.DetailedResponse, error)
+	DeleteInstanceTemplate(options *vpcv1.DeleteInstanceTemplateOptions) (*core.DetailedResponse, error)
+	ListInstanceTemplates(options *vpcv1.ListInstanceTemplatesOptions) (*vpcv1.InstanceTemplateCollection, *core.DetailedResponse, error)
 	DeleteVPC(options *vpcv1.DeleteVPCOptions) (*core.DetailedResponse, error)
 	ListVpcs(options *vpcv1.ListVpcsOptions) (*vpcv1.VPCCollection, *core.DetailedResponse, error)
 	DeleteFloatingIP(options *vpcv1.DeleteFloatingIPOptions) (*core.DetailedResponse, error)
+	GetFloatingIP(options *vpcv1.GetFloatingIPOptions) (*vpcv1.FloatingIP, *core.DetailedResponse, error)
 	ListFloatingIps(options *vpcv1.ListFloatingIpsOptions) (*vpcv1.FloatingIPCollection, *core.DetailedResponse, error)
 	DeleteSubnet(options *vpcv1.DeleteSubnetOptions) (*core.DetailedResponse, error)
 	ListSubnets(options *vpcv1.ListSubnetsOptions) (*vpcv1.SubnetCollection, *core.DetailedResponse, error)
 	GetSubnetPublicGateway(options *vpcv1.GetSubnetPublicGatewayOptions) (*vpcv1.PublicGateway, *core.DetailedResponse, error)
 	DeletePublicGateway(options *vpcv1.DeletePublicGatewayOptions) (*core.DetailedResponse, error)
+	ListPublicGateways(options *vpcv1.ListPublicGatewaysOptions) (*vpcv1.PublicGatewayCollection, *core.DetailedResponse, error)
 	UnsetSubnetPublicGateway(options *vpcv1.UnsetSubnetPublicGatewayOptions) (*core.DetailedResponse, error)
 	DeleteLoadBalancer(options *vpcv1.DeleteLoadBalancerOptions) (*core.DetailedResponse, error)
 	ListLoadBalancers(options *vpcv1.ListLoadBalancersOptions) (*vpcv1.LoadBalancerCollection, *core.DetailedResponse, error)

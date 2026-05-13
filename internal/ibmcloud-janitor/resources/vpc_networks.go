@@ -25,10 +25,10 @@ import (
 
 type VPCNetwork struct{}
 
-// Clean up of network resources in done in the following order:
-// 1. Unset and delete public gateways attached to a subnet
+// Clean up of network resources is done in the following order:
+// 1. Unset and delete public gateways and their floating IPs attached to a subnet
 // 2. Delete the subnet
-// 3. Delete floating IPs
+// 3. Delete any remaining public gateways in the target VPC
 func (VPCNetwork) cleanup(options *CleanupOptions) error {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the networks")
@@ -40,7 +40,6 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 	listSubnetOpts := &vpcv1.ListSubnetsOptions{
 		ResourceGroupID: &client.ResourceGroupID,
 	}
-	// List subnets with optional VPC filter
 	if client.VPCID != "" {
 		listSubnetOpts.VPCID = &client.VPCID
 	}
@@ -51,24 +50,8 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 	}
 
 	for _, subnet := range subnetList.Subnets {
-		pg, _, err := client.GetSubnetPublicGateway(&vpcv1.GetSubnetPublicGatewayOptions{
-			ID: subnet.ID,
-		})
-		if pg != nil && err == nil {
-			_, err := client.UnsetSubnetPublicGateway(&vpcv1.UnsetSubnetPublicGatewayOptions{
-				ID: subnet.ID,
-			})
-			if err != nil {
-				return errors.Wrapf(err, "failed to unset the gateway for %q", *subnet.Name)
-			}
-
-			_, err = client.DeletePublicGateway(&vpcv1.DeletePublicGatewayOptions{
-				ID: pg.ID,
-			})
-			if err != nil {
-				return errors.Wrapf(err, "failed to delete the gateway %q", *pg.Name)
-			}
-			resourceLogger.WithFields(logrus.Fields{"name": pg.Name}).Info("Successfully deleted the gateway")
+		if err := deleteSubnetPublicGateway(client, subnet, resourceLogger); err != nil {
+			return err
 		}
 		_, err = client.DeleteSubnet(&vpcv1.DeleteSubnetOptions{ID: subnet.ID})
 		if err != nil {
@@ -76,27 +59,15 @@ func (VPCNetwork) cleanup(options *CleanupOptions) error {
 		}
 	}
 
-	// Delete the unbound floating IPs that were previously used by a VSI
-	fips, _, err := client.ListFloatingIps(&vpcv1.ListFloatingIpsOptions{
-		ResourceGroupID: &client.ResourceGroupID,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to list the floating IPs")
-	}
-	for _, fip := range fips.FloatingIps {
-		if client.VPCID != "" && fip.Target != nil {
-			// Skip bound FIPs if VPC ID is specified
-			continue
+	if client.VPCID != "" {
+		// Delete orphan gateways left by partial Terraform setup or cleanup.
+		if err := deleteTargetVPCPublicGateways(client, resourceLogger); err != nil {
+			return err
 		}
-		_, err = client.DeleteFloatingIP(&vpcv1.DeleteFloatingIPOptions{
-			ID: fip.ID,
-		})
-		if err != nil {
-			return errors.Wrapf(err, "failed to delete the floating IP %q", *fip.Name)
-		}
-		resourceLogger.WithFields(logrus.Fields{"name": fip.Name}).Info("Successfully deleted the floating IP")
+	} else if err := deleteResourceGroupFloatingIPs(client, resourceLogger); err != nil {
+		return err
 	}
 
-	resourceLogger.Info("Successfully deleted subnets and floating IPs")
+	resourceLogger.Info("Successfully deleted VPC network resources")
 	return nil
 }
