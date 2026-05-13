@@ -35,7 +35,7 @@ RUN make build
 ARG cmd
 RUN make "${cmd}"
 
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:462.0.1-slim
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:568.0.0-slim
 COPY ./cmd/janitor/gcp_janitor.py /bin
 
 ARG cmd
