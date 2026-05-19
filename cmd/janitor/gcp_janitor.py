@@ -50,6 +50,7 @@ RESOURCES_BY_API = {
     ],
 
     # lustre resources
+    # "gcloud lustre" commands require gcloud version 519.0.0 and above (April 2025)
     'lustre.googleapis.com': [
         Resource('', 'lustre', 'instances', None, 'location', None, False, False, None),
     ],
