@@ -1,6 +1,6 @@
 module sigs.k8s.io/boskos
 
-go 1.23.0
+go 1.25.8
 
 require (
 	github.com/IBM-Cloud/power-go-client v1.11.0
@@ -42,7 +42,7 @@ require (
 	k8s.io/client-go v0.28.3
 	sigs.k8s.io/controller-runtime v0.16.5
 	sigs.k8s.io/prow v0.0.0-20240619181241-cfb8754e0459
-	sigs.k8s.io/yaml v1.4.0
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -168,6 +168,7 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect
 	gocloud.dev v0.19.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
@@ -200,6 +201,9 @@ require (
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 	knative.dev/pkg v0.0.0-20230221145627-8efb3485adcf // indirect
+	sigs.k8s.io/boskos/simpleclient v0.0.0-00010101000000-000000000000 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
+
+replace sigs.k8s.io/boskos/simpleclient => ./simpleclient
