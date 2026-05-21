@@ -17,80 +17,31 @@ limitations under the License.
 package common
 
 import (
-	"time"
-
-	"github.com/google/uuid"
+	"sigs.k8s.io/boskos/simpleclient/common"
 )
 
 // ResourceNeeds maps the type to count of resources types needed
-type ResourceNeeds map[string]int
+type ResourceNeeds = common.ResourceNeeds
 
 // TypeToResources stores all the leased resources with the same type f
-type TypeToResources map[string][]Resource
+type TypeToResources = common.TypeToResources
 
 // ConfigType gather the type of config to be applied by Mason in order to construct the resource
-type ConfigType struct {
-	// Identifier of the struct this maps back to
-	Type string `json:"type,omitempty"`
-	// Marshaled JSON content
-	Content string `json:"content,omitempty"`
-}
+type ConfigType = common.ConfigType
 
 // DynamicResourceLifeCycle defines the life cycle of a dynamic resource.
 // All Resource of a given type will be constructed using the same configuration
-type DynamicResourceLifeCycle struct {
-	Type string `json:"type"`
-	// Initial state to be created as
-	InitialState string `json:"state"`
-	// Minimum number of resources to be use as a buffer.
-	// Resources in the process of being deleted and cleaned up are included in this count.
-	MinCount int `json:"min-count"`
-	// Maximum number of resources expected. This maximum may be temporarily
-	// exceeded while resources are in the process of being deleted, though this
-	// is only expected when MaxCount is lowered.
-	MaxCount int `json:"max-count"`
-	// Lifespan of a resource, time after which the resource should be reset.
-	LifeSpan *time.Duration `json:"lifespan,omitempty"`
-	// Config information about how to create the object
-	Config ConfigType `json:"config,omitempty"`
-	// Needs define the resource needs to create the object
-	Needs ResourceNeeds `json:"needs,omitempty"`
-}
+type DynamicResourceLifeCycle = common.DynamicResourceLifeCycle
 
 // DRLCByName helps sorting ResourcesConfig by name
-type DRLCByName []DynamicResourceLifeCycle
-
-func (ut DRLCByName) Len() int           { return len(ut) }
-func (ut DRLCByName) Swap(i, j int)      { ut[i], ut[j] = ut[j], ut[i] }
-func (ut DRLCByName) Less(i, j int) bool { return ut[i].Type < ut[j].Type }
+type DRLCByName = common.DRLCByName
 
 // NewDynamicResourceLifeCycleFromConfig parse the a ResourceEntry into a DynamicResourceLifeCycle
 func NewDynamicResourceLifeCycleFromConfig(e ResourceEntry) DynamicResourceLifeCycle {
-	var dur *time.Duration
-	if e.LifeSpan != nil {
-		dur = e.LifeSpan.Duration
-	}
-	return DynamicResourceLifeCycle{
-		Type:         e.Type,
-		MaxCount:     e.MaxCount,
-		MinCount:     e.MinCount,
-		LifeSpan:     dur,
-		InitialState: e.State,
-		Config:       e.Config,
-		Needs:        e.Needs,
-	}
-}
-
-// Copy returns a copy of the TypeToResources
-func (t TypeToResources) Copy() TypeToResources {
-	n := TypeToResources{}
-	for k, v := range t {
-		n[k] = v
-	}
-	return n
+	return common.NewDynamicResourceLifeCycleFromConfig(e)
 }
 
 // GenerateDynamicResourceName generates a unique name for dynamic resources
 func GenerateDynamicResourceName() string {
-	return uuid.New().String()
+	return common.GenerateDynamicResourceName()
 }

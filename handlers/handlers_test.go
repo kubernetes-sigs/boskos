@@ -49,7 +49,7 @@ var update = flag.Bool("update", false, "If the fixtures should be updated")
 
 func init() {
 	// Don't actually sleep in tests
-	client.SleepFunc = func(_ time.Duration) {}
+	*client.SleepFunc = func(_ time.Duration) {}
 }
 
 // json does not serialized time with nanosecond precision

@@ -17,83 +17,13 @@ limitations under the License.
 package storage
 
 import (
-	"sync"
-
-	"fmt"
-
-	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/simpleclient/storage"
 )
 
 // PersistenceLayer defines a simple interface to persists Boskos Information
-type PersistenceLayer interface {
-	Add(r common.Resource) error
-	Delete(name string) error
-	Update(r common.Resource) (common.Resource, error)
-	Get(name string) (common.Resource, error)
-	List() ([]common.Resource, error)
-}
-
-type inMemoryStore struct {
-	resources map[string]common.Resource
-	lock      sync.RWMutex
-}
+type PersistenceLayer = storage.PersistenceLayer
 
 // NewMemoryStorage creates an in memory persistence layer
 func NewMemoryStorage() PersistenceLayer {
-	return &inMemoryStore{
-		resources: map[string]common.Resource{},
-	}
-}
-
-func (im *inMemoryStore) Add(r common.Resource) error {
-	im.lock.Lock()
-	defer im.lock.Unlock()
-	_, ok := im.resources[r.Name]
-	if ok {
-		return fmt.Errorf("resource %s already exists", r.Name)
-	}
-	im.resources[r.Name] = r
-	return nil
-}
-
-func (im *inMemoryStore) Delete(name string) error {
-	im.lock.Lock()
-	defer im.lock.Unlock()
-	_, ok := im.resources[name]
-	if !ok {
-		return fmt.Errorf("cannot find item %s", name)
-	}
-	delete(im.resources, name)
-	return nil
-}
-
-func (im *inMemoryStore) Update(r common.Resource) (common.Resource, error) {
-	im.lock.Lock()
-	defer im.lock.Unlock()
-	_, ok := im.resources[r.Name]
-	if !ok {
-		return common.Resource{}, fmt.Errorf("cannot find item %s", r.Name)
-	}
-	im.resources[r.Name] = r
-	return r, nil
-}
-
-func (im *inMemoryStore) Get(name string) (common.Resource, error) {
-	im.lock.RLock()
-	defer im.lock.RUnlock()
-	r, ok := im.resources[name]
-	if !ok {
-		return common.Resource{}, fmt.Errorf("cannot find item %s", name)
-	}
-	return r, nil
-}
-
-func (im *inMemoryStore) List() ([]common.Resource, error) {
-	im.lock.RLock()
-	defer im.lock.RUnlock()
-	var resources []common.Resource
-	for _, r := range im.resources {
-		resources = append(resources, r)
-	}
-	return resources, nil
+	return storage.NewMemoryStorage()
 }

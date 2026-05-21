@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package simpleclient
 
 import (
 	"errors"
@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/boskos/common"
+	"sigs.k8s.io/boskos/simpleclient/common"
 )
 
 const (
@@ -92,7 +92,7 @@ func TestAcquire(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL, "", nil)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -161,7 +161,7 @@ func TestRelease(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		defer ts.Close()
 
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL, "", nil)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -226,7 +226,7 @@ func TestUpdate(t *testing.T) {
 	for _, tc := range testcases {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		defer ts.Close()
-		c, err := NewClient("user", ts.URL, "", "")
+		c, err := NewClient("user", ts.URL, "", nil)
 		if err != nil {
 			t.Fatalf("failed to create the Boskos client")
 		}
@@ -252,7 +252,7 @@ func TestReset(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c, err := NewClient("user", ts.URL, "", "")
+	c, err := NewClient("user", ts.URL, "", nil)
 	if err != nil {
 		t.Fatalf("failed to create the Boskos client")
 	}
@@ -281,7 +281,7 @@ func TestMetric(t *testing.T) {
 		},
 	}
 
-	c, err := NewClient("user", ts.URL, "", "")
+	c, err := NewClient("user", ts.URL, "", nil)
 	if err != nil {
 		t.Fatalf("failed to create the Boskos client")
 	}
@@ -337,7 +337,10 @@ func TestRetry(t *testing.T) {
 			workFunc:             workerFuncFactory(100),
 			expectedRetries:      3,
 			expectedSleepSeconds: 14,
-			expectErr:            "[err no 1, err no 2, err no 3, err no 4]",
+			expectErr: `err no 1
+err no 2
+err no 3
+err no 4`,
 		},
 	}
 

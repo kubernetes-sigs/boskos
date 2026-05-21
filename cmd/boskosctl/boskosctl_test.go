@@ -35,7 +35,7 @@ import (
 
 func init() {
 	// Don't actually sleep in tests
-	client.SleepFunc = func(_ time.Duration) {}
+	*client.SleepFunc = func(_ time.Duration) {}
 }
 
 type request struct {

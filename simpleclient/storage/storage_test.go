@@ -24,8 +24,8 @@ import (
 	"sort"
 	"testing"
 
-	"sigs.k8s.io/boskos/common"
-	"sigs.k8s.io/boskos/storage"
+	"sigs.k8s.io/boskos/simpleclient/common"
+	"sigs.k8s.io/boskos/simpleclient/storage"
 )
 
 func createStorages() []storage.PersistenceLayer {
