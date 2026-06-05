@@ -25,7 +25,8 @@ import (
 
 type VPCs struct{}
 
-// Cleans up the VPCs in a given region
+// Cleans up VPCs in resource-group mode. A specific VPC ID identifies a
+// retained Boskos VPC whose contained resources are cleaned for reuse.
 func (VPCs) cleanup(options *CleanupOptions) error {
 	resourceLogger := logrus.WithFields(logrus.Fields{"resource": options.Resource.Name})
 	resourceLogger.Info("Cleaning up the VPCs")
@@ -34,9 +35,8 @@ func (VPCs) cleanup(options *CleanupOptions) error {
 		return errors.Wrap(err, "couldn't create VPC client")
 	}
 
-	// Skip VPC deletion if specific VPC ID is provided
 	if client.VPCID != "" {
-		resourceLogger.Info("Skipping VPC deletion as VPC ID is passed in user-data")
+		resourceLogger.WithField("vpc_id", client.VPCID).Info("Skipping deletion of retained VPC")
 		return nil
 	}
 
@@ -48,9 +48,7 @@ func (VPCs) cleanup(options *CleanupOptions) error {
 	}
 
 	for _, vpc := range vpcList.Vpcs {
-		_, err = client.DeleteVPC(&vpcv1.DeleteVPCOptions{
-			ID: vpc.ID,
-		})
+		_, err = client.DeleteVPC(&vpcv1.DeleteVPCOptions{ID: vpc.ID})
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete the VPC %q", *vpc.Name)
 		}

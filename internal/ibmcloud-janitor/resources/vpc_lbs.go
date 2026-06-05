@@ -64,7 +64,7 @@ func (VPCLoadBalancer) cleanup(options *CleanupOptions) error {
 		}
 
 		for _, lb := range loadBalancers.LoadBalancers {
-			if shouldSkipLoadBalancer(lb, client, &errs) {
+			if !shouldDeleteLoadBalancer(lb, client) {
 				continue
 			}
 
@@ -101,28 +101,26 @@ func (VPCLoadBalancer) cleanup(options *CleanupOptions) error {
 	return nil
 }
 
-func shouldSkipLoadBalancer(lb vpcv1.LoadBalancer, client *IBMVPCClient, errs *[]error) bool {
+func shouldDeleteLoadBalancer(lb vpcv1.LoadBalancer, client *IBMVPCClient) bool {
 	if client.VPCID == "" {
-		// No VPC ID is provided, check if LB's resource group matches the ID passed in user-data
-		return lb.ResourceGroup == nil || *lb.ResourceGroup.ID != client.ResourceGroupID
+		return lb.ResourceGroup != nil && lb.ResourceGroup.ID != nil && *lb.ResourceGroup.ID == client.ResourceGroupID
 	}
 
-	// Check if subnets belong to the VPC using ID passed in user-data. If yes, skip deletion of LB
+	// Delete only load balancers attached to the target VPC.
 	for _, subnetRef := range lb.Subnets {
 		subnet, _, err := client.GetSubnet(&vpcv1.GetSubnetOptions{ID: subnetRef.ID})
 		if err != nil {
 			resourceLogger.WithFields(logrus.Fields{
 				"name":      *lb.Name,
-				"subnet_id": subnetRef.ID,
-			}).Error("failed to get subnet details")
-			*errs = append(*errs, err)
+				"subnet_id": *subnetRef.ID,
+			}).Warn("failed to get subnet details; skipping load balancer")
 			continue
 		}
-		if subnet.VPC != nil && *subnet.VPC.ID == client.VPCID {
+		if subnet.VPC != nil && subnet.VPC.ID != nil && *subnet.VPC.ID == client.VPCID {
 			return true
 		}
 	}
-	resourceLogger.WithField("name", *lb.Name).Warn("load balancer has no attached subnets, assuming stale and proceeding with deletion")
+	resourceLogger.WithField("name", *lb.Name).Warn("load balancer is not attached to the target VPC; skipping")
 	return false
 }
 
