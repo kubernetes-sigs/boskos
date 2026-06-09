@@ -123,13 +123,13 @@ func (k APIKey) cleanup(options *CleanupOptions) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch Service ID")
 	}
-	resourceLogger.WithField("Service ID: ", serviceID.Name).Info("found the target service ID")
+	resourceLogger.WithField("Service ID: ", *serviceID.Name).Info("found the target service ID")
 
 	apikey, err := sclient.resetKeys(serviceID)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset the API key")
 	}
-	resourceLogger.WithField("API key:", apikey.Name).Info("Successfully reset the API key of the resource")
+	resourceLogger.WithField("API key:", *apikey.Name).Info("Successfully reset the API key of the resource")
 
 	ibmcloud.UpdateResource(options.Resource, *apikey.Apikey)
 	return nil
