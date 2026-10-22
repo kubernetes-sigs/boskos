@@ -30,7 +30,7 @@ GOTESTSUM_VER := v1.12.2
 GOTESTSUM_BIN := gotestsum
 GOTESTSUM := $(TOOLS_BIN_DIR)/$(GOTESTSUM_BIN)-$(GOTESTSUM_VER)
 
-GOLANGCI_LINT_VER := v1.64.8
+GOLANGCI_LINT_VER := v2.15.0
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER)
 
@@ -43,7 +43,7 @@ CONTAINER_ENGINE := $(if $(shell which docker),docker,$(if $(shell which podman)
 CMDS = $(notdir $(shell find ./cmd/ -maxdepth 1 -type d | sort))
 MULTI_ARCH_PLATFORMS = linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
 
-export GO_VERSION=1.23.4
+export GO_VERSION=1.27.3
 export GO111MODULE=on
 export DOCKER_REPO
 export DOCKER_TAG
@@ -127,7 +127,7 @@ $(GOTESTSUM):
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) gotest.tools/gotestsum $(GOTESTSUM_BIN) $(GOTESTSUM_VER)
 
 $(GOLANGCI_LINT):
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TOOLS_BIN_DIR) $(GOLANGCI_LINT_VER)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(TOOLS_BIN_DIR) $(GOLANGCI_LINT_VER)
 
 $(CONTROLLER_GEN):
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)

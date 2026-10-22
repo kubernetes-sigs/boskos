@@ -58,6 +58,9 @@ type Options struct {
 	// If true, clean S3 Buckets.
 	EnableS3BucketsClean bool
 
+	// If true, clean S3 Files file systems.
+	EnableS3FilesClean bool
+
 	// List of ECR repositories to clean (only cleans images inside).
 	CleanEcrRepositories []string
 
@@ -87,6 +90,7 @@ var RegionalTypeList = []Type{
 	LaunchTemplates{},
 	Instances{},
 	FSxLustreFileSystems{},
+	S3FilesFileSystems{},
 	VPCEndpoints{},
 	// Addresses
 	NetworkInterfaces{},
