@@ -44,11 +44,6 @@ RESOURCES_BY_API = {
         Resource('', 'filestore', 'instances', None, 'zone', None, False, False, None),
     ],
 
-    # parallelstore resources
-    'parallelstore.googleapis.com': [
-        Resource('alpha', 'parallelstore', 'instances', None, 'location', None, False, False, None),
-    ],
-
     # lustre resources
     # "gcloud lustre" commands require gcloud version 519.0.0 and above (April 2025)
     'lustre.googleapis.com': [
@@ -346,7 +341,7 @@ def collect(project, zones, age, resource, filt, skip_age_check):
         cmd.append('--filter=%s AND zone:( %s )' % (filt, ' '.join(zones)))
     else:
         cmd.append('--filter=%s' % filt)
-    if resource.group in ('parallelstore', 'lustre'):
+    if resource.group == 'lustre':
         cmd.append('--location=-')
     log('%r' % cmd)
 
@@ -383,8 +378,8 @@ def collect(project, zones, age, resource, filt, skip_age_check):
                 # Filestore instances don't have 'zone' field, but require
                 # --zone flag for deletion.
                 colname = item['name'].split('/')[3]
-            elif resource.group in ('parallelstore', 'lustre'):
-                # Parallelstore/Lustre instances don't have 'location' field, but require
+            elif resource.group == 'lustre':
+                # Lustre instances don't have 'location' field, but require
                 # --location flag for deletion.
                 colname = item['name'].split('/')[3]
             else:
