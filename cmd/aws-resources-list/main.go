@@ -38,6 +38,7 @@ var (
 	skipRoute53ManagementCheck = flag.Bool("skip-route53-management-check", false, "If true, skip managed zone check and managed resource name check.")
 	enableDNSZoneClean         = flag.Bool("enable-dns-zone-clean", false, "If true, clean DNS zones.")
 	enableS3BucketsClean       = flag.Bool("enable-s3-buckets-clean", false, "If true, clean S3 buckets.")
+	enableS3FilesClean         = flag.Bool("enable-s3-files-clean", false, "If true, clean S3 Files file systems.")
 )
 
 func listResources(res resources.Type, cfg aws2.Config, acct string, regions []string) {
@@ -54,6 +55,7 @@ func listResources(res resources.Type, cfg aws2.Config, acct string, regions []s
 			SkipRoute53ManagementCheck: *skipRoute53ManagementCheck,
 			EnableDNSZoneClean:         *enableDNSZoneClean,
 			EnableS3BucketsClean:       *enableS3BucketsClean,
+			EnableS3FilesClean:         *enableS3FilesClean,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error listing %T: %v\n", res, err)
